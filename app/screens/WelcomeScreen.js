@@ -1,10 +1,12 @@
-import React from 'react';
+import React, {useContext} from 'react';
 import { Image, ImageBackground, StyleSheet, Text, View } from 'react-native';
 import AppButton from '../components/AppButton';
 
 import colors from '../config/colors';
 import routes from '../navigation/routes';
+import AuthContext from '../auth/context';
 function WelcomeScreen({navigation}) {
+    const {guest, setGuest} = useContext(AuthContext);
     return (
         <ImageBackground
         blurRadius={10}
@@ -18,6 +20,7 @@ function WelcomeScreen({navigation}) {
             <View style={styles.buttonsContainer}>
                 <AppButton title="Log In" onPress={() => navigation.navigate(routes.LOGIN)} foregroundColor={colors.dark}  />
                 <AppButton title="Register" onPress={() => navigation.navigate(routes.REGISTER)} foregroundColor={colors.dark} backgroundColor={colors.light} />
+                <AppButton title="Continue As Guest" onPress={() => setGuest(true)} foregroundColor={colors.light} backgroundColor={colors.dark} />
             </View>
         </ImageBackground>
     );

@@ -8,7 +8,7 @@ function ImageInput({imageUri, onChangeImage}) {
    
     const requestPermission = async () => {
         const {granted} = await ImagePicker.requestCameraPermissionsAsync();
-        if(!granted) alert("You need camera permissions enabled to access photos");
+        if(!granted) alert("We ask for camera permissions to enable access for you to choose a profile picture");
     }
     useEffect(() =>{
         requestPermission();

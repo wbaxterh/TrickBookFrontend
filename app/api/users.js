@@ -8,7 +8,11 @@ const addUser = (name, email, password) =>{
 const getUser = (email) =>{
     return client.get(endpoint + "/", {email});
 }
+const deleteUser = user =>{
+    return client.delete(endpoint + "/" + user);
+}
 export default {
     addUser,
-    getUser
+    getUser,
+    deleteUser
 }

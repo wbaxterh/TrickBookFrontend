@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
 import { View, StyleSheet, Text, TouchableHighlight, TouchableNativeFeedback } from 'react-native';
 import colors from '../config/colors';
 import AppButton from './AppButton';
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import Swipeable from 'react-native-gesture-handler/Swipeable';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import AuthContext from '../auth/context';
 
 import trickApi from '../api/trick';
 
 
 function Trick({trick, name, checked, onPress, renderRightActions, renderLeftActions}) {
+    const {guest, setGuest} = useContext(AuthContext);
     let initColorState = colors.secondary;
     let initTextColorState = colors.white;
     const [checkedState, setCheckedState] = useState(checked);
@@ -26,7 +29,26 @@ function Trick({trick, name, checked, onPress, renderRightActions, renderLeftAct
             //call api to edit trick to "Complete"
             let newTrick = {...trick, checked: "Complete"}
             //console.log(newTrick);
-            trickApi.updateTrick(newTrick);
+            if(!guest){
+                trickApi.updateTrick(newTrick);
+            }
+            else{
+                const updateGuestTrickList = async () => {
+                    try {
+                        const jsonValue = await AsyncStorage.getItem('@guest_trick_list');
+                        let guestList = jsonValue != null ? JSON.parse(jsonValue) : [];
+                        const index = guestList.findIndex((t) => t.id === trick.id);
+                        if (index !== -1) {
+                            guestList[index].checked = "Complete";
+                            await AsyncStorage.setItem('@guest_trick_list', JSON.stringify(guestList));
+                           // setGuestTrickList(guestList);
+                        }
+                    } catch (e) {
+                        console.error('Failed to update guest trick list from AsyncStorage', e);
+                    }
+                }
+                updateGuestTrickList();
+            }
             
         }
         if(checkedState == "Complete"){
@@ -35,10 +57,29 @@ function Trick({trick, name, checked, onPress, renderRightActions, renderLeftAct
             setTextColorState(colors.white);
             //call api to edit trick to "To Do" 
             let newTrick = {...trick, checked: "To Do"}
-            trickApi.updateTrick(newTrick);
+            if(!guest){
+                trickApi.updateTrick(newTrick);
+            }
+            else{
+                const updateGuestTrickList = async () => {
+                    try {
+                        const jsonValue = await AsyncStorage.getItem('@guest_trick_list');
+                        let guestList = jsonValue != null ? JSON.parse(jsonValue) : [];
+                        const index = guestList.findIndex((t) => t.id === trick.id);
+                        if (index !== -1) {
+                            guestList[index].checked = "To Do";
+                            await AsyncStorage.setItem('@guest_trick_list', JSON.stringify(guestList));
+                            //setGuestTrickList(guestList);
+                        }
+                    } catch (e) {
+                        console.error('Failed to update guest trick list from AsyncStorage', e);
+                    }
+                };
+                updateGuestTrickList();
             //console.log(newTrick);
         }
     }
+}
     return (
         <GestureHandlerRootView>
         <Swipeable renderRightActions={renderRightActions} renderLeftActions={renderLeftActions}>

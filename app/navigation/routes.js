@@ -7,5 +7,7 @@ export default Object.freeze({
     TRICKLISTS: 'TrickLists',
     STATS: 'Stats',
     LOGIN: 'Login',
-    REGISTER: 'Register'
+    REGISTER: 'Register',
+    SETTINGS: 'Settings',
+    GUESTTRICKS: 'Guest Tricks'
 })
