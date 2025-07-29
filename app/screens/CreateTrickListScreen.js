@@ -1,6 +1,6 @@
-import React, {useContext} from 'react';
+import React, {useContext, useState, useEffect} from 'react';
 import { View, StyleSheet } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import * as Yup from 'yup';
 import { AppForm, SubmitButton, AppFormField  } from '../components/forms';
 import AuthContext from '../auth/context';
@@ -16,10 +16,17 @@ const validationSchema = Yup.object().shape({
 function CreateTrickListScreen() {
     const authContext = useContext(AuthContext);
     const navigation = useNavigation();
-    //console.log(authContext.user.userId);
+    const [key, setKey] = useState(0);
+    
+    // Reset form when screen comes into focus
+    useFocusEffect(
+        React.useCallback(() => {
+            setKey(prev => prev + 1);
+        }, [])
+    );
+    
     const handleSubmit = async(trick) =>{
         trick = {...trick, userId: authContext.user.userId}
-        // console.log(trick);
         const result = await tricksApi.addTrickList(trick);
         if(!result.ok){
             alert('could not save trick list');
@@ -31,8 +38,12 @@ function CreateTrickListScreen() {
     return (
         <Screen>
             <View style={styles.container}>
-            <AppForm initialValues={{title: ''}} style={styles.container} onSubmit={handleSubmit}
-            validationSchema={validationSchema}>
+            <AppForm 
+                key={key}
+                initialValues={{title: ''}} 
+                style={styles.container} 
+                onSubmit={handleSubmit}
+                validationSchema={validationSchema}>
                 <AppFormField 
                 autoCapitalize={"none"} 
                 autoCorrect={false} 

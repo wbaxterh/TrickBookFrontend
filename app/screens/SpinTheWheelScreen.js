@@ -44,7 +44,12 @@ function SpinTheWheelScreen({ navigation }) {
 	const loadTrickLists = async () => {
 		setLoading(true);
 		try {
-			if (user && typeof user === 'object' && (user._id || user.userId) && !guest) {
+			if (
+				user &&
+				typeof user === "object" &&
+				(user._id || user.userId) &&
+				!guest
+			) {
 				const userId = user._id || user.userId;
 				const response = await tricksApi.getTricks(userId);
 				if (response.ok && response.data) {
@@ -62,7 +67,7 @@ function SpinTheWheelScreen({ navigation }) {
 				const defaultGuestList = {
 					id: "guest_default",
 					name: "My Tricks",
-					_id: "guest_default"
+					_id: "guest_default",
 				};
 				setTrickLists([defaultGuestList]);
 				setSelectedList(defaultGuestList);
@@ -79,7 +84,12 @@ function SpinTheWheelScreen({ navigation }) {
 		if (!selectedList) return;
 
 		try {
-			if (user && typeof user === 'object' && (user._id || user.userId) && !guest) {
+			if (
+				user &&
+				typeof user === "object" &&
+				(user._id || user.userId) &&
+				!guest
+			) {
 				const response = await trickApi.getTrick(selectedList._id);
 				if (response.ok && response.data) {
 					setTricks(response.data);
@@ -123,10 +133,10 @@ function SpinTheWheelScreen({ navigation }) {
 	};
 
 	const handleComplete = () => {
-		setScore((prev) => ({ 
-			...prev, 
+		setScore((prev) => ({
+			...prev,
 			completed: prev.completed + 1,
-			total: prev.total + 1 
+			total: prev.total + 1,
 		}));
 		setCurrentTrick(null);
 	};
@@ -145,7 +155,7 @@ function SpinTheWheelScreen({ navigation }) {
 		return (
 			<Screen style={styles.container}>
 				<View style={styles.loadingContainer}>
-					<ActivityIndicator size="large" color={colors.primary} />
+					<ActivityIndicator size='large' color={colors.primary} />
 					<AppText style={styles.loadingText}>Loading trick lists...</AppText>
 				</View>
 			</Screen>
@@ -155,8 +165,6 @@ function SpinTheWheelScreen({ navigation }) {
 	return (
 		<Screen style={styles.container}>
 			<ScrollView showsVerticalScrollIndicator={false}>
-				<AppText style={styles.title}>Spin the Wheel</AppText>
-
 				{/* Score Display */}
 				<View style={styles.scoreContainer}>
 					<AppText style={styles.scoreText}>
@@ -165,17 +173,17 @@ function SpinTheWheelScreen({ navigation }) {
 				</View>
 
 				{/* Trick List Selector */}
-				<TouchableOpacity 
+				<TouchableOpacity
 					style={styles.dropdownButton}
 					onPress={() => setDropdownVisible(true)}
 				>
 					<AppText style={styles.dropdownButtonText}>
 						{selectedList ? selectedList.name : "Select a Trick List"}
 					</AppText>
-					<MaterialCommunityIcons 
-						name="chevron-down" 
-						size={24} 
-						color={colors.medium} 
+					<MaterialCommunityIcons
+						name='chevron-down'
+						size={24}
+						color={colors.medium}
 					/>
 				</TouchableOpacity>
 
@@ -183,10 +191,10 @@ function SpinTheWheelScreen({ navigation }) {
 				<Modal
 					visible={dropdownVisible}
 					transparent={true}
-					animationType="fade"
+					animationType='fade'
 					onRequestClose={() => setDropdownVisible(false)}
 				>
-					<TouchableOpacity 
+					<TouchableOpacity
 						style={styles.modalOverlay}
 						activeOpacity={1}
 						onPress={() => setDropdownVisible(false)}
@@ -199,7 +207,8 @@ function SpinTheWheelScreen({ navigation }) {
 									<TouchableOpacity
 										style={[
 											styles.dropdownItem,
-											selectedList?._id === item._id || selectedList?.id === item.id
+											selectedList?._id === item._id ||
+											selectedList?.id === item.id
 												? styles.dropdownItemSelected
 												: null,
 										]}
@@ -209,7 +218,9 @@ function SpinTheWheelScreen({ navigation }) {
 											setDropdownVisible(false);
 										}}
 									>
-										<AppText style={styles.dropdownItemText}>{item.name}</AppText>
+										<AppText style={styles.dropdownItemText}>
+											{item.name}
+										</AppText>
 									</TouchableOpacity>
 								)}
 							/>
@@ -221,14 +232,16 @@ function SpinTheWheelScreen({ navigation }) {
 				<View style={styles.wheelContainer}>
 					{isSpinning ? (
 						<View style={styles.spinningContainer}>
-							<ActivityIndicator size="large" color={colors.primary} />
+							<ActivityIndicator size='large' color={colors.primary} />
 							<AppText style={styles.spinningText}>Spinning...</AppText>
 						</View>
 					) : currentTrick ? (
 						<View style={styles.trickContainer}>
 							<AppText style={styles.trickName}>{currentTrick.name}</AppText>
 							{currentTrick.notes && (
-								<AppText style={styles.trickNotes}>{currentTrick.notes}</AppText>
+								<AppText style={styles.trickNotes}>
+									{currentTrick.notes}
+								</AppText>
 							)}
 						</View>
 					) : (
@@ -247,21 +260,21 @@ function SpinTheWheelScreen({ navigation }) {
 					<>
 						<View style={styles.resultButtons}>
 							<AppButton
-								title="Complete"
+								title='Complete'
 								onPress={handleComplete}
 								backgroundColor={colors.primary}
 								foregroundColor={colors.black}
 								style={styles.resultButton}
 							/>
 							<AppButton
-								title="Fail"
+								title='Fail'
 								onPress={handleFail}
 								backgroundColor={colors.dark}
 								style={styles.resultButton}
 							/>
 						</View>
 						<AppButton
-							title="Spin Again"
+							title='Spin Again'
 							onPress={handleSpinAgain}
 							backgroundColor={colors.medium}
 							style={styles.spinAgainButton}
@@ -269,7 +282,7 @@ function SpinTheWheelScreen({ navigation }) {
 					</>
 				) : (
 					<AppButton
-						title="Spin"
+						title='Spin'
 						onPress={spinWheel}
 						backgroundColor={colors.secondary}
 						style={styles.spinButton}
@@ -281,7 +294,8 @@ function SpinTheWheelScreen({ navigation }) {
 				{!currentTrick && !isSpinning && (
 					<View style={styles.instructions}>
 						<AppText style={styles.instructionText}>
-							Select a trick list and press Spin to get a random trick challenge!
+							Select a trick list and press Spin to get a random trick
+							challenge!
 						</AppText>
 					</View>
 				)}
@@ -307,6 +321,7 @@ const styles = StyleSheet.create({
 	scoreContainer: {
 		backgroundColor: colors.light,
 		padding: 15,
+		marginTop: 10,
 		borderRadius: 10,
 		marginBottom: 20,
 		alignItems: "center",
