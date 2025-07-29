@@ -9,8 +9,6 @@ import trickApi from "../api/trick";
 import routes from "../navigation/routes";
 import AppButton from "../components/AppButton";
 import TrickEdit from "../components/TrickEdit";
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
-import trick from "../api/trick";
 
 function TrickListScreen({ navigation, route }) {
 	let list_id = "";
@@ -84,7 +82,7 @@ function TrickListScreen({ navigation, route }) {
 				style={styles.btn}
 				foregroundColor={colors.dark}
 				backgroundColor={colors.primary}
-				title="+ Add Trick"
+				title='+ Add Trick'
 				onPress={() => navigation.navigate(routes.ADDTRICK, trickList)}
 			/>
 		</Screen>
