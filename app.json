@@ -1,44 +1,50 @@
 {
-  "expo": {
-    "name": "TrickBook",
-    "slug": "TrickBook",
-    "version": "1.0.1",
-    "privacy": "public",
-    "orientation": "portrait",
-    "icon": "./app/assets/icon.png",
-    "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./app/assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
-    "updates": {
-      "fallbackToCacheTimeout": 0
-    },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.thetrickbook.trickbook",
-      "buildNumber": "1.0.4",
-      "infoPlist": {
-        "NSCameraUsageDescription": "This app uses the camera to access photos for a profile image."
-      }
-    },
-    "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./app/assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
-      }
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "5fbfc8fe-e3e5-4663-b3af-2a6f903a974f"
-      }
-    }
-  }
+	"expo": {
+		"name": "TrickBook",
+		"slug": "TrickBook",
+		"version": "1.0.3",
+		"privacy": "public",
+		"orientation": "portrait",
+		"icon": "./app/assets/icon.png",
+		"userInterfaceStyle": "light",
+		"splash": {
+			"image": "./app/assets/splash.png",
+			"resizeMode": "contain",
+			"backgroundColor": "#ffffff"
+		},
+		"updates": {
+			"fallbackToCacheTimeout": 0
+		},
+		"assetBundlePatterns": ["**/*"],
+		"ios": {
+			"supportsTablet": true,
+			"bundleIdentifier": "com.thetrickbook.trickbook",
+			"buildNumber": "1.0.5",
+			"infoPlist": {
+				"NSCameraUsageDescription": "This app uses the camera to access photos for a profile image."
+			}
+		},
+		"android": {
+			"package": "com.thetrickbook.trickbook",
+			"versionCode": 3,
+			"adaptiveIcon": {
+				"foregroundImage": "./app/assets/adaptive-icon.png",
+				"backgroundColor": "#FFFFFF"
+			},
+			"permissions": [
+				"CAMERA",
+				"READ_EXTERNAL_STORAGE",
+				"WRITE_EXTERNAL_STORAGE",
+				"com.google.android.gms.permission.AD_ID"
+			]
+		},
+		"web": {
+			"favicon": "./assets/favicon.png"
+		},
+		"extra": {
+			"eas": {
+				"projectId": "5fbfc8fe-e3e5-4663-b3af-2a6f903a974f"
+			}
+		}
+	}
 }

@@ -5,13 +5,14 @@ import AppTextInput from '../AppTextInput';
 import ErrorMessage from './ErrorMessage';
 import { PrivateValueStore } from '@react-navigation/native';
 
-function AppFormField({name, ...otherProps}) {
+function AppFormField({name, showPasswordToggle, ...otherProps}) {
     const {setFieldTouched, handleChange, errors, touched, values, setFieldValue, setValues} = useFormikContext();
     return (
         <>
             <AppTextInput 
                     value={values[name]}
                     {...otherProps}
+                    showPasswordToggle={showPasswordToggle}
                     onBlur={() => setFieldTouched(name)}
                     onChangeText={handleChange(name)} //refers to the initial value
                     />

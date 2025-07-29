@@ -10,5 +10,7 @@ export default Object.freeze({
 	REGISTER: "Register",
 	SETTINGS: "Settings",
 	GUESTTRICKS: "Guest Tricks",
-	HOWTO: "How To",
+	TUTORIALS: "Tutorials",
+	HOWTO: "How To Use",
+	SPINTHEWHEEL: "Spin The Wheel",
 });

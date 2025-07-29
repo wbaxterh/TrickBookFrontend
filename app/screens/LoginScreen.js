@@ -29,7 +29,7 @@ function LoginScreen(props) {
 		const user = jwtDecode(result.data.token);
 		authContext.setUser(user);
 
-		authStorage.storeToken(result.data);
+		authStorage.storeToken(result.data.token);
 	};
 	return (
 		<Screen style={styles.container}>
@@ -63,6 +63,7 @@ function LoginScreen(props) {
 					icon={"lock"}
 					textContentType={"password"}
 					secureTextEntry
+					showPasswordToggle
 				/>
 				<SubmitButton title={"Login"} />
 			</AppForm>

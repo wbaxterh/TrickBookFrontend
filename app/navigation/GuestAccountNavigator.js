@@ -7,6 +7,7 @@ import TrickNavigator from "./TrickNavigator";
 import EditAccountDetailsScreen from "../screens/EditAccountDetailsScreen";
 import SettingsScreen from "../screens/SettingsScreen";
 import GuestTrickListScreen from "../screens/GuestTrickListScreen";
+import SpinTheWheelScreen from "../screens/SpinTheWheelScreen";
 const Stack = createNativeStackNavigator();
 
 const GuestNavigator = () =>{
@@ -15,6 +16,7 @@ const GuestNavigator = () =>{
         <Stack.Screen name="My Account" component={AccountScreen}/>
         <Stack.Screen name="Edit Account" component={EditAccountDetailsScreen}/>
         <Stack.Screen name="Guest Tricks" component={GuestTrickListScreen}/>
+        <Stack.Screen name="Spin The Wheel" component={SpinTheWheelScreen} />
         <Stack.Screen name="Settings" component={SettingsScreen}/>
         <Stack.Screen name="Stats" component={StatsScreen}/>
     </Stack.Navigator>
