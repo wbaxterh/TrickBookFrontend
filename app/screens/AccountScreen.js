@@ -1,9 +1,10 @@
 import React, { useContext, useEffect } from "react";
-import { View, StyleSheet, FlatList, Alert } from "react-native";
+import { View, StyleSheet, FlatList, Alert, Image, Text } from "react-native";
 import Icon from "../components/Icon";
 import { useNavigation } from "@react-navigation/native";
 
 import ListItem from "../components/ListItem";
+import ProfileListItem from "../components/ProfileListItem";
 import ListItemSeperator from "../components/ListItemSeperator";
 import Screen from "../components/Screen";
 import colors from "../config/colors";
@@ -80,7 +81,7 @@ function AccountScreen() {
 		Alert.alert("Delete List", "Delete your trick list?", [
 			{
 				text: "Cancel",
-				onPress: () => console.log("Cancel Pressed"),
+				onPress: () => {},
 				style: "cancel",
 			},
 			{
@@ -99,15 +100,20 @@ function AccountScreen() {
 	return (
 		<Screen style={styles.screen}>
 			<View>
-				<ListItem
+
+				<ProfileListItem
 					title={user ? user.name : "Guest"}
-					subTitle={!guest ? user.email : <></>}
+					subTitle={!guest ? user.email : null}
 					image={{
-						uri: user.imageUri
+						uri: user?.imageUri
 							? user.imageUri
 							: "https://trickbook.s3.amazonaws.com/blank-profile-picture.webp",
 					}}
-					onPress={() => (user ? navigation.navigate("Edit Account") : <></>)}
+					onPress={() => {
+						if (user) {
+							navigation.navigate("Edit Account");
+						}
+					}}
 				/>
 				<View style={styles.container}>
 					{user ? (

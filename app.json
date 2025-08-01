@@ -2,11 +2,12 @@
 	"expo": {
 		"name": "TrickBook",
 		"slug": "TrickBook",
-		"version": "1.0.3",
+		"version": "1.0.8",
 		"privacy": "public",
 		"orientation": "portrait",
 		"icon": "./app/assets/icon.png",
 		"userInterfaceStyle": "light",
+		"plugins": [],
 		"splash": {
 			"image": "./app/assets/splash.png",
 			"resizeMode": "contain",
@@ -19,9 +20,9 @@
 		"ios": {
 			"supportsTablet": true,
 			"bundleIdentifier": "com.thetrickbook.trickbook",
-			"buildNumber": "1.0.5",
 			"infoPlist": {
-				"NSCameraUsageDescription": "This app uses the camera to access photos for a profile image."
+				"NSCameraUsageDescription": "This app uses the camera to access photos for a profile image.",
+				"ITSAppUsesNonExemptEncryption": false
 			}
 		},
 		"android": {

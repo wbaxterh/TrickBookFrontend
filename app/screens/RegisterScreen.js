@@ -28,15 +28,12 @@ function RegisterScreen(props) {
 	const authContext = useContext(AuthContext);
 	const [registerFailed, setRegisterFailed] = useState(false);
 	const handleSubmit = async ({ name, email, password }) => {
-		//console.log(name, email, password);
 		const result = await userApi.addUser(name, email, password);
 		if (result.status == 400) {
 			//error message
 			setRegisterFailed(true);
-			console.log("Error");
 		}
 		if (result.status == 201) {
-			console.log("success!!");
 			//now login the user
 			const result = await authApi.login(email, password);
 			if (!result.ok) return setRegisterFailed(true);

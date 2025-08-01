@@ -4,6 +4,7 @@ import * as Yup from "yup";
 import jwtDecode from "jwt-decode";
 
 import authApi from "../api/auth";
+import usersApi from "../api/users";
 import Screen from "../components/Screen";
 import {
 	ErrorMessage,
@@ -26,8 +27,23 @@ function LoginScreen(props) {
 		const result = await authApi.login(email, password);
 		if (!result.ok) return setLoginFailed(true);
 		setLoginFailed(false);
-		const user = jwtDecode(result.data.token);
-		authContext.setUser(user);
+		
+		// Decode JWT to get basic user info
+		const decodedUser = jwtDecode(result.data.token);
+		
+		// Fetch complete user profile including imageUri
+		const userProfile = await usersApi.getUser(email);
+		if (userProfile.ok) {
+			// Merge decoded JWT data with full profile data
+			const completeUser = {
+				...decodedUser,
+				...userProfile.data,
+			};
+			authContext.setUser(completeUser);
+		} else {
+			// Fallback to just JWT data if profile fetch fails
+			authContext.setUser(decodedUser);
+		}
 
 		authStorage.storeToken(result.data.token);
 	};

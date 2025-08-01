@@ -8,23 +8,38 @@
 			"developmentClient": true,
 			"distribution": "internal",
 			"ios": {
-				"resourceClass": "m1-medium"
+				"resourceClass": "m-medium",
+				"image": "macos-sonoma-14.6-xcode-16.0"
 			}
 		},
 		"preview": {
 			"distribution": "internal",
 			"ios": {
-				"resourceClass": "m1-medium"
+				"resourceClass": "m-medium",
+				"image": "macos-sonoma-14.6-xcode-16.0"
 			}
 		},
 		"production": {
 			"ios": {
-				"resourceClass": "m1-medium"
+				"resourceClass": "m-medium",
+				"image": "macos-sonoma-14.6-xcode-16.0"
 			},
 			"android": {
 				"buildType": "app-bundle",
 				"image": "latest",
 				"autoIncrement": true
+			}
+		},
+		"testflight": {
+			"distribution": "store",
+			"ios": {
+				"resourceClass": "m-medium",
+				"image": "macos-sonoma-14.6-xcode-16.0",
+				"autoIncrement": true
+			},
+			"env": {
+				"EXPO_NO_DOTENV": "1",
+				"NODE_ENV": "production"
 			}
 		}
 	},
