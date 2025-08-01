@@ -19,7 +19,7 @@ The Trick Book App allows users to create, manage, and track their progress on s
 
 ### Backend Integration
 
-The app connects to a Node.js backend API hosted at `http://174.129.64.158:9000/api`
+The app connects to a Node.js backend API hosted at `https://api.thetrickbook.com/api`
 
 ## Project Structure
 
@@ -155,7 +155,7 @@ The app uses `apisauce` for API communication with a centralized client configur
 ```javascript
 // app/api/client.js
 const apiClient = create({
-	baseURL: "http://174.129.64.158:9000/api",
+	baseURL: "https://api.thetrickbook.com/api",
 });
 ```
 
@@ -295,6 +295,57 @@ npm run web
 - **eas.json**: Expo Application Services configuration
 - **metro.config.js**: Metro bundler configuration
 - **babel.config.js**: Babel transpiler configuration
+
+## iOS Deployment
+
+### Preparing for Release
+
+1. **Increment Version Number**
+   - Update the version in `app.json`:
+     ```json
+     "version": "1.0.8"  // Increment this for each release
+     ```
+
+2. **Build for TestFlight/App Store**
+   ```bash
+   # Build the iOS app with TestFlight profile
+   eas build --platform ios --profile testflight
+   ```
+   
+   This command will:
+   - Create an iOS build with the TestFlight distribution profile
+   - Automatically increment the iOS build number (configured in `eas.json`)
+   - Generate an .ipa file ready for submission
+
+3. **Submit to App Store Connect**
+   
+   After the build completes, you have two options:
+   
+   **Option A: Using EAS Submit (Recommended)**
+   ```bash
+   eas submit -p ios --latest
+   ```
+   
+   **Option B: Using Apple Transporter**
+   - Download the .ipa file from the EAS build page
+   - Open Apple's Transporter app
+   - Sign in with your Apple Developer account
+   - Drag and drop the .ipa file
+   - Click "Deliver" to upload to App Store Connect
+
+4. **Complete App Store Connect Setup**
+   - Log in to [App Store Connect](https://appstoreconnect.apple.com)
+   - Select your app
+   - Complete any required information
+   - Submit for review
+
+### Build Profiles
+
+The app is configured with the following build profiles in `eas.json`:
+- **development**: For internal testing with development client
+- **preview**: For internal distribution
+- **production**: For production builds
+- **testflight**: For TestFlight and App Store distribution
 
 ## Future Enhancements
 
