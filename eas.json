@@ -9,32 +9,41 @@
 			"distribution": "internal",
 			"ios": {
 				"resourceClass": "m-medium",
-				"image": "macos-sonoma-14.6-xcode-16.0"
+				"image": "macos-sonoma-14.6-xcode-16.1"
 			}
 		},
 		"preview": {
 			"distribution": "internal",
 			"ios": {
 				"resourceClass": "m-medium",
-				"image": "macos-sonoma-14.6-xcode-16.0"
+				"image": "macos-sonoma-14.6-xcode-16.1"
 			}
 		},
 		"production": {
 			"ios": {
 				"resourceClass": "m-medium",
-				"image": "macos-sonoma-14.6-xcode-16.0"
+				"image": "macos-sonoma-14.6-xcode-16.1"
 			},
 			"android": {
-				"buildType": "app-bundle",
-				"image": "latest",
-				"autoIncrement": true
+				"buildType": "app-bundle"
 			}
 		},
 		"testflight": {
 			"distribution": "store",
 			"ios": {
 				"resourceClass": "m-medium",
-				"image": "macos-sonoma-14.6-xcode-16.0",
+				"image": "macos-sonoma-14.6-xcode-16.1",
+				"autoIncrement": true
+			},
+			"env": {
+				"EXPO_NO_DOTENV": "1"
+			}
+		},
+		"playstore": {
+			"distribution": "store",
+			"android": {
+				"buildType": "app-bundle",
+				"image": "latest",
 				"autoIncrement": true
 			},
 			"env": {

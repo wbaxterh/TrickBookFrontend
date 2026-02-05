@@ -1,51 +1,81 @@
 {
-	"expo": {
-		"name": "TrickBook",
-		"slug": "TrickBook",
-		"version": "1.0.8",
-		"privacy": "public",
-		"orientation": "portrait",
-		"icon": "./app/assets/icon.png",
-		"userInterfaceStyle": "light",
-		"plugins": [],
-		"splash": {
-			"image": "./app/assets/splash.png",
-			"resizeMode": "contain",
-			"backgroundColor": "#ffffff"
-		},
-		"updates": {
-			"fallbackToCacheTimeout": 0
-		},
-		"assetBundlePatterns": ["**/*"],
-		"ios": {
-			"supportsTablet": true,
-			"bundleIdentifier": "com.thetrickbook.trickbook",
-			"infoPlist": {
-				"NSCameraUsageDescription": "This app uses the camera to access photos for a profile image.",
-				"ITSAppUsesNonExemptEncryption": false
-			}
-		},
-		"android": {
-			"package": "com.thetrickbook.trickbook",
-			"versionCode": 3,
-			"adaptiveIcon": {
-				"foregroundImage": "./app/assets/adaptive-icon.png",
-				"backgroundColor": "#FFFFFF"
-			},
-			"permissions": [
-				"CAMERA",
-				"READ_EXTERNAL_STORAGE",
-				"WRITE_EXTERNAL_STORAGE",
-				"com.google.android.gms.permission.AD_ID"
-			]
-		},
-		"web": {
-			"favicon": "./assets/favicon.png"
-		},
-		"extra": {
-			"eas": {
-				"projectId": "5fbfc8fe-e3e5-4663-b3af-2a6f903a974f"
-			}
-		}
-	}
+  "expo": {
+    "name": "TrickBook",
+    "slug": "TrickBook",
+    "version": "2.0.0",
+    "privacy": "public",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "trickbook",
+    "plugins": [
+      "expo-secure-store",
+      "expo-router",
+      "expo-video",
+      "expo-apple-authentication",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "TrickBook uses your location to find nearby spots and show directions."
+        }
+      ]
+    ],
+    "splash": {
+      "image": "./assets/images/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#121212"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.thetrickbook.trickbook",
+      "buildNumber": "5",
+      "config": {
+        "googleMapsApiKey": "AIzaSyA8AlrTQSnVCrc8q298qY8O4zI0ZNcBNTc"
+      },
+      "infoPlist": {
+        "NSCameraUsageDescription": "TrickBook uses the camera to take photos for your profile and spots.",
+        "NSPhotoLibraryUsageDescription": "TrickBook needs access to your photos to upload images.",
+        "NSLocationWhenInUseUsageDescription": "TrickBook uses your location to find nearby spots.",
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.thetrickbook.trickbook",
+      "versionCode": 5,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#121212"
+      },
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyA8AlrTQSnVCrc8q298qY8O4zI0ZNcBNTc"
+        }
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
+    },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "5fbfc8fe-e3e5-4663-b3af-2a6f903a974f"
+      },
+      "router": {
+        "origin": false
+      }
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
 }

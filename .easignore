@@ -1,0 +1,9 @@
+# Expo managed workflow - ignore native folders
+/ios
+/android
+
+# Dependencies
+/node_modules
+
+# Keep patches
+!patches/
