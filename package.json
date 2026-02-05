@@ -1,6 +1,9 @@
 {
   "name": "trickbook",
   "version": "2.0.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "scripts": {
     "start": "expo start",
     "start:dev-client": "expo start --dev-client",

@@ -7,6 +7,7 @@
 		"development": {
 			"developmentClient": true,
 			"distribution": "internal",
+			"node": "20.18.0",
 			"ios": {
 				"resourceClass": "m-medium",
 				"image": "macos-sonoma-14.6-xcode-16.1"
@@ -14,12 +15,14 @@
 		},
 		"preview": {
 			"distribution": "internal",
+			"node": "20.18.0",
 			"ios": {
 				"resourceClass": "m-medium",
 				"image": "macos-sonoma-14.6-xcode-16.1"
 			}
 		},
 		"production": {
+			"node": "20.18.0",
 			"ios": {
 				"resourceClass": "m-medium",
 				"image": "macos-sonoma-14.6-xcode-16.1"
@@ -35,12 +38,14 @@
 				"image": "macos-sonoma-14.6-xcode-16.1",
 				"autoIncrement": true
 			},
+			"node": "20.18.0",
 			"env": {
 				"EXPO_NO_DOTENV": "1"
 			}
 		},
 		"playstore": {
 			"distribution": "store",
+			"node": "20.18.0",
 			"android": {
 				"buildType": "app-bundle",
 				"image": "latest",
