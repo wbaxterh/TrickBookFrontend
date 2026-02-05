@@ -1,0 +1,169 @@
+/**
+ * Homies API
+ * Functions for managing homies (friends) relationships
+ */
+
+import { apiClient } from './client';
+import { ENDPOINTS } from '@/constants/api';
+
+// Types
+export interface Homie {
+  _id: string;
+  name: string;
+  email: string;
+  username?: string;
+  imageUri?: string | null;
+  sports?: string[];
+  network?: boolean;
+  isOnline?: boolean;
+  lastSeen?: string;
+}
+
+export interface HomieRequest {
+  from: string;
+  sentAt: string;
+  user?: Homie;
+}
+
+export interface PendingRequests {
+  received: HomieRequest[];
+  sent: string[];
+}
+
+export interface NetworkStatus {
+  discoverable: boolean;
+  homiesCount: number;
+  pendingRequestsCount: number;
+}
+
+export type HomieStatus = 'homies' | 'pending' | 'received' | 'none';
+
+/**
+ * Get user's network status (discoverable, counts)
+ */
+export async function getNetworkStatus(): Promise<NetworkStatus | null> {
+  try {
+    const response = await apiClient.get<NetworkStatus>(ENDPOINTS.homies.networkStatus);
+    return response;
+  } catch (error) {
+    console.error('Error getting network status:', error);
+    return null;
+  }
+}
+
+/**
+ * Toggle network visibility (discoverable by others)
+ */
+export async function toggleNetwork(userId: string, enabled: boolean): Promise<boolean> {
+  try {
+    await apiClient.put(ENDPOINTS.homies.toggleNetwork(userId), { network: enabled });
+    return true;
+  } catch (error) {
+    console.error('Error toggling network:', error);
+    return false;
+  }
+}
+
+/**
+ * Get list of discoverable users (for Find tab)
+ */
+export async function getDiscoverableUsers(): Promise<Homie[]> {
+  try {
+    const response = await apiClient.get<Homie[]>(ENDPOINTS.homies.discoverable);
+    return response;
+  } catch (error) {
+    console.error('Error getting discoverable users:', error);
+    return [];
+  }
+}
+
+/**
+ * Get user's homies list
+ */
+export async function getMyHomies(): Promise<Homie[]> {
+  try {
+    const response = await apiClient.get<Homie[]>(ENDPOINTS.homies.list);
+    return response;
+  } catch (error) {
+    console.error('Error getting homies:', error);
+    return [];
+  }
+}
+
+/**
+ * Get pending homie requests (received and sent)
+ */
+export async function getPendingRequests(): Promise<PendingRequests> {
+  try {
+    const response = await apiClient.get<PendingRequests>(ENDPOINTS.homies.requests);
+    return response;
+  } catch (error) {
+    console.error('Error getting pending requests:', error);
+    return { received: [], sent: [] };
+  }
+}
+
+/**
+ * Send a homie request to another user
+ */
+export async function sendHomieRequest(targetUserId: string): Promise<boolean> {
+  try {
+    await apiClient.post(ENDPOINTS.homies.sendRequest(targetUserId), {});
+    return true;
+  } catch (error) {
+    console.error('Error sending homie request:', error);
+    return false;
+  }
+}
+
+/**
+ * Accept a homie request
+ */
+export async function acceptHomieRequest(requesterId: string): Promise<boolean> {
+  try {
+    await apiClient.post(ENDPOINTS.homies.accept(requesterId), {});
+    return true;
+  } catch (error) {
+    console.error('Error accepting homie request:', error);
+    return false;
+  }
+}
+
+/**
+ * Reject a homie request
+ */
+export async function rejectHomieRequest(requesterId: string): Promise<boolean> {
+  try {
+    await apiClient.post(ENDPOINTS.homies.reject(requesterId), {});
+    return true;
+  } catch (error) {
+    console.error('Error rejecting homie request:', error);
+    return false;
+  }
+}
+
+/**
+ * Remove a homie
+ */
+export async function removeHomie(homieId: string): Promise<boolean> {
+  try {
+    await apiClient.delete(ENDPOINTS.homies.remove(homieId));
+    return true;
+  } catch (error) {
+    console.error('Error removing homie:', error);
+    return false;
+  }
+}
+
+/**
+ * Check homie status with a specific user
+ */
+export async function getHomieStatus(targetId: string): Promise<HomieStatus> {
+  try {
+    const response = await apiClient.get<{ status: HomieStatus }>(ENDPOINTS.homies.status(targetId));
+    return response.status;
+  } catch (error) {
+    console.error('Error getting homie status:', error);
+    return 'none';
+  }
+}

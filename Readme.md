@@ -346,6 +346,56 @@ The app is configured with the following build profiles in `eas.json`:
 - **preview**: For internal distribution
 - **production**: For production builds
 - **testflight**: For TestFlight and App Store distribution
+- **playstore**: For Google Play Store distribution
+
+## Android Deployment (Google Play Store)
+
+### Preparing for Release
+
+1. **Increment Version Numbers**
+   - Update the version in `app.json`:
+     ```json
+     "version": "1.0.8",  // App version
+     "android": {
+       "versionCode": 4   // Android build number (increment for each release)
+     }
+     ```
+
+2. **Build for Google Play Store**
+   ```bash
+   # Build the Android app with Play Store profile
+   eas build --platform android --profile playstore
+   ```
+   
+   This command will:
+   - Create an Android App Bundle (.aab file) optimized for Play Store
+   - Automatically increment the Android version code (configured in `eas.json`)
+   - Generate a signed .aab file ready for submission
+
+3. **Submit to Google Play Console**
+   
+   After the build completes, you have two options:
+   
+   **Option A: Using EAS Submit (Recommended)**
+   ```bash
+   eas submit -p android --latest
+   ```
+   
+   **Option B: Manual Upload**
+   - Download the .aab file from the EAS build page
+   - Go to [Google Play Console](https://play.google.com/console)
+   - Select your app
+   - Navigate to "Production" or "Internal testing"
+   - Click "Create new release"
+   - Upload the .aab file
+   - Complete release information and submit for review
+
+4. **Complete Google Play Console Setup**
+   - Log in to [Google Play Console](https://play.google.com/console)
+   - Complete store listing information
+   - Set up content rating
+   - Configure pricing and distribution
+   - Submit for review
 
 ## Future Enhancements
 

@@ -1,0 +1,343 @@
+/**
+ * Spots API
+ * Functions for fetching and managing spots
+ */
+
+import { apiClient } from './client';
+import { ENDPOINTS } from '@/constants/api';
+
+// Types
+export interface SpotPhoto {
+  url: string;
+  attribution?: string;
+  key?: string;
+  userId?: string;
+  uploadedAt?: string;
+}
+
+export interface Spot {
+  _id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  imageURL?: string | null;
+  description?: string;
+  rating?: number;
+  tags?: string;
+  city?: string;
+  state?: string;
+  isPublic?: boolean;
+  sportTypes?: string[];
+  category?: 'park' | 'street' | 'indoor' | 'diy' | 'other';
+  approvalStatus?: 'pending' | 'approved' | 'rejected' | 'private';
+  userId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  // Computed fields for display
+  distance?: number;
+  reviewCount?: number;
+  // Google Places integration
+  googlePlaceId?: string;
+  googlePhotos?: SpotPhoto[];
+  userPhotos?: SpotPhoto[];
+  googlePlacesCachedAt?: string;
+}
+
+export interface SportType {
+  value: string;
+  label: string;
+}
+
+export interface SpotsResponse {
+  spots: Spot[];
+  pagination: {
+    page: number;
+    limit: number;
+    totalCount: number;
+    totalPages: number;
+    hasMore: boolean;
+  };
+}
+
+export interface GetSpotsParams {
+  page?: number;
+  limit?: number;
+  sort?: string;
+  order?: 'asc' | 'desc';
+  sportType?: string;
+  category?: string;
+  q?: string;
+}
+
+/**
+ * Get available sport types for filtering
+ */
+export async function getSportTypes(): Promise<SportType[]> {
+  try {
+    const response = await apiClient.get<{ sportTypes: SportType[] }>(
+      `${ENDPOINTS.spots.list}/sport-types`,
+      { skipAuth: true }
+    );
+    return response.sportTypes;
+  } catch (error) {
+    console.error('Error fetching sport types:', error);
+    // Return default sport types if API fails
+    return [
+      { value: 'skateboarding', label: 'Skateboarding' },
+      { value: 'snowboarding', label: 'Snowboarding' },
+      { value: 'skiing', label: 'Skiing' },
+      { value: 'bmx', label: 'BMX' },
+      { value: 'mtb', label: 'MTB' },
+      { value: 'scooter', label: 'Scooter' },
+      { value: 'rollerblading', label: 'Rollerblading' },
+      { value: 'surfing', label: 'Surfing' },
+      { value: 'wakeboarding', label: 'Wakeboarding' },
+    ];
+  }
+}
+
+/**
+ * Get spots with optional filters
+ */
+export async function getSpots(params: GetSpotsParams = {}): Promise<SpotsResponse> {
+  try {
+    const queryParams = new URLSearchParams();
+
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.sort) queryParams.append('sort', params.sort);
+    if (params.order) queryParams.append('order', params.order);
+    if (params.sportType && params.sportType !== 'all') {
+      queryParams.append('sportType', params.sportType);
+    }
+    if (params.category && params.category !== 'all') {
+      queryParams.append('category', params.category);
+    }
+    if (params.q) queryParams.append('q', params.q);
+
+    const queryString = queryParams.toString();
+    const endpoint = queryString
+      ? `${ENDPOINTS.spots.list}?${queryString}`
+      : ENDPOINTS.spots.list;
+
+    const response = await apiClient.get<SpotsResponse>(endpoint, { skipAuth: true });
+    return response;
+  } catch (error) {
+    console.error('Error fetching spots:', error);
+    return {
+      spots: [],
+      pagination: {
+        page: 1,
+        limit: 50,
+        totalCount: 0,
+        totalPages: 0,
+        hasMore: false,
+      },
+    };
+  }
+}
+
+/**
+ * Search spots by query
+ */
+export async function searchSpots(
+  query: string,
+  filters: { city?: string; state?: string; tags?: string } = {}
+): Promise<SpotsResponse> {
+  try {
+    const queryParams = new URLSearchParams();
+    if (query) queryParams.append('q', query);
+    if (filters.city) queryParams.append('city', filters.city);
+    if (filters.state) queryParams.append('state', filters.state);
+    if (filters.tags) queryParams.append('tags', filters.tags);
+
+    const response = await apiClient.get<SpotsResponse>(
+      `${ENDPOINTS.spots.search}?${queryParams.toString()}`,
+      { skipAuth: true }
+    );
+    return response;
+  } catch (error) {
+    console.error('Error searching spots:', error);
+    return {
+      spots: [],
+      pagination: {
+        page: 1,
+        limit: 50,
+        totalCount: 0,
+        totalPages: 0,
+        hasMore: false,
+      },
+    };
+  }
+}
+
+/**
+ * Get a single spot by ID
+ */
+export async function getSpotById(id: string): Promise<Spot | null> {
+  try {
+    const response = await apiClient.get<Spot>(
+      ENDPOINTS.spots.detail(id),
+      { skipAuth: true }
+    );
+    return response;
+  } catch (error) {
+    console.error('Error fetching spot:', error);
+    return null;
+  }
+}
+
+/**
+ * Create a new spot
+ */
+export async function createSpot(
+  spot: Omit<Spot, '_id' | 'createdAt' | 'updatedAt' | 'userId' | 'approvalStatus'>
+): Promise<Spot | null> {
+  try {
+    const response = await apiClient.post<Spot>(ENDPOINTS.spots.create, spot);
+    return response;
+  } catch (error) {
+    console.error('Error creating spot:', error);
+    return null;
+  }
+}
+
+/**
+ * Update a spot
+ */
+export async function updateSpot(
+  id: string,
+  updates: Partial<Spot>
+): Promise<Spot | null> {
+  try {
+    const response = await apiClient.put<Spot>(
+      ENDPOINTS.spots.detail(id),
+      updates
+    );
+    return response;
+  } catch (error) {
+    console.error('Error updating spot:', error);
+    return null;
+  }
+}
+
+/**
+ * Get user's own spots
+ */
+export async function getMySpots(params: { page?: number; limit?: number } = {}): Promise<SpotsResponse> {
+  try {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+
+    const queryString = queryParams.toString();
+    const endpoint = queryString
+      ? `${ENDPOINTS.spots.list}/my-spots?${queryString}`
+      : `${ENDPOINTS.spots.list}/my-spots`;
+
+    const response = await apiClient.get<SpotsResponse>(endpoint);
+    return response;
+  } catch (error) {
+    console.error('Error fetching my spots:', error);
+    return {
+      spots: [],
+      pagination: {
+        page: 1,
+        limit: 50,
+        totalCount: 0,
+        totalPages: 0,
+        hasMore: false,
+      },
+    };
+  }
+}
+
+// Google Places integration types
+export interface PlaceSearchResult {
+  placeId: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  rating?: number;
+  types?: string[];
+  photos?: { reference: string }[];
+}
+
+export interface PlaceDetails {
+  placeId: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  rating?: number;
+  reviewCount?: number;
+  types?: string[];
+  openingHours?: any;
+  photos?: { reference: string; attribution?: string }[];
+}
+
+export interface ReverseGeocodeResult {
+  address: string | null;
+  city: string;
+  state: string;
+  country: string;
+  placeId?: string;
+}
+
+/**
+ * Search Google Places by query
+ */
+export async function searchPlaces(
+  query: string,
+  lat?: number,
+  lng?: number
+): Promise<PlaceSearchResult[]> {
+  try {
+    const params = new URLSearchParams();
+    params.append('query', query);
+    if (lat) params.append('lat', lat.toString());
+    if (lng) params.append('lng', lng.toString());
+
+    const response = await apiClient.get<{ results: PlaceSearchResult[] }>(
+      `${ENDPOINTS.spots.list}/places-search?${params.toString()}`
+    );
+    return response.results || [];
+  } catch (error) {
+    console.error('Error searching places:', error);
+    return [];
+  }
+}
+
+/**
+ * Get place details by Google Place ID
+ */
+export async function getPlaceDetails(placeId: string): Promise<PlaceDetails | null> {
+  try {
+    const response = await apiClient.get<PlaceDetails>(
+      `${ENDPOINTS.spots.list}/places/${placeId}`
+    );
+    return response;
+  } catch (error) {
+    console.error('Error getting place details:', error);
+    return null;
+  }
+}
+
+/**
+ * Reverse geocode coordinates to get address info
+ */
+export async function reverseGeocode(
+  lat: number,
+  lng: number
+): Promise<ReverseGeocodeResult> {
+  try {
+    const response = await apiClient.get<ReverseGeocodeResult>(
+      `${ENDPOINTS.spots.list}/reverse-geocode?lat=${lat}&lng=${lng}`
+    );
+    return response;
+  } catch (error) {
+    console.error('Error reverse geocoding:', error);
+    return { address: null, city: '', state: '', country: '' };
+  }
+}
