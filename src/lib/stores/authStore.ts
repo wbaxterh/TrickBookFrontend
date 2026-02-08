@@ -93,6 +93,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Call the real login API
       const { token, user } = await authApi.login(email, password);
 
+      // Store token in secure storage for session persistence
+      await apiClient.setToken(token);
+
       // Store user data locally for offline access
       await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
 
@@ -119,6 +122,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // After registration, automatically log them in
       const { token, user } = await authApi.login(data.email, data.password);
+
+      // Store token in secure storage for session persistence
+      await apiClient.setToken(token);
 
       // Store user data
       await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
@@ -171,15 +177,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const token = await apiClient.getToken();
       const userJson = await SecureStore.getItemAsync(USER_KEY);
 
+      console.log('[Auth] Loading stored auth - token exists:', !!token, 'user exists:', !!userJson);
+
       if (token && userJson) {
         const user = JSON.parse(userJson) as User;
+        console.log('[Auth] Restoring session for user:', user.email);
         set({ user, token, isAuthenticated: true });
 
         // Optionally refresh user data in background
         get().refreshUser().catch(console.error);
+      } else {
+        console.log('[Auth] No stored session found');
       }
     } catch (error) {
-      console.error('Load stored auth error:', error);
+      console.error('[Auth] Load stored auth error:', error);
       // Clear potentially corrupted data
       await SecureStore.deleteItemAsync(TOKEN_KEY);
       await SecureStore.deleteItemAsync(USER_KEY);
