@@ -35,9 +35,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.thetrickbook.trickbook",
       "buildNumber": "5",
-      "config": {
-        "googleMapsApiKey": "AIzaSyA8AlrTQSnVCrc8q298qY8O4zI0ZNcBNTc"
-      },
+      "config": {},
       "infoPlist": {
         "NSCameraUsageDescription": "TrickBook uses the camera to take photos for your profile and spots.",
         "NSPhotoLibraryUsageDescription": "TrickBook needs access to your photos to upload images.",
@@ -52,11 +50,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#121212"
       },
-      "config": {
-        "googleMaps": {
-          "apiKey": "AIzaSyA8AlrTQSnVCrc8q298qY8O4zI0ZNcBNTc"
-        }
-      },
+      "config": {},
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION"

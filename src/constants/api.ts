@@ -7,7 +7,7 @@
 const isDevelopment = __DEV__;
 
 // Use your computer's local IP for physical devices (localhost only works on simulators)
-const DEV_API_HOST = '172.20.10.11';
+const DEV_API_HOST = '10.117.162.103';
 
 export const API_CONFIG = {
   // Base URLs

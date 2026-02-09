@@ -58,6 +58,12 @@
 		}
 	},
 	"submit": {
-		"production": {}
+		"production": {},
+		"playstore": {
+			"android": {
+				"track": "internal",
+				"releaseStatus": "draft"
+			}
+		}
 	}
 }
