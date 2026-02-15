@@ -14,13 +14,16 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 import { addSpotToList, createSpotList, getSpotLists } from '@/lib/api/spotlists';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
@@ -46,6 +49,15 @@ export function AddToSpotListModal({
 }: AddToSpotListModalProps) {
   const { theme, isDark } = useThemeContext();
   const { user } = useAuthStore();
+  const { isKeyboardVisible, dismissKeyboard } = useKeyboardVisible();
+
+  const handleBackdropPress = () => {
+    if (isKeyboardVisible()) {
+      dismissKeyboard();
+    } else {
+      onClose();
+    }
+  };
 
   const [lists, setLists] = useState<SpotList[]>([]);
   const [loading, setLoading] = useState(true);
@@ -181,103 +193,111 @@ export function AddToSpotListModal({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose}>
-        <Pressable
-          style={[styles.content, { backgroundColor: theme.surface }]}
-          onPress={(e) => e.stopPropagation()}
-        >
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.text }]}>Add to List</Text>
-            <Pressable onPress={onClose}>
-              <Ionicons name="close" size={24} color={theme.text} />
-            </Pressable>
-          </View>
-
-          <Text style={[styles.spotName, { color: theme.textSecondary }]} numberOfLines={1}>
-            {spotName}
-          </Text>
-
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={YELLOW} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <Pressable style={styles.overlay} onPress={handleBackdropPress}>
+          <Pressable
+            style={[styles.content, { backgroundColor: theme.surface }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.header}>
+              <Text style={[styles.title, { color: theme.text }]}>Add to List</Text>
+              <Pressable onPress={onClose}>
+                <Ionicons name="close" size={24} color={theme.text} />
+              </Pressable>
             </View>
-          ) : (
-            <>
-              {/* Create New List */}
-              {showCreateInput ? (
-                <View style={styles.createContainer}>
-                  <TextInput
-                    style={[
-                      styles.createInput,
-                      {
-                        backgroundColor: theme.background,
-                        color: theme.text,
-                        borderColor: theme.border,
-                      },
-                    ]}
-                    placeholder="Enter list name..."
-                    placeholderTextColor={theme.textSecondary}
-                    value={newListName}
-                    onChangeText={setNewListName}
-                    autoFocus
-                  />
-                  <View style={styles.createButtons}>
-                    <Pressable
-                      style={[styles.createCancelButton, { borderColor: theme.border }]}
-                      onPress={() => {
-                        setShowCreateInput(false);
-                        setNewListName('');
-                      }}
-                    >
-                      <Text style={[styles.createCancelText, { color: theme.text }]}>Cancel</Text>
-                    </Pressable>
-                    <Pressable
-                      style={[
-                        styles.createSubmitButton,
-                        { backgroundColor: YELLOW },
-                        (!newListName.trim() || creating) && styles.buttonDisabled,
-                      ]}
-                      onPress={handleCreateAndAdd}
-                      disabled={!newListName.trim() || creating}
-                    >
-                      {creating ? (
-                        <ActivityIndicator size="small" color={DARK} />
-                      ) : (
-                        <Text style={styles.createSubmitText}>Create & Add</Text>
-                      )}
-                    </Pressable>
-                  </View>
-                </View>
-              ) : (
-                <Pressable
-                  style={[styles.createNewButton, { borderColor: theme.border }]}
-                  onPress={() => setShowCreateInput(true)}
-                >
-                  <Ionicons name="add" size={22} color={YELLOW} />
-                  <Text style={[styles.createNewText, { color: theme.text }]}>Create New List</Text>
-                </Pressable>
-              )}
 
-              {/* Lists */}
-              <FlatList
-                data={lists}
-                keyExtractor={(item) => item._id}
-                renderItem={renderListItem}
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
-                ListEmptyComponent={
-                  <View style={styles.emptyContainer}>
-                    <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                      No spot lists yet. Create one above!
-                    </Text>
+            <Text style={[styles.spotName, { color: theme.textSecondary }]} numberOfLines={1}>
+              {spotName}
+            </Text>
+
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={YELLOW} />
+              </View>
+            ) : (
+              <>
+                {/* Create New List */}
+                {showCreateInput ? (
+                  <View style={styles.createContainer}>
+                    <TextInput
+                      style={[
+                        styles.createInput,
+                        {
+                          backgroundColor: theme.background,
+                          color: theme.text,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                      placeholder="Enter list name..."
+                      placeholderTextColor={theme.textSecondary}
+                      value={newListName}
+                      onChangeText={setNewListName}
+                      autoFocus
+                    />
+                    <View style={styles.createButtons}>
+                      <Pressable
+                        style={[styles.createCancelButton, { borderColor: theme.border }]}
+                        onPress={() => {
+                          setShowCreateInput(false);
+                          setNewListName('');
+                        }}
+                      >
+                        <Text style={[styles.createCancelText, { color: theme.text }]}>Cancel</Text>
+                      </Pressable>
+                      <Pressable
+                        style={[
+                          styles.createSubmitButton,
+                          { backgroundColor: YELLOW },
+                          (!newListName.trim() || creating) && styles.buttonDisabled,
+                        ]}
+                        onPress={handleCreateAndAdd}
+                        disabled={!newListName.trim() || creating}
+                      >
+                        {creating ? (
+                          <ActivityIndicator size="small" color={DARK} />
+                        ) : (
+                          <Text style={styles.createSubmitText}>Create & Add</Text>
+                        )}
+                      </Pressable>
+                    </View>
                   </View>
-                }
-                ItemSeparatorComponent={() => <View style={styles.separator} />}
-              />
-            </>
-          )}
+                ) : (
+                  <Pressable
+                    style={[styles.createNewButton, { borderColor: theme.border }]}
+                    onPress={() => setShowCreateInput(true)}
+                  >
+                    <Ionicons name="add" size={22} color={YELLOW} />
+                    <Text style={[styles.createNewText, { color: theme.text }]}>
+                      Create New List
+                    </Text>
+                  </Pressable>
+                )}
+
+                {/* Lists */}
+                <FlatList
+                  data={lists}
+                  keyExtractor={(item) => item._id}
+                  renderItem={renderListItem}
+                  contentContainerStyle={styles.listContent}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                  ListEmptyComponent={
+                    <View style={styles.emptyContainer}>
+                      <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                        No spot lists yet. Create one above!
+                      </Text>
+                    </View>
+                  }
+                  ItemSeparatorComponent={() => <View style={styles.separator} />}
+                />
+              </>
+            )}
+          </Pressable>
         </Pressable>
-      </Pressable>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

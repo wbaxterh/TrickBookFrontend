@@ -19,9 +19,12 @@ import {
   Animated,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -30,6 +33,7 @@ import {
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ShareToHomieModal } from '@/components/share';
+import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 import {
   addSpotToList,
   deleteSpotList,
@@ -51,6 +55,15 @@ export default function SpotListDetailScreen() {
   const { listId } = useLocalSearchParams<{ listId: string }>();
   const { theme, isDark } = useThemeContext();
   const { token, user } = useAuthStore();
+  const { isKeyboardVisible, dismissKeyboard } = useKeyboardVisible();
+
+  const handleRenameBackdropPress = () => {
+    if (isKeyboardVisible()) {
+      dismissKeyboard();
+    } else {
+      setRenameModalVisible(false);
+    }
+  };
 
   const [list, setList] = useState<SpotList | null>(null);
   const [spots, setSpots] = useState<Spot[]>([]);
@@ -437,75 +450,82 @@ export default function SpotListDetailScreen() {
           animationType="slide"
           onRequestClose={() => setRenameModalVisible(false)}
         >
-          <Pressable style={styles.modalOverlay} onPress={() => setRenameModalVisible(false)}>
-            <Pressable
-              style={[styles.modalContent, { backgroundColor: theme.surface }]}
-              onPress={(e) => e.stopPropagation()}
-            >
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: theme.text }]}>Rename List</Text>
-                <Pressable onPress={() => setRenameModalVisible(false)}>
-                  <Ionicons name="close" size={24} color={theme.text} />
-                </Pressable>
-              </View>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={{ flex: 1 }}
+          >
+            <Pressable style={styles.modalOverlay} onPress={handleRenameBackdropPress}>
+              <Pressable
+                style={[styles.modalContent, { backgroundColor: theme.surface }]}
+                onPress={(e) => e.stopPropagation()}
+              >
+                <View style={styles.modalHeader}>
+                  <Text style={[styles.modalTitle, { color: theme.text }]}>Rename List</Text>
+                  <Pressable onPress={() => setRenameModalVisible(false)}>
+                    <Ionicons name="close" size={24} color={theme.text} />
+                  </Pressable>
+                </View>
 
-              <View style={styles.modalBody}>
-                <Text style={[styles.inputLabel, { color: theme.text }]}>List Name</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    {
-                      backgroundColor: theme.background,
-                      color: theme.text,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                  value={newListName}
-                  onChangeText={setNewListName}
-                  placeholder="Enter list name"
-                  placeholderTextColor={theme.textSecondary}
-                  autoFocus
-                />
+                <ScrollView keyboardShouldPersistTaps="handled">
+                  <View style={styles.modalBody}>
+                    <Text style={[styles.inputLabel, { color: theme.text }]}>List Name</Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        {
+                          backgroundColor: theme.background,
+                          color: theme.text,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                      value={newListName}
+                      onChangeText={setNewListName}
+                      placeholder="Enter list name"
+                      placeholderTextColor={theme.textSecondary}
+                      autoFocus
+                    />
 
-                <Text style={[styles.inputLabel, { color: theme.text, marginTop: 16 }]}>
-                  Description (optional)
-                </Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    styles.inputMultiline,
-                    {
-                      backgroundColor: theme.background,
-                      color: theme.text,
-                      borderColor: theme.border,
-                    },
-                  ]}
-                  value={newListDescription}
-                  onChangeText={setNewListDescription}
-                  placeholder="Add a description..."
-                  placeholderTextColor={theme.textSecondary}
-                  multiline
-                  numberOfLines={3}
-                />
+                    <Text style={[styles.inputLabel, { color: theme.text, marginTop: 16 }]}>
+                      Description (optional)
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.input,
+                        styles.inputMultiline,
+                        {
+                          backgroundColor: theme.background,
+                          color: theme.text,
+                          borderColor: theme.border,
+                        },
+                      ]}
+                      value={newListDescription}
+                      onChangeText={setNewListDescription}
+                      placeholder="Add a description..."
+                      placeholderTextColor={theme.textSecondary}
+                      multiline
+                      numberOfLines={3}
+                    />
 
-                <Pressable
-                  style={[
-                    styles.submitButton,
-                    { backgroundColor: YELLOW },
-                    (!newListName.trim() || saving) && styles.submitButtonDisabled,
-                  ]}
-                  onPress={handleRenameList}
-                  disabled={!newListName.trim() || saving}
-                >
-                  {saving ? (
-                    <ActivityIndicator size="small" color={DARK} />
-                  ) : (
-                    <Text style={styles.submitButtonText}>Save Changes</Text>
-                  )}
-                </Pressable>
-              </View>
+                    <Pressable
+                      style={[
+                        styles.submitButton,
+                        { backgroundColor: YELLOW },
+                        (!newListName.trim() || saving) && styles.submitButtonDisabled,
+                      ]}
+                      onPress={handleRenameList}
+                      disabled={!newListName.trim() || saving}
+                    >
+                      {saving ? (
+                        <ActivityIndicator size="small" color={DARK} />
+                      ) : (
+                        <Text style={styles.submitButtonText}>Save Changes</Text>
+                      )}
+                    </Pressable>
+                  </View>
+                </ScrollView>
+              </Pressable>
             </Pressable>
-          </Pressable>
+          </KeyboardAvoidingView>
         </Modal>
 
         {/* Add Spot Modal */}

@@ -11,7 +11,9 @@ import {
   Dimensions,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -203,125 +205,134 @@ export function ShareToHomieModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
-          {/* Header */}
-          <View style={[styles.header, { borderBottomColor: theme.border }]}>
-            <Pressable style={styles.closeButton} onPress={onClose}>
-              <Ionicons name="close" size={24} color={theme.text} />
-            </Pressable>
-            <Text style={[styles.headerTitle, { color: theme.text }]}>Share to Homie</Text>
-            <View style={styles.closeButton} />
-          </View>
-
-          {/* Content Preview */}
-          <View style={[styles.previewCard, { backgroundColor: theme.surface }]}>
-            <View style={[styles.previewIcon, { backgroundColor: `${colors.primary}20` }]}>
-              <Ionicons name={getContentTypeIcon() as any} size={24} color={colors.primary} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
+            {/* Header */}
+            <View style={[styles.header, { borderBottomColor: theme.border }]}>
+              <Pressable style={styles.closeButton} onPress={onClose}>
+                <Ionicons name="close" size={24} color={theme.text} />
+              </Pressable>
+              <Text style={[styles.headerTitle, { color: theme.text }]}>Share to Homie</Text>
+              <View style={styles.closeButton} />
             </View>
-            <View style={styles.previewInfo}>
-              <Text style={[styles.previewType, { color: theme.textSecondary }]}>
-                {getContentTypeLabel()}
-              </Text>
-              <Text style={[styles.previewTitle, { color: theme.text }]} numberOfLines={1}>
-                {preview.title}
-              </Text>
-              {preview.subtitle && (
-                <Text
-                  style={[styles.previewSubtitle, { color: theme.textSecondary }]}
-                  numberOfLines={1}
-                >
-                  {preview.subtitle}
+
+            {/* Content Preview */}
+            <View style={[styles.previewCard, { backgroundColor: theme.surface }]}>
+              <View style={[styles.previewIcon, { backgroundColor: `${colors.primary}20` }]}>
+                <Ionicons name={getContentTypeIcon() as any} size={24} color={colors.primary} />
+              </View>
+              <View style={styles.previewInfo}>
+                <Text style={[styles.previewType, { color: theme.textSecondary }]}>
+                  {getContentTypeLabel()}
                 </Text>
+                <Text style={[styles.previewTitle, { color: theme.text }]} numberOfLines={1}>
+                  {preview.title}
+                </Text>
+                {preview.subtitle && (
+                  <Text
+                    style={[styles.previewSubtitle, { color: theme.textSecondary }]}
+                    numberOfLines={1}
+                  >
+                    {preview.subtitle}
+                  </Text>
+                )}
+              </View>
+              {preview.thumbnailUrl && (
+                <Image source={{ uri: preview.thumbnailUrl }} style={styles.previewThumbnail} />
               )}
             </View>
-            {preview.thumbnailUrl && (
-              <Image source={{ uri: preview.thumbnailUrl }} style={styles.previewThumbnail} />
-            )}
-          </View>
 
-          {/* Search */}
-          <View style={[styles.searchContainer, { backgroundColor: theme.surface }]}>
-            <Ionicons name="search" size={20} color={theme.textSecondary} />
-            <TextInput
-              style={[styles.searchInput, { color: theme.text }]}
-              placeholder="Search homies..."
-              placeholderTextColor={theme.textSecondary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
-
-          {/* Homies List */}
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.primary} />
-            </View>
-          ) : filteredHomies.length === 0 ? (
-            <View style={styles.emptyContainer}>
-              <Ionicons name="people-outline" size={48} color={theme.textSecondary} />
-              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                {homies.length === 0 ? 'No homies yet' : 'No homies found'}
-              </Text>
-            </View>
-          ) : (
-            <FlatList
-              data={filteredHomies}
-              keyExtractor={(item) => item._id}
-              renderItem={renderHomieItem}
-              contentContainerStyle={styles.homiesList}
-              showsVerticalScrollIndicator={false}
-            />
-          )}
-
-          {/* Optional Message Input */}
-          {selectedHomie && (
-            <View style={[styles.messageContainer, { borderTopColor: theme.border }]}>
+            {/* Search */}
+            <View style={[styles.searchContainer, { backgroundColor: theme.surface }]}>
+              <Ionicons name="search" size={20} color={theme.textSecondary} />
               <TextInput
-                style={[styles.messageInput, { backgroundColor: theme.surface, color: theme.text }]}
-                placeholder="Add a message (optional)..."
+                style={[styles.searchInput, { color: theme.text }]}
+                placeholder="Search homies..."
                 placeholderTextColor={theme.textSecondary}
-                value={message}
-                onChangeText={setMessage}
-                multiline
-                maxLength={200}
+                value={searchQuery}
+                onChangeText={setSearchQuery}
               />
             </View>
-          )}
 
-          {/* Send Button */}
-          <View style={styles.footer}>
-            <Pressable
-              style={[
-                styles.sendButton,
-                { backgroundColor: selectedHomie ? colors.primary : theme.surface },
-              ]}
-              onPress={handleSend}
-              disabled={!selectedHomie || sending}
-            >
-              {sending ? (
-                <ActivityIndicator size="small" color={DARK} />
-              ) : (
-                <>
-                  <Ionicons
-                    name="send"
-                    size={20}
-                    color={selectedHomie ? DARK : theme.textSecondary}
-                  />
-                  <Text
-                    style={[
-                      styles.sendButtonText,
-                      { color: selectedHomie ? DARK : theme.textSecondary },
-                    ]}
-                  >
-                    {selectedHomie ? `Send to ${selectedHomie.name}` : 'Select a homie'}
-                  </Text>
-                </>
-              )}
-            </Pressable>
+            {/* Homies List */}
+            {loading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={colors.primary} />
+              </View>
+            ) : filteredHomies.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="people-outline" size={48} color={theme.textSecondary} />
+                <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                  {homies.length === 0 ? 'No homies yet' : 'No homies found'}
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={filteredHomies}
+                keyExtractor={(item) => item._id}
+                renderItem={renderHomieItem}
+                contentContainerStyle={styles.homiesList}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              />
+            )}
+
+            {/* Optional Message Input */}
+            {selectedHomie && (
+              <View style={[styles.messageContainer, { borderTopColor: theme.border }]}>
+                <TextInput
+                  style={[
+                    styles.messageInput,
+                    { backgroundColor: theme.surface, color: theme.text },
+                  ]}
+                  placeholder="Add a message (optional)..."
+                  placeholderTextColor={theme.textSecondary}
+                  value={message}
+                  onChangeText={setMessage}
+                  multiline
+                  maxLength={200}
+                />
+              </View>
+            )}
+
+            {/* Send Button */}
+            <View style={styles.footer}>
+              <Pressable
+                style={[
+                  styles.sendButton,
+                  { backgroundColor: selectedHomie ? colors.primary : theme.surface },
+                ]}
+                onPress={handleSend}
+                disabled={!selectedHomie || sending}
+              >
+                {sending ? (
+                  <ActivityIndicator size="small" color={DARK} />
+                ) : (
+                  <>
+                    <Ionicons
+                      name="send"
+                      size={20}
+                      color={selectedHomie ? DARK : theme.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.sendButtonText,
+                        { color: selectedHomie ? DARK : theme.textSecondary },
+                      ]}
+                    >
+                      {selectedHomie ? `Send to ${selectedHomie.name}` : 'Select a homie'}
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

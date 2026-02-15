@@ -14,7 +14,9 @@ import {
   Dimensions,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -26,6 +28,7 @@ import {
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SpotListCard as SpotListCardComponent } from '@/components/spots';
+import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 import { createSpotList, getSpotLists } from '@/lib/api/spotlists';
 import { getSportTypes, getSpots, type SportType, type Spot } from '@/lib/api/spots';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
@@ -102,6 +105,7 @@ export default function SpotsScreen() {
   // All Spots state
   const [viewMode, setViewMode] = useState<ViewMode>('map');
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedSport, setSelectedSport] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -129,6 +133,16 @@ export default function SpotsScreen() {
   const [newListName, setNewListName] = useState('');
   const [newListDescription, setNewListDescription] = useState('');
   const [creating, setCreating] = useState(false);
+
+  const { isKeyboardVisible, dismissKeyboard } = useKeyboardVisible();
+
+  const handleCreateModalBackdropPress = () => {
+    if (isKeyboardVisible()) {
+      dismissKeyboard();
+    } else {
+      setCreateModalVisible(false);
+    }
+  };
 
   const handleAddToList = (spot: Spot) => {
     // Navigate to add-to-list screen or show modal
@@ -170,6 +184,12 @@ export default function SpotsScreen() {
     fetchSportTypes();
   }, []);
 
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   // Fetch spots when filters change
   const fetchSpots = useCallback(async () => {
     setLoading(true);
@@ -177,7 +197,7 @@ export default function SpotsScreen() {
       const response = await getSpots({
         sportType: selectedSport,
         category: selectedCategory,
-        q: searchQuery || undefined,
+        q: debouncedSearchQuery || undefined,
         limit: 50,
       });
       setSpots(response.spots);
@@ -186,7 +206,7 @@ export default function SpotsScreen() {
     } finally {
       setLoading(false);
     }
-  }, [selectedSport, selectedCategory, searchQuery]);
+  }, [selectedSport, selectedCategory, debouncedSearchQuery]);
 
   useEffect(() => {
     fetchSpots();
@@ -248,16 +268,6 @@ export default function SpotsScreen() {
       setCreating(false);
     }
   };
-
-  // Debounced search
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!loading) {
-        fetchSpots();
-      }
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [fetchSpots, loading]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
@@ -854,75 +864,82 @@ export default function SpotsScreen() {
             animationType="slide"
             onRequestClose={() => setCreateModalVisible(false)}
           >
-            <Pressable style={styles.modalOverlay} onPress={() => setCreateModalVisible(false)}>
-              <Pressable
-                style={[styles.modalContent, { backgroundColor: theme.surface }]}
-                onPress={(e) => e.stopPropagation()}
-              >
-                <View style={styles.modalHeader}>
-                  <Text style={[styles.modalTitle, { color: theme.text }]}>Create Spot List</Text>
-                  <Pressable onPress={() => setCreateModalVisible(false)}>
-                    <Ionicons name="close" size={24} color={theme.text} />
-                  </Pressable>
-                </View>
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={{ flex: 1 }}
+            >
+              <Pressable style={styles.modalOverlay} onPress={handleCreateModalBackdropPress}>
+                <Pressable
+                  style={[styles.modalContent, { backgroundColor: theme.surface }]}
+                  onPress={(e) => e.stopPropagation()}
+                >
+                  <View style={styles.modalHeader}>
+                    <Text style={[styles.modalTitle, { color: theme.text }]}>Create Spot List</Text>
+                    <Pressable onPress={() => setCreateModalVisible(false)}>
+                      <Ionicons name="close" size={24} color={theme.text} />
+                    </Pressable>
+                  </View>
 
-                <View style={styles.createModalBody}>
-                  <Text style={[styles.inputLabel, { color: theme.text }]}>List Name</Text>
-                  <TextInput
-                    style={[
-                      styles.createInput,
-                      {
-                        backgroundColor: theme.background,
-                        color: theme.text,
-                        borderColor: theme.border,
-                      },
-                    ]}
-                    placeholder="e.g., My Favorite Skate Spots"
-                    placeholderTextColor={theme.textSecondary}
-                    value={newListName}
-                    onChangeText={setNewListName}
-                    autoFocus
-                  />
+                  <ScrollView keyboardShouldPersistTaps="handled">
+                    <View style={styles.createModalBody}>
+                      <Text style={[styles.inputLabel, { color: theme.text }]}>List Name</Text>
+                      <TextInput
+                        style={[
+                          styles.createInput,
+                          {
+                            backgroundColor: theme.background,
+                            color: theme.text,
+                            borderColor: theme.border,
+                          },
+                        ]}
+                        placeholder="e.g., My Favorite Skate Spots"
+                        placeholderTextColor={theme.textSecondary}
+                        value={newListName}
+                        onChangeText={setNewListName}
+                        autoFocus
+                      />
 
-                  <Text style={[styles.inputLabel, { color: theme.text, marginTop: 16 }]}>
-                    Description (optional)
-                  </Text>
-                  <TextInput
-                    style={[
-                      styles.createInput,
-                      styles.createInputMultiline,
-                      {
-                        backgroundColor: theme.background,
-                        color: theme.text,
-                        borderColor: theme.border,
-                      },
-                    ]}
-                    placeholder="Add a description for this list..."
-                    placeholderTextColor={theme.textSecondary}
-                    value={newListDescription}
-                    onChangeText={setNewListDescription}
-                    multiline
-                    numberOfLines={3}
-                  />
+                      <Text style={[styles.inputLabel, { color: theme.text, marginTop: 16 }]}>
+                        Description (optional)
+                      </Text>
+                      <TextInput
+                        style={[
+                          styles.createInput,
+                          styles.createInputMultiline,
+                          {
+                            backgroundColor: theme.background,
+                            color: theme.text,
+                            borderColor: theme.border,
+                          },
+                        ]}
+                        placeholder="Add a description for this list..."
+                        placeholderTextColor={theme.textSecondary}
+                        value={newListDescription}
+                        onChangeText={setNewListDescription}
+                        multiline
+                        numberOfLines={3}
+                      />
 
-                  <Pressable
-                    style={[
-                      styles.createSubmitButton,
-                      { backgroundColor: YELLOW },
-                      (!newListName.trim() || creating) && styles.createSubmitButtonDisabled,
-                    ]}
-                    onPress={handleCreateList}
-                    disabled={!newListName.trim() || creating}
-                  >
-                    {creating ? (
-                      <ActivityIndicator size="small" color={DARK} />
-                    ) : (
-                      <Text style={styles.createSubmitButtonText}>Create List</Text>
-                    )}
-                  </Pressable>
-                </View>
+                      <Pressable
+                        style={[
+                          styles.createSubmitButton,
+                          { backgroundColor: YELLOW },
+                          (!newListName.trim() || creating) && styles.createSubmitButtonDisabled,
+                        ]}
+                        onPress={handleCreateList}
+                        disabled={!newListName.trim() || creating}
+                      >
+                        {creating ? (
+                          <ActivityIndicator size="small" color={DARK} />
+                        ) : (
+                          <Text style={styles.createSubmitButtonText}>Create List</Text>
+                        )}
+                      </Pressable>
+                    </View>
+                  </ScrollView>
+                </Pressable>
               </Pressable>
-            </Pressable>
+            </KeyboardAvoidingView>
           </Modal>
         </>
       )}
