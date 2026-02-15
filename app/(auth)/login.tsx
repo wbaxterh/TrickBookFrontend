@@ -3,25 +3,25 @@
  * Email/password login with Google option
  */
 
+import { Ionicons } from '@expo/vector-icons';
+import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
+  Alert,
   KeyboardAvoidingView,
   Platform,
-  Alert,
-  StyleSheet,
+  Pressable,
   ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
-import { Link, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Button, IconButton } from '@/components/ui';
+import { forgotPassword } from '@/lib/api/auth';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
-import { forgotPassword } from '@/lib/api/auth';
-import { Button, IconButton } from '@/components/ui';
 
 export default function LoginScreen() {
   const { theme, colors } = useThemeContext();
@@ -62,24 +62,23 @@ export default function LoginScreen() {
       Alert.alert('Email Required', 'Please enter your email address first');
       return;
     }
-    Alert.alert(
-      'Reset Password',
-      `We'll send a reset link to ${email.trim()}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Send Link',
-          onPress: async () => {
-            try {
-              await forgotPassword(email.trim().toLowerCase());
-              Alert.alert('Success', 'If an account exists, a reset link has been sent to your email');
-            } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to send reset link');
-            }
-          },
+    Alert.alert('Reset Password', `We'll send a reset link to ${email.trim()}`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Send Link',
+        onPress: async () => {
+          try {
+            await forgotPassword(email.trim().toLowerCase());
+            Alert.alert(
+              'Success',
+              'If an account exists, a reset link has been sent to your email',
+            );
+          } catch (error: any) {
+            Alert.alert('Error', error.message || 'Failed to send reset link');
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const loading = isLoading || localLoading;
@@ -109,9 +108,7 @@ export default function LoginScreen() {
 
           {/* Header */}
           <View style={styles.header}>
-            <Text style={[styles.title, { color: theme.text }]}>
-              Welcome back
-            </Text>
+            <Text style={[styles.title, { color: theme.text }]}>Welcome back</Text>
             <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
               Sign in to continue your journey
             </Text>
@@ -121,9 +118,7 @@ export default function LoginScreen() {
           <View style={styles.form}>
             {/* Email Input */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: theme.textSecondary }]}>
-                Email
-              </Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>Email</Text>
               <TextInput
                 style={[
                   styles.input,
@@ -146,9 +141,7 @@ export default function LoginScreen() {
 
             {/* Password Input */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: theme.textSecondary }]}>
-                Password
-              </Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>Password</Text>
               <View style={styles.passwordContainer}>
                 <TextInput
                   style={[
@@ -203,9 +196,7 @@ export default function LoginScreen() {
           {/* Divider */}
           <View style={styles.divider}>
             <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
-            <Text style={[styles.dividerText, { color: theme.textSecondary }]}>
-              or
-            </Text>
+            <Text style={[styles.dividerText, { color: theme.textSecondary }]}>or</Text>
             <View style={[styles.dividerLine, { backgroundColor: theme.border }]} />
           </View>
 
@@ -228,9 +219,7 @@ export default function LoginScreen() {
             </Text>
             <Link href="/(auth)/register" asChild>
               <Pressable>
-                <Text style={[styles.signUpLink, { color: colors.primary }]}>
-                  Sign up
-                </Text>
+                <Text style={[styles.signUpLink, { color: colors.primary }]}>Sign up</Text>
               </Pressable>
             </Link>
           </View>

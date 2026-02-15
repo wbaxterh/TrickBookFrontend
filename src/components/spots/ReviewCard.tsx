@@ -3,12 +3,11 @@
  * Displays a single spot review with user info, rating, and helpful button
  */
 
-import React from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors, getThemeColors } from '@/constants/colors';
+import type { SpotReview } from '@/lib/api/spotReviews';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { SpotReview } from '@/lib/api/spotReviews';
 import { StarRatingInput } from './StarRatingInput';
 
 interface ReviewCardProps {
@@ -73,19 +72,14 @@ export function ReviewCard({
 
       {/* Review Content */}
       {review.content ? (
-        <Text style={[styles.content, { color: theme.text }]}>
-          {review.content}
-        </Text>
+        <Text style={[styles.content, { color: theme.text }]}>{review.content}</Text>
       ) : null}
 
       {/* Tags */}
       {review.tags && review.tags.length > 0 && (
         <View style={styles.tagsContainer}>
           {review.tags.map((tag, index) => (
-            <View
-              key={index}
-              style={[styles.tag, { backgroundColor: colors.primary + '20' }]}
-            >
+            <View key={index} style={[styles.tag, { backgroundColor: `${colors.primary}20` }]}>
               <Text style={[styles.tagText, { color: isDark ? colors.primary : theme.text }]}>
                 {tag}
               </Text>
@@ -101,11 +95,7 @@ export function ReviewCard({
           onPress={() => onHelpfulPress?.(review._id)}
           disabled={isHelpfulLoading}
         >
-          <Ionicons
-            name="thumbs-up-outline"
-            size={16}
-            color={theme.textSecondary}
-          />
+          <Ionicons name="thumbs-up-outline" size={16} color={theme.textSecondary} />
           <Text style={[styles.helpfulText, { color: theme.textSecondary }]}>
             Helpful ({review.helpfulCount})
           </Text>
@@ -113,10 +103,7 @@ export function ReviewCard({
 
         {isOwner && (
           <View style={styles.ownerActions}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => onEditPress?.(review)}
-            >
+            <TouchableOpacity style={styles.actionButton} onPress={() => onEditPress?.(review)}>
               <Ionicons name="pencil" size={16} color={theme.textSecondary} />
             </TouchableOpacity>
             <TouchableOpacity

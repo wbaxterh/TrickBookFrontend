@@ -59,13 +59,13 @@
 
 export const colors = {
   // Brand (matching TrickBook website)
-  primary: '#FCF150',        // TrickBook Yellow (use for filled buttons, badges)
-  primaryDark: '#E3D948',    // Pressed state
-  primaryLight: '#FDF580',   // Lighter variant
-  primaryText: '#1f1f1f',    // Secondary brand color for text/icons on light backgrounds
-  secondary: '#1f1f1f',      // TrickBook Secondary Dark
+  primary: '#FCF150', // TrickBook Yellow (use for filled buttons, badges)
+  primaryDark: '#E3D948', // Pressed state
+  primaryLight: '#FDF580', // Lighter variant
+  primaryText: '#1f1f1f', // Secondary brand color for text/icons on light backgrounds
+  secondary: '#1f1f1f', // TrickBook Secondary Dark
   secondaryLight: '#333333',
-  accent: '#1976D2',         // Blue accent
+  accent: '#1976D2', // Blue accent
   accentDark: '#1565C0',
   accentLight: '#42A5F5',
 
@@ -74,7 +74,7 @@ export const colors = {
   error: '#F44336',
   warning: '#FF9800',
   info: '#2196F3',
-  premium: '#1DA1F2',        // Verified badge blue
+  premium: '#1DA1F2', // Verified badge blue
 
   // Status badges
   status: {

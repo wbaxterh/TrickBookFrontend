@@ -3,26 +3,26 @@
  * Allows users to edit their post's caption, sport types, tricks, and visibility
  */
 
-import { useState, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  TextInput,
-  Image,
   ActivityIndicator,
-  StyleSheet,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { getPost, updatePost, FeedPost } from '@/lib/api/feed';
+import { type FeedPost, getPost, updatePost } from '@/lib/api/feed';
 import { SPORT_TYPES, VISIBILITY_OPTIONS } from '@/lib/api/upload';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 const YELLOW = '#FCF150';
 const DARK = '#1a1a1a';
@@ -55,8 +55,7 @@ export default function EditPostScreen() {
           setTricks(postData.tricks || []);
           setVisibility(postData.visibility || 'public');
         }
-      } catch (error) {
-        console.error('Error fetching post:', error);
+      } catch (_error) {
         Alert.alert('Error', 'Failed to load post');
       } finally {
         setLoading(false);
@@ -111,8 +110,7 @@ export default function EditPostScreen() {
       } else {
         Alert.alert('Error', 'Failed to update post');
       }
-    } catch (error) {
-      console.error('Error updating post:', error);
+    } catch (_error) {
       Alert.alert('Error', 'Failed to update post');
     } finally {
       setSaving(false);
@@ -121,7 +119,10 @@ export default function EditPostScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.header}>
           <Pressable
             style={[styles.headerButton, { backgroundColor: theme.surface }]}
@@ -141,7 +142,10 @@ export default function EditPostScreen() {
 
   if (!post) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.header}>
           <Pressable
             style={[styles.headerButton, { backgroundColor: theme.surface }]}

@@ -3,9 +3,9 @@
  * Profile, Stats, and Activity
  */
 
-import { apiClient } from './client';
 import { ENDPOINTS } from '@/constants/api';
-import { User } from './auth';
+import type { User } from './auth';
+import { apiClient } from './client';
 
 // Types
 export interface UserStats {
@@ -100,7 +100,7 @@ export async function getUserStats(userId: string): Promise<UserStats> {
  */
 export async function getUserActivity(
   userId: string,
-  options?: { limit?: number; skip?: number }
+  options?: { limit?: number; skip?: number },
 ): Promise<UserActivityResponse> {
   const params = new URLSearchParams();
   if (options?.limit) params.append('limit', String(options.limit));
@@ -117,7 +117,7 @@ export async function getUserActivity(
  */
 export async function updateUserProfile(
   userId: string,
-  data: ProfileUpdateData
+  data: ProfileUpdateData,
 ): Promise<{ message: string; updated: ProfileUpdateData }> {
   return apiClient.put(ENDPOINTS.user.update(userId), data);
 }
@@ -128,7 +128,7 @@ export async function updateUserProfile(
  */
 export async function getHomieActivity(
   homieIds: string[],
-  limit: number = 10
+  limit: number = 10,
 ): Promise<ActivityItem[]> {
   // Fetch activities from each homie and combine
   const activities: ActivityItem[] = [];
@@ -150,7 +150,9 @@ export async function getHomieActivity(
   });
 
   const results = await Promise.all(promises);
-  results.forEach((result) => activities.push(...result));
+  for (const result of results) {
+    activities.push(...result);
+  }
 
   // Sort by date and limit
   activities.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());

@@ -5,13 +5,13 @@
  * Aligns with Website settings Preferences tab (network toggle)
  */
 
-import { useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { SettingsDivider, SettingsGroup, SettingsItem } from '@/components/ui';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { SettingsItem, SettingsDivider, SettingsGroup } from '@/components/ui';
 
 export default function PrivacyScreen() {
   const { theme } = useThemeContext();
@@ -23,17 +23,10 @@ export default function PrivacyScreen() {
   const [showTrickLists, setShowTrickLists] = useState(true);
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      edges={['top']}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-          hitSlop={8}
-        >
+        <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={8}>
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Privacy</Text>

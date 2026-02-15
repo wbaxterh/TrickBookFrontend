@@ -3,8 +3,8 @@
  * Login, Register, and User Authentication
  */
 
-import { apiClient } from './client';
 import { ENDPOINTS } from '@/constants/api';
+import { apiClient } from './client';
 
 // Types
 export interface LoginResponse {
@@ -69,17 +69,16 @@ export interface User {
 /**
  * Login with email and password
  */
-export async function login(email: string, password: string): Promise<{ token: string; user: User }> {
-  console.log('[Auth] Attempting login for:', email);
-
+export async function login(
+  email: string,
+  password: string,
+): Promise<{ token: string; user: User }> {
   // Login returns only token, we need to decode JWT or fetch user after
   const response = await apiClient.post<LoginResponse>(
     ENDPOINTS.auth.login,
     { email, password },
-    { skipAuth: true }
+    { skipAuth: true },
   );
-
-  console.log('[Auth] Login response received, token exists:', !!response.token);
 
   if (!response.token) {
     throw new Error('No token received from server');
@@ -90,7 +89,6 @@ export async function login(email: string, password: string): Promise<{ token: s
 
   // Decode JWT to get user info (basic info is in the token)
   const tokenPayload = decodeJWT(response.token);
-  console.log('[Auth] Token decoded, userId:', tokenPayload.userId);
 
   const user: User = {
     id: tokenPayload.userId,
@@ -107,11 +105,9 @@ export async function login(email: string, password: string): Promise<{ token: s
  * Register a new user
  */
 export async function register(data: RegisterData): Promise<RegisterResponse> {
-  const response = await apiClient.post<RegisterResponse>(
-    ENDPOINTS.auth.register,
-    data,
-    { skipAuth: true }
-  );
+  const response = await apiClient.post<RegisterResponse>(ENDPOINTS.auth.register, data, {
+    skipAuth: true,
+  });
 
   return response;
 }
@@ -140,15 +136,11 @@ export async function logout(): Promise<void> {
  * Sends the Google ID token to the backend for verification
  */
 export async function googleSignIn(tokenId: string): Promise<{ token: string; user: User }> {
-  console.log('[Auth] Attempting Google sign-in');
-
   const response = await apiClient.post<{ token: string }>(
     ENDPOINTS.auth.googleAuth,
     { tokenId },
-    { skipAuth: true }
+    { skipAuth: true },
   );
-
-  console.log('[Auth] Google sign-in response received, token exists:', !!response.token);
 
   if (!response.token) {
     throw new Error('No token received from server');
@@ -159,7 +151,6 @@ export async function googleSignIn(tokenId: string): Promise<{ token: string; us
 
   // Decode JWT to get user info
   const tokenPayload = decodeJWT(response.token);
-  console.log('[Auth] Token decoded, userId:', tokenPayload.userId);
 
   const user: User = {
     id: tokenPayload.userId,
@@ -179,10 +170,8 @@ export async function googleSignIn(tokenId: string): Promise<{ token: string; us
 export async function appleSignIn(
   identityToken: string,
   fullName?: { givenName?: string | null; familyName?: string | null } | null,
-  email?: string | null
+  email?: string | null,
 ): Promise<{ token: string; user: User }> {
-  console.log('[Auth] Attempting Apple sign-in');
-
   const response = await apiClient.post<{ token: string }>(
     ENDPOINTS.auth.appleAuth,
     {
@@ -190,10 +179,8 @@ export async function appleSignIn(
       fullName: fullName ? `${fullName.givenName || ''} ${fullName.familyName || ''}`.trim() : null,
       email,
     },
-    { skipAuth: true }
+    { skipAuth: true },
   );
-
-  console.log('[Auth] Apple sign-in response received, token exists:', !!response.token);
 
   if (!response.token) {
     throw new Error('No token received from server');
@@ -204,7 +191,6 @@ export async function appleSignIn(
 
   // Decode JWT to get user info
   const tokenPayload = decodeJWT(response.token);
-  console.log('[Auth] Token decoded, userId:', tokenPayload.userId);
 
   const user: User = {
     id: tokenPayload.userId,
@@ -221,22 +207,17 @@ export async function appleSignIn(
  * Request password reset
  */
 export async function forgotPassword(email: string): Promise<{ message: string }> {
-  return apiClient.post(
-    ENDPOINTS.auth.forgotPassword,
-    { email },
-    { skipAuth: true }
-  );
+  return apiClient.post(ENDPOINTS.auth.forgotPassword, { email }, { skipAuth: true });
 }
 
 /**
  * Reset password with token
  */
-export async function resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
-  return apiClient.post(
-    ENDPOINTS.auth.resetPassword,
-    { token, newPassword },
-    { skipAuth: true }
-  );
+export async function resetPassword(
+  token: string,
+  newPassword: string,
+): Promise<{ message: string }> {
+  return apiClient.post(ENDPOINTS.auth.resetPassword, { token, newPassword }, { skipAuth: true });
 }
 
 /**
@@ -255,13 +236,12 @@ function decodeJWT(token: string): any {
     const jsonPayload = decodeURIComponent(
       atob(base64)
         .split('')
-        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
-        .join('')
+        .map((c) => `%${(`00${c.charCodeAt(0).toString(16)}`).slice(-2)}`)
+        .join(''),
     );
 
     return JSON.parse(jsonPayload);
-  } catch (error) {
-    console.error('Failed to decode JWT:', error);
+  } catch (_error) {
     return {};
   }
 }

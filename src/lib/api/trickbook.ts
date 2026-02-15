@@ -3,8 +3,8 @@
  * Endpoints for Trickipedia and TrickLists
  */
 
-import { Trick, Category, TrickList, TrickStatus } from '@/types/trickbook';
 import { API_CONFIG } from '@/constants/api';
+import type { Category, Trick, TrickList, TrickStatus } from '@/types/trickbook';
 
 const API_BASE = API_CONFIG.baseUrl;
 
@@ -28,8 +28,7 @@ export async function getTricks(params?: {
     }
 
     return response.json();
-  } catch (error) {
-    console.error('Error fetching tricks:', error);
+  } catch (_error) {
     return [];
   }
 }
@@ -45,8 +44,7 @@ export async function getTricksByCategory(category: string): Promise<Trick[]> {
 
     const data = await response.json();
     return data.tricks || [];
-  } catch (error) {
-    console.error('Error fetching tricks by category:', error);
+  } catch (_error) {
     return [];
   }
 }
@@ -61,8 +59,7 @@ export async function getTrickById(id: string): Promise<Trick | null> {
     }
 
     return response.json();
-  } catch (error) {
-    console.error('Error fetching trick:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -77,21 +74,16 @@ export async function getCategories(): Promise<Category[]> {
     }
 
     return response.json();
-  } catch (error) {
-    console.error('Error fetching categories:', error);
+  } catch (_error) {
     return [];
   }
 }
 
 // Fetch user's trick lists
-export async function getUserTrickLists(
-  userId: string,
-  token: string
-): Promise<TrickList[]> {
+export async function getUserTrickLists(userId: string, token: string): Promise<TrickList[]> {
   try {
     // Backend uses /listings for trick lists
     const url = `${API_BASE}/listings?userId=${userId}`;
-    console.log('[TrickLists] Fetching:', url);
 
     const response = await fetch(url, {
       headers: {
@@ -99,19 +91,14 @@ export async function getUserTrickLists(
       },
     });
 
-    console.log('[TrickLists] Response status:', response.status);
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.log('[TrickLists] Error response:', errorText);
+      const _errorText = await response.text();
       throw new Error('Failed to fetch trick lists');
     }
 
     const data = await response.json();
-    console.log('[TrickLists] Success, count:', data?.length || 0);
     return data;
-  } catch (error) {
-    console.error('Error fetching trick lists:', error);
+  } catch (_error) {
     return [];
   }
 }
@@ -120,7 +107,7 @@ export async function getUserTrickLists(
 export async function createTrickList(
   name: string,
   userId: string,
-  token: string
+  token: string,
 ): Promise<TrickList | null> {
   try {
     // Backend expects 'title' not 'name'
@@ -138,17 +125,13 @@ export async function createTrickList(
     }
 
     return response.json();
-  } catch (error) {
-    console.error('Error creating trick list:', error);
+  } catch (_error) {
     return null;
   }
 }
 
 // Delete a trick list
-export async function deleteTrickList(
-  listId: string,
-  token: string
-): Promise<boolean> {
+export async function deleteTrickList(listId: string, token: string): Promise<boolean> {
   try {
     const response = await fetch(`${API_BASE}/listings/${listId}`, {
       method: 'DELETE',
@@ -158,8 +141,7 @@ export async function deleteTrickList(
     });
 
     return response.ok;
-  } catch (error) {
-    console.error('Error deleting trick list:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -168,7 +150,7 @@ export async function deleteTrickList(
 export async function updateTrickList(
   listId: string,
   name: string,
-  token: string
+  token: string,
 ): Promise<boolean> {
   try {
     const response = await fetch(`${API_BASE}/listings/edit`, {
@@ -181,8 +163,7 @@ export async function updateTrickList(
     });
 
     return response.ok;
-  } catch (error) {
-    console.error('Error updating trick list:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -190,15 +171,19 @@ export async function updateTrickList(
 // Update trick status in a list
 // Backend uses PUT /listing/update with { _id, checked } where checked is "To Do" or "Completed"
 export async function updateTrickStatus(
-  listId: string,
+  _listId: string,
   trickId: string,
   status: TrickStatus,
-  token: string
+  token: string,
 ): Promise<boolean> {
   try {
     // Map our status to backend's checked format
-    const checked = status === 'Mastered' || status === 'Landed' ? 'Completed' :
-                    status === 'Learning' ? 'Learning' : 'To Do';
+    const checked =
+      status === 'Mastered' || status === 'Landed'
+        ? 'Completed'
+        : status === 'Learning'
+          ? 'Learning'
+          : 'To Do';
 
     const response = await fetch(`${API_BASE}/listing/update`, {
       method: 'PUT',
@@ -210,8 +195,7 @@ export async function updateTrickStatus(
     });
 
     return response.ok;
-  } catch (error) {
-    console.error('Error updating trick status:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -221,7 +205,7 @@ export async function updateTrickStatus(
 export async function addTrickToList(
   listId: string,
   trick: { name: string; link?: string; notes?: string; trickipediaId?: string },
-  token: string
+  token: string,
 ): Promise<boolean> {
   try {
     const body: Record<string, string> = {
@@ -247,8 +231,7 @@ export async function addTrickToList(
     });
 
     return response.ok;
-  } catch (error) {
-    console.error('Error adding trick to list:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -268,8 +251,7 @@ export async function getPublicTrickLists(token?: string): Promise<TrickList[]> 
     }
 
     return response.json();
-  } catch (error) {
-    console.error('Error fetching public trick lists:', error);
+  } catch (_error) {
     return [];
   }
 }
@@ -280,29 +262,25 @@ export async function getPublicTrickLists(token?: string): Promise<TrickList[]> 
 export async function getTrickList(
   listId: string,
   token: string,
-  userId?: string
+  userId?: string,
 ): Promise<TrickList | null> {
   try {
     // If we have userId, fetch all lists and find the matching one
     // (The GET /listings endpoint already enriches tricks with full data)
     if (userId) {
       const allLists = await getUserTrickLists(userId, token);
-      console.log('[getTrickList] Fetched', allLists.length, 'lists for user');
 
       // Handle both string and ObjectId comparison
-      const list = allLists.find(l => {
+      const list = allLists.find((l) => {
         const listIdStr = typeof l._id === 'object' ? String(l._id) : l._id;
         return listIdStr === listId;
       });
 
       if (list) {
-        console.log('[getTrickList] Found list:', list.name, 'with', list.tricks?.length, 'tricks');
         if (list.tricks?.[0]) {
-          console.log('[getTrickList] First trick checked field:', list.tricks[0].checked);
         }
         return list;
       }
-      console.log('[getTrickList] List not found in user lists, trying fallback');
     }
 
     // Fallback: fetch tricks for this list and construct a basic list object
@@ -317,9 +295,7 @@ export async function getTrickList(
     }
 
     const tricks = await tricksResponse.json();
-    console.log('[getTrickList] Fallback: fetched', tricks.length, 'tricks');
     if (tricks[0]) {
-      console.log('[getTrickList] Fallback first trick:', JSON.stringify(tricks[0]));
     }
 
     // Return a basic list structure with the tricks
@@ -331,16 +307,19 @@ export async function getTrickList(
         _id: t._id,
         name: t.name,
         checked: t.checked || 'To Do', // Preserve original checked field
-        status: t.checked === 'Complete' || t.checked === 'Completed' ? 'Mastered' :
-                t.checked === 'Learning' ? 'Learning' : 'Not Started',
+        status:
+          t.checked === 'Complete' || t.checked === 'Completed'
+            ? 'Mastered'
+            : t.checked === 'Learning'
+              ? 'Learning'
+              : 'Not Started',
         link: t.link,
         notes: t.notes,
         createdAt: t.createdAt,
       })),
       isPublic: false,
     } as TrickList;
-  } catch (error) {
-    console.error('Error fetching trick list:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -348,9 +327,9 @@ export async function getTrickList(
 // Remove a trick from a list
 // Backend uses DELETE /listing/:trickId (not /listings)
 export async function removeTrickFromList(
-  listId: string,
+  _listId: string,
   trickId: string,
-  token: string
+  token: string,
 ): Promise<boolean> {
   try {
     const response = await fetch(`${API_BASE}/listing/${trickId}`, {
@@ -361,8 +340,7 @@ export async function removeTrickFromList(
     });
 
     return response.ok;
-  } catch (error) {
-    console.error('Error removing trick from list:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -372,7 +350,7 @@ export async function removeTrickFromList(
 export async function editTrick(
   trickId: string,
   updates: { name: string; link?: string; notes?: string },
-  token: string
+  token: string,
 ): Promise<boolean> {
   try {
     const response = await fetch(`${API_BASE}/listing/edit`, {
@@ -390,8 +368,7 @@ export async function editTrick(
     });
 
     return response.ok;
-  } catch (error) {
-    console.error('Error editing trick:', error);
+  } catch (_error) {
     return false;
   }
 }

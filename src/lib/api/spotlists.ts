@@ -3,10 +3,10 @@
  * Functions for managing user's spot lists (collections of saved spots)
  */
 
-import { apiClient } from './client';
 import { ENDPOINTS } from '@/constants/api';
-import { Spot } from './spots';
-import { SpotList, CreateSpotListInput, SpotListUsage } from '@/types/spots';
+import type { CreateSpotListInput, SpotList, SpotListUsage } from '@/types/spots';
+import { apiClient } from './client';
+import type { Spot } from './spots';
 
 /**
  * Get all spot lists for the current user
@@ -15,8 +15,7 @@ export async function getSpotLists(): Promise<SpotList[]> {
   try {
     const response = await apiClient.get<SpotList[]>(ENDPOINTS.spotLists.list);
     return response;
-  } catch (error) {
-    console.error('Error fetching spot lists:', error);
+  } catch (_error) {
     return [];
   }
 }
@@ -28,8 +27,7 @@ export async function getSpotList(listId: string): Promise<SpotList | null> {
   try {
     const response = await apiClient.get<SpotList>(ENDPOINTS.spotLists.detail(listId));
     return response;
-  } catch (error) {
-    console.error('Error fetching spot list:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -41,8 +39,7 @@ export async function getSpotsInList(listId: string): Promise<Spot[]> {
   try {
     const response = await apiClient.get<Spot[]>(`${ENDPOINTS.spotLists.detail(listId)}/spots`);
     return response;
-  } catch (error) {
-    console.error('Error fetching spots in list:', error);
+  } catch (_error) {
     return [];
   }
 }
@@ -54,8 +51,7 @@ export async function createSpotList(data: CreateSpotListInput): Promise<SpotLis
   try {
     const response = await apiClient.post<SpotList>(ENDPOINTS.spotLists.create, data);
     return response;
-  } catch (error) {
-    console.error('Error creating spot list:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -63,15 +59,11 @@ export async function createSpotList(data: CreateSpotListInput): Promise<SpotLis
 /**
  * Update a spot list (name and/or description)
  */
-export async function updateSpotList(
-  listId: string,
-  data: CreateSpotListInput
-): Promise<boolean> {
+export async function updateSpotList(listId: string, data: CreateSpotListInput): Promise<boolean> {
   try {
     await apiClient.put(ENDPOINTS.spotLists.update(listId), data);
     return true;
-  } catch (error) {
-    console.error('Error updating spot list:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -83,8 +75,7 @@ export async function deleteSpotList(listId: string): Promise<boolean> {
   try {
     await apiClient.delete(ENDPOINTS.spotLists.delete(listId));
     return true;
-  } catch (error) {
-    console.error('Error deleting spot list:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -96,8 +87,7 @@ export async function addSpotToList(listId: string, spotId: string): Promise<boo
   try {
     await apiClient.post(`${ENDPOINTS.spotLists.detail(listId)}/spots`, { spotId });
     return true;
-  } catch (error) {
-    console.error('Error adding spot to list:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -109,8 +99,7 @@ export async function removeSpotFromList(listId: string, spotId: string): Promis
   try {
     await apiClient.delete(`${ENDPOINTS.spotLists.detail(listId)}/spots/${spotId}`);
     return true;
-  } catch (error) {
-    console.error('Error removing spot from list:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -122,8 +111,7 @@ export async function getSpotListUsage(): Promise<SpotListUsage | null> {
   try {
     const response = await apiClient.get<SpotListUsage>(`${ENDPOINTS.spotLists.list}/usage`);
     return response;
-  } catch (error) {
-    console.error('Error fetching spot list usage:', error);
+  } catch (_error) {
     return null;
   }
 }

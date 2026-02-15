@@ -3,9 +3,9 @@
  * Redirects to the unified profile screen with source tracking
  */
 
-import { useEffect } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { View, ActivityIndicator } from 'react-native';
+import { useEffect } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 
 export default function HomieProfileRedirect() {
   const { userId } = useLocalSearchParams<{ userId: string }>();
@@ -23,7 +23,14 @@ export default function HomieProfileRedirect() {
 
   // Show loading while redirecting
   return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#121212' }}>
+    <View
+      style={{
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        backgroundColor: '#121212',
+      }}
+    >
       <ActivityIndicator size="large" color="#FCF150" />
     </View>
   );

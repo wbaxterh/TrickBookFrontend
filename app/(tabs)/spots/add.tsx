@@ -9,38 +9,38 @@
  * - Spot details form
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  Pressable,
-  TextInput,
-  ScrollView,
-  StyleSheet,
-  Dimensions,
   ActivityIndicator,
   Alert,
-  Linking,
-  Platform,
-  KeyboardAvoidingView,
-  Modal,
+  Dimensions,
   FlatList,
+  KeyboardAvoidingView,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
-import * as Location from 'expo-location';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { useAuthStore } from '@/lib/stores/authStore';
 import {
   createSpot,
-  searchPlaces,
-  reverseGeocode,
-  PlaceSearchResult,
   getSportTypes,
-  SportType,
+  type PlaceSearchResult,
+  reverseGeocode,
+  type SportType,
+  searchPlaces,
 } from '@/lib/api/spots';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { useAuthStore } from '@/lib/stores/authStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const YELLOW = '#FCF150';
@@ -77,8 +77,13 @@ export default function AddSpotScreen() {
   const [step, setStep] = useState<Step>('location');
 
   // Location state
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [selectedLocation, setSelectedLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(
+    null,
+  );
+  const [selectedLocation, setSelectedLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [locationName, setLocationName] = useState('');
   const [locationAddress, setLocationAddress] = useState('');
   const [city, setCity] = useState('');
@@ -149,8 +154,7 @@ export default function AddSpotScreen() {
       if (result.address) setLocationAddress(result.address);
       if (result.city) setCity(result.city);
       if (result.state) setState(result.state);
-    } catch (error) {
-      console.error('Reverse geocode error:', error);
+    } catch (_error) {
     } finally {
       setLoading(false);
     }
@@ -169,11 +173,10 @@ export default function AddSpotScreen() {
       const results = await searchPlaces(
         searchQuery,
         userLocation?.latitude,
-        userLocation?.longitude
+        userLocation?.longitude,
       );
       setSearchResults(results);
-    } catch (error) {
-      console.error('Search error:', error);
+    } catch (_error) {
     } finally {
       setSearching(false);
     }
@@ -206,12 +209,15 @@ export default function AddSpotScreen() {
     }
 
     // Animate to the selected location
-    mapRef.current?.animateToRegion({
-      latitude: place.latitude,
-      longitude: place.longitude,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
-    }, 500);
+    mapRef.current?.animateToRegion(
+      {
+        latitude: place.latitude,
+        longitude: place.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      },
+      500,
+    );
   }, []);
 
   // Open Street View
@@ -239,11 +245,14 @@ export default function AddSpotScreen() {
   // Center on user location
   const centerOnUser = useCallback(() => {
     if (userLocation) {
-      mapRef.current?.animateToRegion({
-        ...userLocation,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }, 500);
+      mapRef.current?.animateToRegion(
+        {
+          ...userLocation,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        },
+        500,
+      );
     }
   }, [userLocation]);
 
@@ -262,10 +271,8 @@ export default function AddSpotScreen() {
 
   // Toggle sport selection
   const toggleSport = useCallback((sport: string) => {
-    setSelectedSports(prev =>
-      prev.includes(sport)
-        ? prev.filter(s => s !== sport)
-        : [...prev, sport]
+    setSelectedSports((prev) =>
+      prev.includes(sport) ? prev.filter((s) => s !== sport) : [...prev, sport],
     );
   }, []);
 
@@ -312,18 +319,27 @@ export default function AddSpotScreen() {
               text: 'OK',
               onPress: () => router.back(),
             },
-          ]
+          ],
         );
       } else {
         Alert.alert('Error', 'Failed to create spot. Please try again.');
       }
-    } catch (error) {
-      console.error('Error creating spot:', error);
+    } catch (_error) {
       Alert.alert('Error', 'Failed to create spot. Please try again.');
     } finally {
       setSaving(false);
     }
-  }, [spotName, selectedLocation, description, city, state, selectedCategory, selectedSports, isPublic, selectedPlaceId]);
+  }, [
+    spotName,
+    selectedLocation,
+    description,
+    city,
+    state,
+    selectedCategory,
+    selectedSports,
+    isPublic,
+    selectedPlaceId,
+  ]);
 
   // Render location selection step
   const renderLocationStep = () => (
@@ -353,11 +369,7 @@ export default function AddSpotScreen() {
         }
       >
         {selectedLocation && (
-          <Marker
-            coordinate={selectedLocation}
-            draggable
-            onDragEnd={handleMapPress}
-          >
+          <Marker coordinate={selectedLocation} draggable onDragEnd={handleMapPress}>
             <View style={styles.markerContainer}>
               <View style={styles.marker}>
                 <Ionicons name="location" size={24} color={DARK} />
@@ -373,7 +385,10 @@ export default function AddSpotScreen() {
         <SafeAreaView edges={['top']}>
           {/* Header */}
           <View style={styles.header}>
-            <Pressable style={[styles.backButton, { backgroundColor: theme.surface }]} onPress={() => router.back()}>
+            <Pressable
+              style={[styles.backButton, { backgroundColor: theme.surface }]}
+              onPress={() => router.back()}
+            >
               <Ionicons name="close" size={24} color={theme.text} />
             </Pressable>
             <Text style={[styles.headerTitle, { color: theme.text }]}>Add Spot</Text>
@@ -393,11 +408,13 @@ export default function AddSpotScreen() {
               returnKeyType="search"
             />
             {searchQuery.length > 0 && (
-              <Pressable onPress={() => {
-                setSearchQuery('');
-                setSearchResults([]);
-                setShowSearchResults(false);
-              }}>
+              <Pressable
+                onPress={() => {
+                  setSearchQuery('');
+                  setSearchResults([]);
+                  setShowSearchResults(false);
+                }}
+              >
                 <Ionicons name="close-circle" size={20} color={theme.textSecondary} />
               </Pressable>
             )}
@@ -426,10 +443,16 @@ export default function AddSpotScreen() {
                     >
                       <Ionicons name="location" size={20} color={YELLOW} />
                       <View style={styles.searchResultInfo}>
-                        <Text style={[styles.searchResultName, { color: theme.text }]} numberOfLines={1}>
+                        <Text
+                          style={[styles.searchResultName, { color: theme.text }]}
+                          numberOfLines={1}
+                        >
                           {item.name}
                         </Text>
-                        <Text style={[styles.searchResultAddress, { color: theme.textSecondary }]} numberOfLines={1}>
+                        <Text
+                          style={[styles.searchResultAddress, { color: theme.textSecondary }]}
+                          numberOfLines={1}
+                        >
                           {item.address}
                         </Text>
                       </View>
@@ -474,8 +497,12 @@ export default function AddSpotScreen() {
                   {locationName}
                 </Text>
               ) : null}
-              <Text style={[styles.locationAddress, { color: theme.textSecondary }]} numberOfLines={2}>
-                {locationAddress || `${selectedLocation.latitude.toFixed(6)}, ${selectedLocation.longitude.toFixed(6)}`}
+              <Text
+                style={[styles.locationAddress, { color: theme.textSecondary }]}
+                numberOfLines={2}
+              >
+                {locationAddress ||
+                  `${selectedLocation.latitude.toFixed(6)}, ${selectedLocation.longitude.toFixed(6)}`}
               </Text>
               {loading && (
                 <ActivityIndicator size="small" color={YELLOW} style={{ marginTop: 8 }} />
@@ -533,7 +560,9 @@ export default function AddSpotScreen() {
                 {locationName || locationAddress || 'Selected Location'}
               </Text>
               <Text style={[styles.locationPreviewCoords, { color: theme.textSecondary }]}>
-                {city && state ? `${city}, ${state}` : `${selectedLocation?.latitude.toFixed(4)}, ${selectedLocation?.longitude.toFixed(4)}`}
+                {city && state
+                  ? `${city}, ${state}`
+                  : `${selectedLocation?.latitude.toFixed(4)}, ${selectedLocation?.longitude.toFixed(4)}`}
               </Text>
             </View>
             <Pressable onPress={() => setStep('location')}>
@@ -544,7 +573,10 @@ export default function AddSpotScreen() {
           {/* Spot Name */}
           <Text style={[styles.label, { color: theme.text }]}>Spot Name *</Text>
           <TextInput
-            style={[styles.input, { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border }]}
+            style={[
+              styles.input,
+              { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border },
+            ]}
             placeholder="e.g., Astoria Skatepark"
             placeholderTextColor={theme.textSecondary}
             value={spotName}
@@ -554,7 +586,11 @@ export default function AddSpotScreen() {
           {/* Description */}
           <Text style={[styles.label, { color: theme.text }]}>Description</Text>
           <TextInput
-            style={[styles.input, styles.inputMultiline, { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border }]}
+            style={[
+              styles.input,
+              styles.inputMultiline,
+              { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border },
+            ]}
             placeholder="Describe this spot..."
             placeholderTextColor={theme.textSecondary}
             value={description}
@@ -595,12 +631,15 @@ export default function AddSpotScreen() {
           {/* Sport Types */}
           <Text style={[styles.label, { color: theme.text }]}>Sport Types *</Text>
           <Pressable
-            style={[styles.sportSelector, { backgroundColor: theme.surface, borderColor: theme.border }]}
+            style={[
+              styles.sportSelector,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
             onPress={() => setSportModalVisible(true)}
           >
             <Text style={{ color: selectedSports.length > 0 ? theme.text : theme.textSecondary }}>
               {selectedSports.length > 0
-                ? selectedSports.map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(', ')
+                ? selectedSports.map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join(', ')
                 : 'Select sport types...'}
             </Text>
             <Ionicons name="chevron-down" size={20} color={theme.textSecondary} />
@@ -609,16 +648,17 @@ export default function AddSpotScreen() {
           {/* Public/Private Toggle */}
           <View style={styles.toggleContainer}>
             <View style={styles.toggleInfo}>
-              <Text style={[styles.label, { color: theme.text, marginBottom: 0 }]}>Make Public</Text>
+              <Text style={[styles.label, { color: theme.text, marginBottom: 0 }]}>
+                Make Public
+              </Text>
               <Text style={[styles.toggleSubtext, { color: theme.textSecondary }]}>
-                {isPublic ? 'Spot will be visible to everyone after approval' : 'Only you can see this spot'}
+                {isPublic
+                  ? 'Spot will be visible to everyone after approval'
+                  : 'Only you can see this spot'}
               </Text>
             </View>
             <Pressable
-              style={[
-                styles.toggle,
-                { backgroundColor: isPublic ? YELLOW : theme.border },
-              ]}
+              style={[styles.toggle, { backgroundColor: isPublic ? YELLOW : theme.border }]}
               onPress={() => setIsPublic(!isPublic)}
             >
               <View
@@ -661,10 +701,7 @@ export default function AddSpotScreen() {
         animationType="slide"
         onRequestClose={() => setSportModalVisible(false)}
       >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setSportModalVisible(false)}
-        >
+        <Pressable style={styles.modalOverlay} onPress={() => setSportModalVisible(false)}>
           <Pressable
             style={[styles.modalContent, { backgroundColor: theme.surface }]}
             onPress={(e) => e.stopPropagation()}
@@ -682,7 +719,7 @@ export default function AddSpotScreen() {
                   key={sport.value}
                   style={[
                     styles.sportOption,
-                    selectedSports.includes(sport.value) && { backgroundColor: YELLOW + '20' },
+                    selectedSports.includes(sport.value) && { backgroundColor: `${YELLOW}20` },
                   ]}
                   onPress={() => toggleSport(sport.value)}
                 >

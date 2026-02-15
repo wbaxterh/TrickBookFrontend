@@ -10,38 +10,38 @@
  * - Rename/Delete list via ellipsis menu
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  FlatList,
-  ActivityIndicator,
-  Modal,
-  TextInput,
-  Alert,
-  Image,
-  StyleSheet,
-  Animated,
-  RefreshControl,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Swipeable, GestureHandlerRootView } from 'react-native-gesture-handler';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { useAuthStore } from '@/lib/stores/authStore';
-import { getSpots, Spot } from '@/lib/api/spots';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  FlatList,
+  Image,
+  Modal,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ShareToHomieModal } from '@/components/share';
+import {
+  addSpotToList,
+  deleteSpotList,
   getSpotList,
   getSpotsInList,
-  updateSpotList,
-  deleteSpotList,
-  addSpotToList,
   removeSpotFromList,
+  updateSpotList,
 } from '@/lib/api/spotlists';
-import { SpotList } from '@/types/spots';
-import { ShareToHomieModal } from '@/components/share';
+import { getSpots, type Spot } from '@/lib/api/spots';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { useAuthStore } from '@/lib/stores/authStore';
+import type { SpotList } from '@/types/spots';
 
 const YELLOW = '#FCF150';
 const DARK = '#1f1f1f';
@@ -84,8 +84,7 @@ export default function SpotListDetailScreen() {
       ]);
       setList(listData);
       setSpots(spotsData);
-    } catch (error) {
-      console.error('Failed to load spot list:', error);
+    } catch (_error) {
       Alert.alert('Error', 'Failed to load spot list');
     } finally {
       setLoading(false);
@@ -106,35 +105,34 @@ export default function SpotListDetailScreen() {
   const handleRemoveSpot = async (spot: Spot) => {
     if (!listId) return;
 
-    Alert.alert(
-      'Remove Spot',
-      `Remove "${spot.name}" from this list?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const success = await removeSpotFromList(listId, spot._id);
-              if (success) {
-                setSpots(prev => prev.filter(s => s._id !== spot._id));
-                setList(prev => prev ? {
-                  ...prev,
-                  spotCount: (prev.spotCount || 0) - 1,
-                  spotIds: prev.spotIds.filter(id => id !== spot._id),
-                } : prev);
-              } else {
-                Alert.alert('Error', 'Failed to remove spot');
-              }
-            } catch (error) {
-              console.error('Failed to remove spot:', error);
+    Alert.alert('Remove Spot', `Remove "${spot.name}" from this list?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const success = await removeSpotFromList(listId, spot._id);
+            if (success) {
+              setSpots((prev) => prev.filter((s) => s._id !== spot._id));
+              setList((prev) =>
+                prev
+                  ? {
+                      ...prev,
+                      spotCount: (prev.spotCount || 0) - 1,
+                      spotIds: prev.spotIds.filter((id) => id !== spot._id),
+                    }
+                  : prev,
+              );
+            } else {
               Alert.alert('Error', 'Failed to remove spot');
             }
-          },
+          } catch (_error) {
+            Alert.alert('Error', 'Failed to remove spot');
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   // Open share modal
@@ -162,17 +160,20 @@ export default function SpotListDetailScreen() {
         description: newListDescription.trim() || undefined,
       });
       if (success) {
-        setList(prev => prev ? {
-          ...prev,
-          name: newListName.trim(),
-          description: newListDescription.trim() || undefined,
-        } : prev);
+        setList((prev) =>
+          prev
+            ? {
+                ...prev,
+                name: newListName.trim(),
+                description: newListDescription.trim() || undefined,
+              }
+            : prev,
+        );
         setRenameModalVisible(false);
       } else {
         Alert.alert('Error', 'Failed to rename list');
       }
-    } catch (error) {
-      console.error('Failed to rename list:', error);
+    } catch (_error) {
       Alert.alert('Error', 'Failed to rename list');
     } finally {
       setSaving(false);
@@ -199,13 +200,12 @@ export default function SpotListDetailScreen() {
               } else {
                 Alert.alert('Error', 'Failed to delete list');
               }
-            } catch (error) {
-              console.error('Failed to delete list:', error);
+            } catch (_error) {
               Alert.alert('Error', 'Failed to delete list');
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -217,10 +217,9 @@ export default function SpotListDetailScreen() {
       const response = await getSpots({ limit: 100 });
       // Filter out spots already in the list
       const spotIdsInList = new Set(list?.spotIds || []);
-      const available = response.spots.filter(s => !spotIdsInList.has(s._id));
+      const available = response.spots.filter((s) => !spotIdsInList.has(s._id));
       setAvailableSpots(available);
-    } catch (error) {
-      console.error('Failed to load available spots:', error);
+    } catch (_error) {
     } finally {
       setLoadingAvailableSpots(false);
     }
@@ -233,56 +232,62 @@ export default function SpotListDetailScreen() {
     try {
       const success = await addSpotToList(listId, spot._id);
       if (success) {
-        setSpots(prev => [...prev, spot]);
-        setList(prev => prev ? {
-          ...prev,
-          spotCount: (prev.spotCount || 0) + 1,
-          spotIds: [...prev.spotIds, spot._id],
-        } : prev);
-        setAvailableSpots(prev => prev.filter(s => s._id !== spot._id));
+        setSpots((prev) => [...prev, spot]);
+        setList((prev) =>
+          prev
+            ? {
+                ...prev,
+                spotCount: (prev.spotCount || 0) + 1,
+                spotIds: [...prev.spotIds, spot._id],
+              }
+            : prev,
+        );
+        setAvailableSpots((prev) => prev.filter((s) => s._id !== spot._id));
         Alert.alert('Success', `Added "${spot.name}" to the list`);
       } else {
         Alert.alert('Error', 'Failed to add spot to list');
       }
-    } catch (error) {
-      console.error('Failed to add spot to list:', error);
+    } catch (_error) {
       Alert.alert('Error', 'Failed to add spot to list');
     }
   };
 
   // Filter available spots by search
-  const filteredAvailableSpots = availableSpots.filter(spot =>
-    spot.name.toLowerCase().includes(spotsSearchQuery.toLowerCase()) ||
-    spot.city?.toLowerCase().includes(spotsSearchQuery.toLowerCase()) ||
-    spot.state?.toLowerCase().includes(spotsSearchQuery.toLowerCase())
+  const filteredAvailableSpots = availableSpots.filter(
+    (spot) =>
+      spot.name.toLowerCase().includes(spotsSearchQuery.toLowerCase()) ||
+      spot.city?.toLowerCase().includes(spotsSearchQuery.toLowerCase()) ||
+      spot.state?.toLowerCase().includes(spotsSearchQuery.toLowerCase()),
   );
 
   // Render swipe actions
-  const renderRightActions = (spot: Spot) => (
-    progress: Animated.AnimatedInterpolation<number>,
-    dragX: Animated.AnimatedInterpolation<number>
-  ) => {
-    const scale = dragX.interpolate({
-      inputRange: [-100, 0],
-      outputRange: [1, 0],
-      extrapolate: 'clamp',
-    });
+  const renderRightActions =
+    (spot: Spot) =>
+    (
+      _progress: Animated.AnimatedInterpolation<number>,
+      dragX: Animated.AnimatedInterpolation<number>,
+    ) => {
+      const scale = dragX.interpolate({
+        inputRange: [-100, 0],
+        outputRange: [1, 0],
+        extrapolate: 'clamp',
+      });
 
-    return (
-      <Pressable
-        style={[styles.swipeAction, styles.deleteAction]}
-        onPress={() => {
-          swipeableRefs.current.get(spot._id)?.close();
-          handleRemoveSpot(spot);
-        }}
-      >
-        <Animated.View style={{ transform: [{ scale }] }}>
-          <Ionicons name="trash" size={24} color="#fff" />
-          <Text style={styles.swipeActionText}>Remove</Text>
-        </Animated.View>
-      </Pressable>
-    );
-  };
+      return (
+        <Pressable
+          style={[styles.swipeAction, styles.deleteAction]}
+          onPress={() => {
+            swipeableRefs.current.get(spot._id)?.close();
+            handleRemoveSpot(spot);
+          }}
+        >
+          <Animated.View style={{ transform: [{ scale }] }}>
+            <Ionicons name="trash" size={24} color="#fff" />
+            <Text style={styles.swipeActionText}>Remove</Text>
+          </Animated.View>
+        </Pressable>
+      );
+    };
 
   // Render spot item
   const renderSpotItem = ({ item }: { item: Spot }) => {
@@ -330,7 +335,10 @@ export default function SpotListDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={YELLOW} />
         </View>
@@ -340,7 +348,10 @@ export default function SpotListDetailScreen() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         {/* Header */}
         <View style={styles.header}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
@@ -367,11 +378,7 @@ export default function SpotListDetailScreen() {
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={YELLOW}
-            />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={YELLOW} />
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
@@ -403,30 +410,21 @@ export default function SpotListDetailScreen() {
           animationType="fade"
           onRequestClose={() => setMenuModalVisible(false)}
         >
-          <Pressable
-            style={styles.menuOverlay}
-            onPress={() => setMenuModalVisible(false)}
-          >
+          <Pressable style={styles.menuOverlay} onPress={() => setMenuModalVisible(false)}>
             <View style={[styles.menuContent, { backgroundColor: theme.surface }]}>
               <Pressable style={styles.menuOption} onPress={handleOpenShare}>
                 <Ionicons name="share-outline" size={22} color={theme.text} />
-                <Text style={[styles.menuOptionText, { color: theme.text }]}>
-                  Share to Homie
-                </Text>
+                <Text style={[styles.menuOptionText, { color: theme.text }]}>Share to Homie</Text>
               </Pressable>
               <View style={[styles.menuDivider, { backgroundColor: theme.border }]} />
               <Pressable style={styles.menuOption} onPress={handleOpenRename}>
                 <Ionicons name="pencil-outline" size={22} color={theme.text} />
-                <Text style={[styles.menuOptionText, { color: theme.text }]}>
-                  Rename List
-                </Text>
+                <Text style={[styles.menuOptionText, { color: theme.text }]}>Rename List</Text>
               </Pressable>
               <View style={[styles.menuDivider, { backgroundColor: theme.border }]} />
               <Pressable style={styles.menuOption} onPress={handleDeleteList}>
                 <Ionicons name="trash-outline" size={22} color={RED} />
-                <Text style={[styles.menuOptionText, { color: RED }]}>
-                  Delete List
-                </Text>
+                <Text style={[styles.menuOptionText, { color: RED }]}>Delete List</Text>
               </Pressable>
             </View>
           </Pressable>
@@ -439,10 +437,7 @@ export default function SpotListDetailScreen() {
           animationType="slide"
           onRequestClose={() => setRenameModalVisible(false)}
         >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setRenameModalVisible(false)}
-          >
+          <Pressable style={styles.modalOverlay} onPress={() => setRenameModalVisible(false)}>
             <Pressable
               style={[styles.modalContent, { backgroundColor: theme.surface }]}
               onPress={(e) => e.stopPropagation()}
@@ -459,7 +454,11 @@ export default function SpotListDetailScreen() {
                 <TextInput
                   style={[
                     styles.input,
-                    { backgroundColor: theme.background, color: theme.text, borderColor: theme.border },
+                    {
+                      backgroundColor: theme.background,
+                      color: theme.text,
+                      borderColor: theme.border,
+                    },
                   ]}
                   value={newListName}
                   onChangeText={setNewListName}
@@ -475,7 +474,11 @@ export default function SpotListDetailScreen() {
                   style={[
                     styles.input,
                     styles.inputMultiline,
-                    { backgroundColor: theme.background, color: theme.text, borderColor: theme.border },
+                    {
+                      backgroundColor: theme.background,
+                      color: theme.text,
+                      borderColor: theme.border,
+                    },
                   ]}
                   value={newListDescription}
                   onChangeText={setNewListDescription}
@@ -562,7 +565,8 @@ export default function SpotListDetailScreen() {
                     </View>
                   }
                   renderItem={({ item }) => {
-                    const address = [item.city, item.state].filter(Boolean).join(', ') || 'Unknown location';
+                    const address =
+                      [item.city, item.state].filter(Boolean).join(', ') || 'Unknown location';
                     return (
                       <Pressable
                         style={[styles.addSpotRow, { backgroundColor: theme.surface }]}
@@ -571,15 +575,26 @@ export default function SpotListDetailScreen() {
                         {item.imageURL ? (
                           <Image source={{ uri: item.imageURL }} style={styles.addSpotImage} />
                         ) : (
-                          <View style={[styles.addSpotImagePlaceholder, { backgroundColor: theme.border }]}>
+                          <View
+                            style={[
+                              styles.addSpotImagePlaceholder,
+                              { backgroundColor: theme.border },
+                            ]}
+                          >
                             <Ionicons name="image-outline" size={20} color={theme.textSecondary} />
                           </View>
                         )}
                         <View style={styles.addSpotInfo}>
-                          <Text style={[styles.addSpotName, { color: theme.text }]} numberOfLines={1}>
+                          <Text
+                            style={[styles.addSpotName, { color: theme.text }]}
+                            numberOfLines={1}
+                          >
                             {item.name}
                           </Text>
-                          <Text style={[styles.addSpotAddress, { color: theme.textSecondary }]} numberOfLines={1}>
+                          <Text
+                            style={[styles.addSpotAddress, { color: theme.textSecondary }]}
+                            numberOfLines={1}
+                          >
                             {address}
                           </Text>
                         </View>

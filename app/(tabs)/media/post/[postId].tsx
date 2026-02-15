@@ -3,41 +3,40 @@
  * Full post view with comments for The Feed
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  Image,
-  TextInput,
   ActivityIndicator,
-  StyleSheet,
+  Alert,
   Dimensions,
+  Image,
   KeyboardAvoidingView,
   Platform,
-  FlatList,
-  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useVideoPlayer, VideoView } from 'expo-video';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { useAuthStore } from '@/lib/stores/authStore';
 import {
-  getPost,
-  getComments,
   addComment,
   addReaction,
+  type Comment,
+  type FeedPost,
+  formatCount,
+  formatTimeAgo,
+  getComments,
+  getPost,
   removeReaction,
   toggleSavePost,
   trackPostView,
-  FeedPost,
-  Comment,
-  formatTimeAgo,
-  formatCount,
 } from '@/lib/api/feed';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { useAuthStore } from '@/lib/stores/authStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const YELLOW = '#FCF150';
@@ -79,8 +78,7 @@ export default function PostDetailScreen() {
       if (postData) {
         trackPostView(postId);
       }
-    } catch (error) {
-      console.error('Error fetching post:', error);
+    } catch (_error) {
     } finally {
       setLoading(false);
     }
@@ -133,8 +131,7 @@ export default function PostDetailScreen() {
           });
         }
       }
-    } catch (error) {
-      console.error('Error sending comment:', error);
+    } catch (_error) {
       setCommentText(content);
       Alert.alert('Error', 'Could not send comment');
     } finally {
@@ -185,7 +182,10 @@ export default function PostDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={YELLOW} />
         </View>
@@ -195,7 +195,10 @@ export default function PostDetailScreen() {
 
   if (!post) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.header}>
           <Pressable
             style={[styles.backButton, { backgroundColor: theme.surface }]}
@@ -298,10 +301,7 @@ export default function PostDetailScreen() {
                 {formatCount(post.stats.respectCount)}
               </Text>
             </Pressable>
-            <Pressable
-              style={styles.actionButton}
-              onPress={() => commentInputRef.current?.focus()}
-            >
+            <Pressable style={styles.actionButton} onPress={() => commentInputRef.current?.focus()}>
               <Ionicons name="chatbubble-outline" size={24} color={theme.text} />
               <Text style={[styles.actionCount, { color: theme.textSecondary }]}>
                 {formatCount(post.stats.commentCount)}
@@ -400,14 +400,7 @@ function PostVideoPlayer({ hlsUrl }: { hlsUrl: string }) {
     player.play();
   });
 
-  return (
-    <VideoView
-      player={player}
-      style={styles.media}
-      contentFit="contain"
-      nativeControls
-    />
-  );
+  return <VideoView player={player} style={styles.media} contentFit="contain" nativeControls />;
 }
 
 interface CommentItemProps {

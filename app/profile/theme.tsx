@@ -8,12 +8,12 @@
  * - System: Follow device settings (default)
  */
 
-import { View, Text, ScrollView, Pressable, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useThemeContext, ThemePreference } from '@/lib/providers/ThemeProvider';
+import { router } from 'expo-router';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Card } from '@/components/ui';
+import { type ThemePreference, useThemeContext } from '@/lib/providers/ThemeProvider';
 
 type ThemeOption = {
   id: ThemePreference;
@@ -55,17 +55,10 @@ export default function ThemeScreen() {
   const currentThemeIcon = isDark ? 'moon' : 'sunny';
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      edges={['top']}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-          hitSlop={8}
-        >
+        <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={8}>
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Theme</Text>
@@ -79,38 +72,21 @@ export default function ThemeScreen() {
       >
         {/* Current Theme Display */}
         <View style={styles.currentSection}>
-          <View
-            style={[
-              styles.currentBadge,
-              { backgroundColor: colors.primary + '20' },
-            ]}
-          >
-            <Ionicons
-              name={currentThemeIcon}
-              size={32}
-              color={colors.primary}
-            />
+          <View style={[styles.currentBadge, { backgroundColor: `${colors.primary}20` }]}>
+            <Ionicons name={currentThemeIcon} size={32} color={colors.primary} />
           </View>
-          <Text style={[styles.currentLabel, { color: theme.textSecondary }]}>
-            Current theme
-          </Text>
-          <Text style={[styles.currentValue, { color: theme.text }]}>
-            {currentThemeLabel} Mode
-          </Text>
+          <Text style={[styles.currentLabel, { color: theme.textSecondary }]}>Current theme</Text>
+          <Text style={[styles.currentValue, { color: theme.text }]}>{currentThemeLabel} Mode</Text>
         </View>
 
         {/* Info Card */}
         <View style={styles.cardWrapper}>
           <Card padding="lg">
             <View style={styles.infoContent}>
-              <Ionicons
-                name="information-circle-outline"
-                size={24}
-                color={theme.textSecondary}
-              />
+              <Ionicons name="information-circle-outline" size={24} color={theme.textSecondary} />
               <Text style={[styles.infoText, { color: theme.textSecondary }]}>
                 {themePreference === 'system'
-                  ? 'TrickBook automatically follows your device\'s appearance settings. Change your system theme in your device Settings to switch between light and dark mode.'
+                  ? "TrickBook automatically follows your device's appearance settings. Change your system theme in your device Settings to switch between light and dark mode."
                   : `You've selected ${themePreference} mode. The app will always use ${themePreference} theme regardless of your device settings.`}
               </Text>
             </View>
@@ -118,9 +94,7 @@ export default function ThemeScreen() {
         </View>
 
         {/* Theme Options */}
-        <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>
-          THEME OPTIONS
-        </Text>
+        <Text style={[styles.sectionTitle, { color: theme.textSecondary }]}>THEME OPTIONS</Text>
 
         <View style={styles.optionsContainer}>
           {themeOptions.map((option) => {
@@ -143,9 +117,7 @@ export default function ThemeScreen() {
                   style={[
                     styles.optionIcon,
                     {
-                      backgroundColor: isSelected
-                        ? colors.primary + '20'
-                        : theme.surfaceElevated,
+                      backgroundColor: isSelected ? `${colors.primary}20` : theme.surfaceElevated,
                     },
                   ]}
                 >
@@ -156,20 +128,12 @@ export default function ThemeScreen() {
                   />
                 </View>
                 <Text
-                  style={[
-                    styles.optionLabel,
-                    { color: isSelected ? colors.primary : theme.text },
-                  ]}
+                  style={[styles.optionLabel, { color: isSelected ? colors.primary : theme.text }]}
                 >
                   {option.label}
                 </Text>
                 {isSelected && (
-                  <View
-                    style={[
-                      styles.activeBadge,
-                      { backgroundColor: colors.primary },
-                    ]}
-                  >
+                  <View style={[styles.activeBadge, { backgroundColor: colors.primary }]}>
                     <Text style={styles.activeBadgeText}>Active</Text>
                   </View>
                 )}

@@ -6,13 +6,12 @@
  * Shows: Add Trick, Find Spot, Open Trickipedia, The Feed
  */
 
-import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { colors as brandColors } from '@/constants/colors';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card } from '@/components/ui/Card';
 import { SectionHeader } from '@/components/ui/SectionHeader';
+import { colors as brandColors } from '@/constants/colors';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 interface QuickAction {
   id: string;
@@ -27,10 +26,7 @@ interface QuickActionsProps {
   title?: string;
 }
 
-export function QuickActions({
-  actions,
-  title = 'Quick Actions',
-}: QuickActionsProps) {
+export function QuickActions({ actions, title = 'Quick Actions' }: QuickActionsProps) {
   const { theme, isDark } = useThemeContext();
 
   // Use dark amber for icons in light mode for better contrast
@@ -47,22 +43,13 @@ export function QuickActions({
             style={({ pressed }) => [
               styles.actionButton,
               {
-                backgroundColor: pressed
-                  ? theme.surfaceElevated
-                  : theme.surface,
+                backgroundColor: pressed ? theme.surfaceElevated : theme.surface,
               },
             ]}
             onPress={action.onPress}
           >
-            <Ionicons
-              name={action.icon}
-              size={24}
-              color={action.iconColor || iconColor}
-            />
-            <Text
-              style={[styles.actionLabel, { color: theme.text }]}
-              numberOfLines={2}
-            >
+            <Ionicons name={action.icon} size={24} color={action.iconColor || iconColor} />
+            <Text style={[styles.actionLabel, { color: theme.text }]} numberOfLines={2}>
               {action.label}
             </Text>
           </Pressable>
@@ -82,12 +69,7 @@ interface QuickActionButtonProps {
   iconColor?: string;
 }
 
-export function QuickActionButton({
-  label,
-  icon,
-  onPress,
-  iconColor,
-}: QuickActionButtonProps) {
+export function QuickActionButton({ label, icon, onPress, iconColor }: QuickActionButtonProps) {
   const { theme, isDark } = useThemeContext();
 
   // Use dark amber for icons in light mode for better contrast
@@ -104,17 +86,8 @@ export function QuickActionButton({
       ]}
       onPress={onPress}
     >
-      <View
-        style={[
-          styles.iconContainer,
-          { backgroundColor: finalIconColor + '20' },
-        ]}
-      >
-        <Ionicons
-          name={icon}
-          size={24}
-          color={finalIconColor}
-        />
+      <View style={[styles.iconContainer, { backgroundColor: `${finalIconColor}20` }]}>
+        <Ionicons name={icon} size={24} color={finalIconColor} />
       </View>
       <Text style={[styles.actionLabel, { color: theme.text }]}>{label}</Text>
     </Pressable>

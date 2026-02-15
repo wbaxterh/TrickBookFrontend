@@ -3,32 +3,32 @@
  * Modal for sharing content (tricks, tricklists, spots, videos) with homies via DM
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  Modal,
-  Pressable,
+  ActivityIndicator,
+  Alert,
+  Dimensions,
   FlatList,
   Image,
-  TextInput,
-  ActivityIndicator,
+  Modal,
+  Pressable,
   StyleSheet,
-  Dimensions,
-  Alert,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { getMyHomies, Homie } from '@/lib/api/homies';
+import { getMyHomies, type Homie } from '@/lib/api/homies';
 import {
+  type SharedContent,
+  type SharedContentPreview,
+  type SharedContentType,
   sendSharedContent,
-  SharedContent,
-  SharedContentType,
-  SharedContentPreview,
 } from '@/lib/api/messages';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const YELLOW = '#FCF150';
+const _YELLOW = '#FCF150';
 const DARK = '#1a1a1a';
 
 interface ShareToHomieModalProps {
@@ -73,7 +73,7 @@ export function ShareToHomieModal({
   useEffect(() => {
     if (searchQuery.trim()) {
       const filtered = homies.filter((h) =>
-        h.name.toLowerCase().includes(searchQuery.toLowerCase())
+        h.name.toLowerCase().includes(searchQuery.toLowerCase()),
       );
       setFilteredHomies(filtered);
     } else {
@@ -87,8 +87,7 @@ export function ShareToHomieModal({
       const data = await getMyHomies();
       setHomies(data);
       setFilteredHomies(data);
-    } catch (error) {
-      console.error('Error fetching homies:', error);
+    } catch (_error) {
     } finally {
       setLoading(false);
     }
@@ -112,34 +111,29 @@ export function ShareToHomieModal({
       const result = await sendSharedContent(
         selectedHomie._id,
         sharedContent,
-        message.trim() || undefined
+        message.trim() || undefined,
       );
 
       if (result.success) {
-        Alert.alert(
-          'Sent!',
-          `Shared with ${selectedHomie.name}`,
-          [
-            {
-              text: 'View Chat',
-              onPress: () => {
-                onClose();
-                if (result.conversationId && onSuccess) {
-                  onSuccess(result.conversationId);
-                }
-              },
+        Alert.alert('Sent!', `Shared with ${selectedHomie.name}`, [
+          {
+            text: 'View Chat',
+            onPress: () => {
+              onClose();
+              if (result.conversationId && onSuccess) {
+                onSuccess(result.conversationId);
+              }
             },
-            {
-              text: 'OK',
-              onPress: onClose,
-            },
-          ]
-        );
+          },
+          {
+            text: 'OK',
+            onPress: onClose,
+          },
+        ]);
       } else {
         Alert.alert('Error', 'Failed to send. Please try again.');
       }
-    } catch (error) {
-      console.error('Error sending shared content:', error);
+    } catch (_error) {
       Alert.alert('Error', 'Failed to send. Please try again.');
     } finally {
       setSending(false);
@@ -187,7 +181,7 @@ export function ShareToHomieModal({
       <Pressable
         style={[
           styles.homieItem,
-          { backgroundColor: isSelected ? colors.primary + '20' : theme.surface },
+          { backgroundColor: isSelected ? `${colors.primary}20` : theme.surface },
           isSelected && { borderColor: colors.primary, borderWidth: 2 },
         ]}
         onPress={() => handleSelectHomie(item)}
@@ -202,20 +196,13 @@ export function ShareToHomieModal({
         <Text style={[styles.homieName, { color: theme.text }]} numberOfLines={1}>
           {item.name}
         </Text>
-        {isSelected && (
-          <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
-        )}
+        {isSelected && <Ionicons name="checkmark-circle" size={24} color={colors.primary} />}
       </Pressable>
     );
   };
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
         <View style={[styles.modalContent, { backgroundColor: theme.background }]}>
           {/* Header */}
@@ -223,15 +210,13 @@ export function ShareToHomieModal({
             <Pressable style={styles.closeButton} onPress={onClose}>
               <Ionicons name="close" size={24} color={theme.text} />
             </Pressable>
-            <Text style={[styles.headerTitle, { color: theme.text }]}>
-              Share to Homie
-            </Text>
+            <Text style={[styles.headerTitle, { color: theme.text }]}>Share to Homie</Text>
             <View style={styles.closeButton} />
           </View>
 
           {/* Content Preview */}
           <View style={[styles.previewCard, { backgroundColor: theme.surface }]}>
-            <View style={[styles.previewIcon, { backgroundColor: colors.primary + '20' }]}>
+            <View style={[styles.previewIcon, { backgroundColor: `${colors.primary}20` }]}>
               <Ionicons name={getContentTypeIcon() as any} size={24} color={colors.primary} />
             </View>
             <View style={styles.previewInfo}>
@@ -242,7 +227,10 @@ export function ShareToHomieModal({
                 {preview.title}
               </Text>
               {preview.subtitle && (
-                <Text style={[styles.previewSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
+                <Text
+                  style={[styles.previewSubtitle, { color: theme.textSecondary }]}
+                  numberOfLines={1}
+                >
                   {preview.subtitle}
                 </Text>
               )}

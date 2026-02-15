@@ -6,8 +6,7 @@
  * Uses smooth transitions and status colors
  */
 
-import React from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 type ProgressBarVariant = 'default' | 'success' | 'warning' | 'error' | 'status';
@@ -43,7 +42,6 @@ export function ProgressBar({
           return colors.status.landed;
         case 'learning':
           return colors.status.learning;
-        case 'notStarted':
         default:
           return colors.status.notStarted;
       }
@@ -101,11 +99,7 @@ interface SegmentedProgressBarProps {
   height?: number;
 }
 
-export function SegmentedProgressBar({
-  segments,
-  total,
-  height = 6,
-}: SegmentedProgressBarProps) {
+export function SegmentedProgressBar({ segments, total, height = 6 }: SegmentedProgressBarProps) {
   const { theme } = useThemeContext();
 
   return (

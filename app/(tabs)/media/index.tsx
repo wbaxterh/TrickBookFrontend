@@ -3,49 +3,48 @@
  * Toggle between The Couch (Netflix-style video library) and The Feed (TikTok-style reels)
  */
 
-import { useState, useEffect, useCallback, useRef, memo, useMemo } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  FlatList,
-  Dimensions,
-  Image,
   ActivityIndicator,
-  RefreshControl,
-  StyleSheet,
-  ViewToken,
+  Dimensions,
+  FlatList,
+  Image,
   ImageBackground,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type ViewToken,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useVideoPlayer, VideoView } from 'expo-video';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { useAuthStore } from '@/lib/stores/authStore';
+import { CommentsBottomSheet } from '@/components/feed';
+import { ShareToHomieModal } from '@/components/share';
 import {
-  getVideos,
-  getFeatured,
-  getCollections,
-  CouchVideo,
-  CouchCollection,
-  getThumbnailUrl,
+  type CouchCollection,
+  type CouchVideo,
   formatDuration,
+  getCollections,
+  getFeatured,
+  getThumbnailUrl,
+  getVideos,
 } from '@/lib/api/couch';
-import { API_CONFIG } from '@/constants/api';
 import {
+  addReaction,
+  type FeedPost,
+  formatCount,
+  formatTimeAgo,
   getFeed,
   getTrending,
-  FeedPost,
-  formatTimeAgo,
-  formatCount,
-  addReaction,
   removeReaction,
   toggleSavePost,
 } from '@/lib/api/feed';
-import { CommentsBottomSheet } from '@/components/feed';
-import { ShareToHomieModal } from '@/components/share';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { useAuthStore } from '@/lib/stores/authStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const POSTER_WIDTH = 130;
@@ -107,8 +106,7 @@ function CouchView({ theme, colors, onSwitchTab }: CouchViewProps) {
       setFeatured(featuredData);
       setCollections(collectionsData);
       setRecentVideos(videosData || []);
-    } catch (error) {
-      console.error('Error fetching couch data:', error);
+    } catch (_error) {
     } finally {
       setLoading(false);
     }
@@ -175,9 +173,7 @@ function CouchView({ theme, colors, onSwitchTab }: CouchViewProps) {
           {featured && <HeroSection video={featured} colors={colors} />}
 
           {/* Recent Videos Row */}
-          {recentVideos.length > 0 && (
-            <MediaRow title="Recently Added" videos={recentVideos} />
-          )}
+          {recentVideos.length > 0 && <MediaRow title="Recently Added" videos={recentVideos} />}
 
           {/* Collections as Rows */}
           {collections.map((collection) => (
@@ -188,9 +184,7 @@ function CouchView({ theme, colors, onSwitchTab }: CouchViewProps) {
         <View style={styles.emptyContainer}>
           <Ionicons name="tv-outline" size={64} color="rgba(255,255,255,0.5)" />
           <Text style={styles.emptyTitle}>No content yet</Text>
-          <Text style={styles.emptySubtitle}>
-            Check back later for curated action sports films
-          </Text>
+          <Text style={styles.emptySubtitle}>Check back later for curated action sports films</Text>
         </View>
       )}
     </ScrollView>
@@ -223,9 +217,7 @@ function HeroSection({ video, colors }: { video: CouchVideo; colors: any }) {
                 </Text>
               )}
               <View style={styles.heroMeta}>
-                {video.releaseYear && (
-                  <Text style={styles.heroMetaText}>{video.releaseYear}</Text>
-                )}
+                {video.releaseYear && <Text style={styles.heroMetaText}>{video.releaseYear}</Text>}
                 {video.sportTypes?.[0] && (
                   <Text style={styles.heroMetaText}>{video.sportTypes[0]}</Text>
                 )}
@@ -358,32 +350,34 @@ function FeedView({ theme, colors, onSwitchTab }: FeedViewProps) {
       return () => {
         setIsFocused(false);
       };
-    }, [])
+    }, []),
   );
 
   // Calculate video height (full screen minus tab bar)
   const TAB_BAR_HEIGHT = 80;
   const VIDEO_HEIGHT = SCREEN_HEIGHT - TAB_BAR_HEIGHT;
 
-  const fetchPosts = useCallback(async (pageNum: number = 1, refresh: boolean = false) => {
-    try {
-      const response = user
-        ? await getFeed({ page: pageNum, limit: 10 })
-        : await getTrending({ page: pageNum, limit: 10 });
+  const fetchPosts = useCallback(
+    async (pageNum: number = 1, refresh: boolean = false) => {
+      try {
+        const response = user
+          ? await getFeed({ page: pageNum, limit: 10 })
+          : await getTrending({ page: pageNum, limit: 10 });
 
-      if (refresh || pageNum === 1) {
-        setPosts(response.posts);
-      } else {
-        setPosts((prev) => [...prev, ...response.posts]);
+        if (refresh || pageNum === 1) {
+          setPosts(response.posts);
+        } else {
+          setPosts((prev) => [...prev, ...response.posts]);
+        }
+        setHasMore(response.pagination.hasMore ?? response.posts.length === 10);
+        setPage(pageNum);
+      } catch (_error) {
+      } finally {
+        setLoading(false);
       }
-      setHasMore(response.pagination.hasMore ?? response.posts.length === 10);
-      setPage(pageNum);
-    } catch (error) {
-      console.error('Error fetching posts:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
+    },
+    [user],
+  );
 
   useEffect(() => {
     fetchPosts(1, true);
@@ -440,7 +434,7 @@ function FeedView({ theme, colors, onSwitchTab }: FeedViewProps) {
           };
         }
         return p;
-      })
+      }),
     );
 
     if (hasReaction) {
@@ -466,7 +460,7 @@ function FeedView({ theme, colors, onSwitchTab }: FeedViewProps) {
           return { ...p, saved: !isSaved };
         }
         return p;
-      })
+      }),
     );
 
     await toggleSavePost(post._id, !isSaved);
@@ -494,7 +488,10 @@ function FeedView({ theme, colors, onSwitchTab }: FeedViewProps) {
 
   if (posts.length === 0) {
     return (
-      <SafeAreaView style={[styles.feedEmptyContainer, { backgroundColor: '#000' }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.feedEmptyContainer, { backgroundColor: '#000' }]}
+        edges={['top']}
+      >
         {/* Header */}
         <View style={styles.feedEmptyHeader}>
           <Text style={styles.feedHeaderTitle}>Media</Text>
@@ -595,7 +592,13 @@ function FeedView({ theme, colors, onSwitchTab }: FeedViewProps) {
             onSave={() => handleSave(item)}
             onComment={() => handleOpenComments(item)}
             onShare={() => handleOpenShare(item)}
-            onUserPress={() => item.user && router.push({ pathname: '/(tabs)/profile/[userId]', params: { userId: item.userId, from: 'feed' } })}
+            onUserPress={() =>
+              item.user &&
+              router.push({
+                pathname: '/(tabs)/profile/[userId]',
+                params: { userId: item.userId, from: 'feed' },
+              })
+            }
           />
         )}
       />
@@ -664,9 +667,7 @@ function FeedVideoPlayer({
   useEffect(() => {
     if (!player) return;
 
-    const statusSub = player.addListener('statusChange', (status) => {
-      console.log('Player status:', status);
-    });
+    const statusSub = player.addListener('statusChange', (_status) => {});
 
     return () => {
       statusSub.remove();
@@ -678,12 +679,11 @@ function FeedVideoPlayer({
     if (!player) return;
 
     if (isActive) {
-      console.log('Playing video:', videoUrl);
       player.play();
     } else {
       player.pause();
     }
-  }, [isActive, player, videoUrl]);
+  }, [isActive, player]);
 
   // Sync muted state
   useEffect(() => {
@@ -723,7 +723,7 @@ const FeedVideoItem = memo(function FeedVideoItem({
   onShare,
   onUserPress,
 }: FeedVideoItemProps) {
-  const [showPlayPause, setShowPlayPause] = useState(false);
+  const [_showPlayPause, _setShowPlayPause] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
 
   const hasLove = post.userReactions?.includes('love');
@@ -754,13 +754,8 @@ const FeedVideoItem = memo(function FeedVideoItem({
   // Debug logging
   useEffect(() => {
     if (isActive) {
-      console.log('=== FEED VIDEO DEBUG ===');
-      console.log('Post ID:', post._id);
-      console.log('Media Type:', post.mediaType);
-      console.log('Video URL:', videoUrl);
-      console.log('========================');
     }
-  }, [isActive, post._id, post.mediaType, videoUrl]);
+  }, [isActive]);
 
   // Toggle mute
   const handleMuteToggle = () => {
@@ -851,11 +846,7 @@ const FeedVideoItem = memo(function FeedVideoItem({
         {/* Mute toggle */}
         {isVideo && (
           <Pressable style={styles.actionItem} onPress={handleMuteToggle}>
-            <Ionicons
-              name={isMuted ? 'volume-mute' : 'volume-high'}
-              size={26}
-              color="#fff"
-            />
+            <Ionicons name={isMuted ? 'volume-mute' : 'volume-high'} size={26} color="#fff" />
           </Pressable>
         )}
       </View>

@@ -3,9 +3,9 @@
  * Handles uploads to Bunny.net (video) and S3 (images)
  */
 
+import { FileSystemUploadType, uploadAsync } from 'expo-file-system/legacy';
+import { ENDPOINTS } from '@/constants/api';
 import { apiClient } from './client';
-import { ENDPOINTS, API_CONFIG } from '@/constants/api';
-import { uploadAsync, FileSystemUploadType } from 'expo-file-system/legacy';
 
 // Types
 export interface VideoEntryResponse {
@@ -27,7 +27,15 @@ export interface VideoEntryResponse {
 
 export interface VideoStatus {
   videoId: string;
-  status: 'created' | 'uploaded' | 'processing' | 'transcoding' | 'finished' | 'error' | 'upload_failed' | 'unknown';
+  status:
+    | 'created'
+    | 'uploaded'
+    | 'processing'
+    | 'transcoding'
+    | 'finished'
+    | 'error'
+    | 'upload_failed'
+    | 'unknown';
   statusCode: number;
   isReady: boolean;
   title?: string;
@@ -55,13 +63,11 @@ export interface ImagePresignResponse {
  */
 export async function createVideoEntry(title: string): Promise<VideoEntryResponse> {
   try {
-    const response = await apiClient.post<VideoEntryResponse>(
-      ENDPOINTS.upload.createVideo,
-      { title }
-    );
+    const response = await apiClient.post<VideoEntryResponse>(ENDPOINTS.upload.createVideo, {
+      title,
+    });
     return response;
-  } catch (error) {
-    console.error('Error creating video entry:', error);
+  } catch (_error) {
     throw new Error('Failed to create video entry');
   }
 }
@@ -71,13 +77,11 @@ export async function createVideoEntry(title: string): Promise<VideoEntryRespons
  */
 export async function getVideoStatus(videoId: string): Promise<VideoStatus> {
   try {
-    const response = await apiClient.get<VideoStatus>(
-      ENDPOINTS.upload.videoStatus(videoId),
-      { skipAuth: true }
-    );
+    const response = await apiClient.get<VideoStatus>(ENDPOINTS.upload.videoStatus(videoId), {
+      skipAuth: true,
+    });
     return response;
-  } catch (error) {
-    console.error('Error getting video status:', error);
+  } catch (_error) {
     throw new Error('Failed to get video status');
   }
 }
@@ -88,7 +92,7 @@ export async function getVideoStatus(videoId: string): Promise<VideoStatus> {
 export async function waitForVideoProcessing(
   videoId: string,
   maxAttempts: number = 60,
-  intervalMs: number = 5000
+  intervalMs: number = 5000,
 ): Promise<VideoStatus> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
     const status = await getVideoStatus(videoId);
@@ -114,8 +118,7 @@ export async function waitForVideoProcessing(
 export async function deleteVideo(videoId: string): Promise<void> {
   try {
     await apiClient.delete(ENDPOINTS.upload.deleteVideo(videoId));
-  } catch (error) {
-    console.error('Error deleting video:', error);
+  } catch (_error) {
     throw new Error('Failed to delete video');
   }
 }
@@ -126,9 +129,9 @@ export async function deleteVideo(videoId: string): Promise<void> {
  * For production, consider using expo-file-system for better handling
  */
 export async function uploadVideoTUS(
-  fileUri: string,
+  _fileUri: string,
   credentials: VideoEntryResponse['uploadCredentials'],
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
 ): Promise<{ videoId: string; success: boolean }> {
   try {
     // For React Native, we need to use FormData or direct upload
@@ -157,8 +160,7 @@ export async function uploadVideoTUS(
       videoId: credentials.videoId,
       success: true,
     };
-  } catch (error) {
-    console.error('Error uploading video:', error);
+  } catch (_error) {
     throw new Error('Failed to upload video');
   }
 }
@@ -172,16 +174,15 @@ export async function uploadVideoTUS(
  */
 export async function getImageUploadUrl(
   filename: string,
-  contentType: string
+  contentType: string,
 ): Promise<ImagePresignResponse> {
   try {
-    const response = await apiClient.post<ImagePresignResponse>(
-      ENDPOINTS.upload.imagePresign,
-      { filename, contentType }
-    );
+    const response = await apiClient.post<ImagePresignResponse>(ENDPOINTS.upload.imagePresign, {
+      filename,
+      contentType,
+    });
     return response;
-  } catch (error) {
-    console.error('Error getting image upload URL:', error);
+  } catch (_error) {
     throw new Error('Failed to get upload URL');
   }
 }
@@ -194,7 +195,7 @@ export async function uploadImageToS3(
   fileUri: string,
   filename: string,
   contentType: string,
-  onProgress?: (progress: number) => void
+  onProgress?: (progress: number) => void,
 ): Promise<{ fileUrl: string; key: string }> {
   try {
     // Step 1: Get presigned URL
@@ -211,7 +212,6 @@ export async function uploadImageToS3(
     });
 
     if (uploadResult.status !== 200) {
-      console.error('S3 upload error:', uploadResult.status, uploadResult.body);
       throw new Error(`Upload failed: ${uploadResult.status}`);
     }
 
@@ -219,7 +219,6 @@ export async function uploadImageToS3(
 
     return { fileUrl, key };
   } catch (error: any) {
-    console.error('Error uploading image to S3:', error);
     throw new Error(error.message || 'Failed to upload image');
   }
 }
@@ -230,8 +229,7 @@ export async function uploadImageToS3(
 export async function deleteImage(key: string): Promise<void> {
   try {
     await apiClient.post(`${ENDPOINTS.upload.deleteImage}/delete`, { key });
-  } catch (error) {
-    console.error('Error deleting image:', error);
+  } catch (_error) {
     throw new Error('Failed to delete image');
   }
 }
@@ -252,7 +250,7 @@ export const SPORT_TYPES = [
   { value: 'rollerblading', label: 'Rollerblading' },
 ] as const;
 
-export type SportType = typeof SPORT_TYPES[number]['value'];
+export type SportType = (typeof SPORT_TYPES)[number]['value'];
 
 // =============================================
 // VISIBILITY OPTIONS
@@ -264,4 +262,4 @@ export const VISIBILITY_OPTIONS = [
   { value: 'private', label: 'Only Me', icon: 'lock-closed-outline' as const },
 ] as const;
 
-export type VisibilityType = typeof VISIBILITY_OPTIONS[number]['value'];
+export type VisibilityType = (typeof VISIBILITY_OPTIONS)[number]['value'];

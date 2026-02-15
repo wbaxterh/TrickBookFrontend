@@ -3,11 +3,9 @@
  * Row item for tricks in a list with status badge
  */
 
-import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { TrickListItem, TrickStatus, convertStatus } from '@/types/trickbook';
+import { convertStatus, type TrickListItem, type TrickStatus } from '@/types/trickbook';
 import { StatusBadge } from './StatusBadge';
 
 interface TrickRowProps {
@@ -23,10 +21,7 @@ export function TrickRow({ trick, onPress, onStatusChange }: TrickRowProps) {
   const status: TrickStatus = trick.status || convertStatus(trick.checked);
 
   return (
-    <Pressable
-      style={[styles.container, { borderBottomColor: theme.border }]}
-      onPress={onPress}
-    >
+    <Pressable style={[styles.container, { borderBottomColor: theme.border }]} onPress={onPress}>
       <View style={styles.content}>
         <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>
           {trick.name}

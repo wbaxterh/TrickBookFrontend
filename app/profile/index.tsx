@@ -3,10 +3,10 @@
  * User's own profile view
  */
 
-import { View, Text, ScrollView, Pressable, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
 
@@ -17,10 +17,7 @@ export default function ProfileScreen() {
   const stats = user?.stats || { spots: 0, followers: 0, following: 0, tricks: 0 };
 
   return (
-    <SafeAreaView
-      style={{ flex: 1, backgroundColor: theme.background }}
-      edges={['top']}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top']}>
       <ScrollView
         className="flex-1"
         showsVerticalScrollIndicator={false}
@@ -55,10 +52,7 @@ export default function ProfileScreen() {
             style={{ backgroundColor: colors.primary }}
           >
             {user?.imageUri ? (
-              <Image
-                source={{ uri: user.imageUri }}
-                className="w-24 h-24 rounded-full"
-              />
+              <Image source={{ uri: user.imageUri }} className="w-24 h-24 rounded-full" />
             ) : (
               <Text className="text-4xl">🛹</Text>
             )}
@@ -106,10 +100,7 @@ export default function ProfileScreen() {
 
         {/* Sports */}
         <View className="px-6 mb-6">
-          <Text
-            className="text-sm font-semibold mb-3"
-            style={{ color: theme.textSecondary }}
-          >
+          <Text className="text-sm font-semibold mb-3" style={{ color: theme.textSecondary }}>
             SPORTS
           </Text>
           <View className="flex-row flex-wrap gap-2">
@@ -132,7 +123,7 @@ export default function ProfileScreen() {
           <View className="px-6 mb-6">
             <View
               className="flex-row items-center p-4 rounded-xl"
-              style={{ backgroundColor: colors.premium + '20' }}
+              style={{ backgroundColor: `${colors.premium}20` }}
             >
               <Ionicons name="checkmark-circle" size={24} color={colors.premium} />
               <View className="ml-3">
@@ -149,27 +140,15 @@ export default function ProfileScreen() {
 
         {/* Activity Placeholder */}
         <View className="px-6">
-          <Text
-            className="text-sm font-semibold mb-3"
-            style={{ color: theme.textSecondary }}
-          >
+          <Text className="text-sm font-semibold mb-3" style={{ color: theme.textSecondary }}>
             RECENT ACTIVITY
           </Text>
-          <View
-            className="p-8 rounded-xl items-center"
-            style={{ backgroundColor: theme.surface }}
-          >
+          <View className="p-8 rounded-xl items-center" style={{ backgroundColor: theme.surface }}>
             <Ionicons name="time-outline" size={48} color={theme.textSecondary} />
-            <Text
-              className="mt-4 text-base font-medium"
-              style={{ color: theme.text }}
-            >
+            <Text className="mt-4 text-base font-medium" style={{ color: theme.text }}>
               No recent activity
             </Text>
-            <Text
-              className="mt-1 text-sm text-center"
-              style={{ color: theme.textSecondary }}
-            >
+            <Text className="mt-1 text-sm text-center" style={{ color: theme.textSecondary }}>
               Start logging tricks and sessions to see your activity here
             </Text>
           </View>
@@ -179,15 +158,7 @@ export default function ProfileScreen() {
   );
 }
 
-function StatItem({
-  value,
-  label,
-  theme,
-}: {
-  value: number;
-  label: string;
-  theme: any;
-}) {
+function StatItem({ value, label, theme }: { value: number; label: string; theme: any }) {
   return (
     <View className="flex-1 items-center">
       <Text className="text-xl font-bold" style={{ color: theme.text }}>

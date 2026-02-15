@@ -4,7 +4,7 @@
  */
 
 import { useColorScheme } from 'react-native';
-import { colors, getThemeColors, ThemeColors } from '@/constants/colors';
+import { colors, getThemeColors, type ThemeColors } from '@/constants/colors';
 
 export interface UseThemeReturn {
   isDark: boolean;

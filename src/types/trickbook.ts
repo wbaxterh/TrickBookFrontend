@@ -133,15 +133,15 @@ export function calculateProgress(tricks: TrickListItem[]): ListProgress {
 // Status colors matching the design
 export const STATUS_COLORS = {
   'Not Started': '#666666',
-  'Learning': '#FF9800',
-  'Landed': '#4CAF50',
-  'Mastered': '#FFD700',
+  Learning: '#FF9800',
+  Landed: '#4CAF50',
+  Mastered: '#FFD700',
 } as const;
 
 // Difficulty colors
 export const DIFFICULTY_COLORS = {
-  'Beginner': '#4CAF50',
-  'Intermediate': '#FF9800',
-  'Advanced': '#F44336',
-  'Expert': '#9C27B0',
+  Beginner: '#4CAF50',
+  Intermediate: '#FF9800',
+  Advanced: '#F44336',
+  Expert: '#9C27B0',
 } as const;

@@ -3,15 +3,15 @@
  * Sets up providers, fonts, and navigation structure
  */
 
-import { useEffect, useState } from 'react';
-import { Stack, router, useSegments, useRootNavigationState } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { useColorScheme, View, ActivityIndicator } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { router, Stack, useRootNavigationState, useSegments } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, useColorScheme, View } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { colors } from '@/constants/colors';
 import { ThemeProvider } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
-import { colors } from '@/constants/colors';
 import '../global.css';
 
 // React Query client
@@ -33,7 +33,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // Load stored auth on mount
   useEffect(() => {
     loadStoredAuth().finally(() => setHasCheckedAuth(true));
-  }, []);
+  }, [loadStoredAuth]);
 
   // Handle navigation based on auth state
   useEffect(() => {
@@ -86,9 +86,7 @@ export default function RootLayout() {
             <View
               style={{
                 flex: 1,
-                backgroundColor: isDark
-                  ? colors.dark.background
-                  : colors.light.background,
+                backgroundColor: isDark ? colors.dark.background : colors.light.background,
               }}
             >
               <StatusBar style={isDark ? 'light' : 'dark'} />
@@ -96,9 +94,7 @@ export default function RootLayout() {
                 screenOptions={{
                   headerShown: false,
                   contentStyle: {
-                    backgroundColor: isDark
-                      ? colors.dark.background
-                      : colors.light.background,
+                    backgroundColor: isDark ? colors.dark.background : colors.light.background,
                   },
                   animation: 'slide_from_right',
                 }}

@@ -5,32 +5,37 @@
  * Design: /TrickBookScreenshots/MobileApp/newScreens/TrickBook-*.png
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  TextInput,
-  FlatList,
   ActivityIndicator,
-  Modal,
   Alert,
-  StyleSheet,
   Dimensions,
+  FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { TrickCard, TrickListCard } from '@/components/trickbook';
 import { colors as brandColors } from '@/constants/colors';
+import {
+  addTrickToList,
+  createTrickList,
+  getCategories,
+  getTricks,
+  getUserTrickLists,
+} from '@/lib/api/trickbook';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
-import { getTricks, getCategories, getUserTrickLists, createTrickList, addTrickToList } from '@/lib/api/trickbook';
-import { Trick, Category, TrickList, TrickListItem, TrickStatus, convertStatus } from '@/types/trickbook';
-import { TrickCard, TrickListCard, TrickRow, StatusBadge } from '@/components/trickbook';
-import { Button } from '@/components/ui';
+import type { Category, Trick, TrickList } from '@/types/trickbook';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CARD_GAP = 12;
@@ -48,7 +53,7 @@ export default function TrickBookScreen() {
 
   // Tab state - check for URL param to set initial tab
   const [activeTab, setActiveTab] = useState<TabType>(
-    params.tab === 'mylists' ? 'mylists' : 'trickipedia'
+    params.tab === 'mylists' ? 'mylists' : 'trickipedia',
   );
 
   // Trickipedia state
@@ -86,8 +91,7 @@ export default function TrickBookScreen() {
       const data = await getTricks(params);
       setTricks(data);
       setFilteredTricks(data);
-    } catch (error) {
-      console.error('Error fetching tricks:', error);
+    } catch (_error) {
     } finally {
       setTricksLoading(false);
     }
@@ -106,8 +110,7 @@ export default function TrickBookScreen() {
     try {
       const data = await getUserTrickLists(user.id, token);
       setMyLists(data);
-    } catch (error) {
-      console.error('Error fetching lists:', error);
+    } catch (_error) {
     } finally {
       setListsLoading(false);
     }
@@ -124,7 +127,7 @@ export default function TrickBookScreen() {
   useEffect(() => {
     fetchCategories();
     fetchTricks();
-  }, []);
+  }, [fetchCategories, fetchTricks]);
 
   // Refetch when tab changes
   useEffect(() => {
@@ -133,7 +136,7 @@ export default function TrickBookScreen() {
     } else if (activeTab === 'mylists') {
       fetchMyLists();
     }
-  }, [activeTab]);
+  }, [activeTab, fetchMyLists, fetchTricks]);
 
   // Refetch lists when screen gains focus (e.g., after deleting a list)
   useFocusEffect(
@@ -141,7 +144,7 @@ export default function TrickBookScreen() {
       if (activeTab === 'mylists') {
         fetchMyLists();
       }
-    }, [activeTab, fetchMyLists])
+    }, [activeTab, fetchMyLists]),
   );
 
   // Filter tricks by search
@@ -152,7 +155,7 @@ export default function TrickBookScreen() {
       const filtered = tricks.filter(
         (trick) =>
           trick.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          trick.description?.toLowerCase().includes(searchQuery.toLowerCase())
+          trick.description?.toLowerCase().includes(searchQuery.toLowerCase()),
       );
       setFilteredTricks(filtered);
     }
@@ -175,7 +178,7 @@ export default function TrickBookScreen() {
       setCreateModalVisible(false);
       setNewListName('');
       fetchMyLists();
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'Failed to create list');
     } finally {
       setCreating(false);
@@ -201,39 +204,26 @@ export default function TrickBookScreen() {
 
   // Render list card
   const renderListCard = ({ item }: { item: TrickList }) => (
-    <TrickListCard
-      list={item}
-      onPress={() => router.push(`/(tabs)/trickbook/list/${item._id}`)}
-    />
+    <TrickListCard list={item} onPress={() => router.push(`/(tabs)/trickbook/list/${item._id}`)} />
   );
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      edges={['top']}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: theme.text }]}>
           {activeTab === 'trickipedia' ? 'Trickipedia' : 'TrickBook'}
         </Text>
         {activeTab === 'trickipedia' && (
-          <Pressable
-            style={styles.filterButton}
-            onPress={() => setFilterModalVisible(true)}
-          >
+          <Pressable style={styles.filterButton} onPress={() => setFilterModalVisible(true)}>
             <Ionicons name="options-outline" size={18} color={accentColor} />
-            <Text style={[styles.filterText, { color: accentColor }]}>
-              Filter
-            </Text>
+            <Text style={[styles.filterText, { color: accentColor }]}>Filter</Text>
           </Pressable>
         )}
       </View>
 
       {/* Tab Toggle */}
-      <View
-        style={[styles.tabContainer, { backgroundColor: theme.surface }]}
-      >
+      <View style={[styles.tabContainer, { backgroundColor: theme.surface }]}>
         <Pressable
           style={[
             styles.tab,
@@ -247,8 +237,7 @@ export default function TrickBookScreen() {
             style={[
               styles.tabText,
               {
-                color:
-                  activeTab === 'trickipedia' ? '#000000' : theme.textSecondary,
+                color: activeTab === 'trickipedia' ? '#000000' : theme.textSecondary,
               },
             ]}
           >
@@ -268,8 +257,7 @@ export default function TrickBookScreen() {
             style={[
               styles.tabText,
               {
-                color:
-                  activeTab === 'mylists' ? '#000000' : theme.textSecondary,
+                color: activeTab === 'mylists' ? '#000000' : theme.textSecondary,
               },
             ]}
           >
@@ -282,9 +270,7 @@ export default function TrickBookScreen() {
         <>
           {/* Search Bar */}
           <View style={styles.searchContainer}>
-            <View
-              style={[styles.searchBar, { backgroundColor: theme.surface }]}
-            >
+            <View style={[styles.searchBar, { backgroundColor: theme.surface }]}>
               <Ionicons name="search" size={20} color={theme.textSecondary} />
               <TextInput
                 style={[styles.searchInput, { color: theme.text }]}
@@ -317,14 +303,8 @@ export default function TrickBookScreen() {
               showsVerticalScrollIndicator={false}
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
-                  <Ionicons
-                    name="search-outline"
-                    size={64}
-                    color={theme.textSecondary}
-                  />
-                  <Text style={[styles.emptyTitle, { color: theme.text }]}>
-                    No tricks found
-                  </Text>
+                  <Ionicons name="search-outline" size={64} color={theme.textSecondary} />
+                  <Text style={[styles.emptyTitle, { color: theme.text }]}>No tricks found</Text>
                   <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
                     Try adjusting your search or filters
                   </Text>
@@ -350,10 +330,7 @@ export default function TrickBookScreen() {
               ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
               ListHeaderComponent={
                 <Pressable
-                  style={[
-                    styles.createListButton,
-                    { borderColor: accentColor },
-                  ]}
+                  style={[styles.createListButton, { borderColor: accentColor }]}
                   onPress={() => setCreateModalVisible(true)}
                 >
                   <Ionicons name="add-circle" size={24} color={accentColor} />
@@ -364,14 +341,8 @@ export default function TrickBookScreen() {
               }
               ListEmptyComponent={
                 <View style={styles.emptyContainer}>
-                  <Ionicons
-                    name="book-outline"
-                    size={64}
-                    color={theme.textSecondary}
-                  />
-                  <Text style={[styles.emptyTitle, { color: theme.text }]}>
-                    No trick lists yet
-                  </Text>
+                  <Ionicons name="book-outline" size={64} color={theme.textSecondary} />
+                  <Text style={[styles.emptyTitle, { color: theme.text }]}>No trick lists yet</Text>
                   <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
                     Create your first list to start tracking your progress
                   </Text>
@@ -389,17 +360,10 @@ export default function TrickBookScreen() {
         animationType="slide"
         onRequestClose={() => setFilterModalVisible(false)}
       >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setFilterModalVisible(false)}
-        >
-          <View
-            style={[styles.modalContent, { backgroundColor: theme.surface }]}
-          >
+        <Pressable style={styles.modalOverlay} onPress={() => setFilterModalVisible(false)}>
+          <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>
-                Filter by Category
-              </Text>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Filter by Category</Text>
               <Pressable onPress={() => setFilterModalVisible(false)}>
                 <Ionicons name="close" size={24} color={theme.text} />
               </Pressable>
@@ -410,7 +374,7 @@ export default function TrickBookScreen() {
                 style={[
                   styles.filterOption,
                   selectedCategory === null && {
-                    backgroundColor: accentColor + '20',
+                    backgroundColor: `${accentColor}20`,
                   },
                 ]}
                 onPress={() => handleCategorySelect(null)}
@@ -419,8 +383,7 @@ export default function TrickBookScreen() {
                   style={[
                     styles.filterOptionText,
                     {
-                      color:
-                        selectedCategory === null ? accentColor : theme.text,
+                      color: selectedCategory === null ? accentColor : theme.text,
                     },
                   ]}
                 >
@@ -437,7 +400,7 @@ export default function TrickBookScreen() {
                   style={[
                     styles.filterOption,
                     selectedCategory === category.name && {
-                      backgroundColor: accentColor + '20',
+                      backgroundColor: `${accentColor}20`,
                     },
                   ]}
                   onPress={() => handleCategorySelect(category.name)}
@@ -446,10 +409,7 @@ export default function TrickBookScreen() {
                     style={[
                       styles.filterOptionText,
                       {
-                        color:
-                          selectedCategory === category.name
-                            ? accentColor
-                            : theme.text,
+                        color: selectedCategory === category.name ? accentColor : theme.text,
                       },
                     ]}
                   >
@@ -476,17 +436,12 @@ export default function TrickBookScreen() {
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.keyboardAvoid}
         >
-          <Pressable
-            style={styles.modalOverlay}
-            onPress={() => setCreateModalVisible(false)}
-          >
+          <Pressable style={styles.modalOverlay} onPress={() => setCreateModalVisible(false)}>
             <View
               style={[styles.createModalContent, { backgroundColor: theme.surface }]}
               onStartShouldSetResponder={() => true}
             >
-              <Text style={[styles.modalTitle, { color: theme.text }]}>
-                Create New List
-              </Text>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>Create New List</Text>
 
               <TextInput
                 style={[
@@ -539,13 +494,8 @@ export default function TrickBookScreen() {
         animationType="slide"
         onRequestClose={() => setAddToListModalVisible(false)}
       >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setAddToListModalVisible(false)}
-        >
-          <View
-            style={[styles.modalContent, { backgroundColor: theme.surface }]}
-          >
+        <Pressable style={styles.modalOverlay} onPress={() => setAddToListModalVisible(false)}>
+          <View style={[styles.modalContent, { backgroundColor: theme.surface }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>
                 Add "{selectedTrick?.name}" to List
@@ -572,7 +522,7 @@ export default function TrickBookScreen() {
                             notes: `From Trickipedia: ${selectedTrick.category} - ${selectedTrick.difficulty}`,
                             trickipediaId: selectedTrick._id,
                           },
-                          token
+                          token,
                         );
                         if (success) {
                           Alert.alert('Added!', `"${selectedTrick.name}" added to "${list.name}"`);
@@ -581,8 +531,7 @@ export default function TrickBookScreen() {
                         } else {
                           Alert.alert('Error', 'Failed to add trick to list');
                         }
-                      } catch (error) {
-                        console.error('Error adding trick to list:', error);
+                      } catch (_error) {
                         Alert.alert('Error', 'Something went wrong');
                       }
                       setAddToListModalVisible(false);

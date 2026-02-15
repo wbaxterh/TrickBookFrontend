@@ -9,23 +9,34 @@
  * - Homie Activity: Horizontal scroll
  */
 
-import { useEffect, useState, useCallback } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, ActivityIndicator, RefreshControl } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityCard, GoalCard, QuickActions, StatsCard } from '@/components/home';
+import { Avatar, Card, IconButton, SectionHeader } from '@/components/ui';
 import { colors as brandColors } from '@/constants/colors';
-import { useAuthStore } from '@/lib/stores/authStore';
-import { getUserStats, UserStats, getHomieActivity, ActivityItem } from '@/lib/api/user';
-import { getMyHomies, Homie } from '@/lib/api/homies';
+import { getMyHomies, type Homie } from '@/lib/api/homies';
 import { getUserTrickLists } from '@/lib/api/trickbook';
-import { TrickList, TrickListItem } from '@/types/trickbook';
-import { Avatar, IconButton, SectionHeader, Card } from '@/components/ui';
-import { GoalCard, StatsCard, QuickActions, ActivityCard } from '@/components/home';
+import { type ActivityItem, getHomieActivity, getUserStats, type UserStats } from '@/lib/api/user';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { useAuthStore } from '@/lib/stores/authStore';
+import type { TrickList, TrickListItem } from '@/types/trickbook';
 
 // Transform trick status from backend to GoalCard format
-function mapTrickStatus(status?: string, checked?: string): 'learning' | 'landed' | 'notStarted' | 'mastered' {
+function mapTrickStatus(
+  status?: string,
+  checked?: string,
+): 'learning' | 'landed' | 'notStarted' | 'mastered' {
   if (status === 'Learning') return 'learning';
   if (status === 'Landed') return 'landed';
   if (status === 'Mastered') return 'mastered';
@@ -36,15 +47,19 @@ function mapTrickStatus(status?: string, checked?: string): 'learning' | 'landed
 // Get progress percentage based on status
 function getStatusProgress(status: 'learning' | 'landed' | 'notStarted' | 'mastered'): number {
   switch (status) {
-    case 'mastered': return 100;
-    case 'landed': return 100;
-    case 'learning': return 50;
-    default: return 0;
+    case 'mastered':
+      return 100;
+    case 'landed':
+      return 100;
+    case 'learning':
+      return 50;
+    default:
+      return 0;
   }
 }
 
 // Get relative time string
-function getTimeAgo(dateString: string): string {
+function _getTimeAgo(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
@@ -66,7 +81,9 @@ export default function HomeScreen() {
   const [stats, setStats] = useState<UserStats | null>(null);
   const [trickLists, setTrickLists] = useState<TrickList[]>([]);
   const [homies, setHomies] = useState<Homie[]>([]);
-  const [homieActivity, setHomieActivity] = useState<(ActivityItem & { userName?: string; userImage?: string })[]>([]);
+  const [homieActivity, setHomieActivity] = useState<
+    (ActivityItem & { userName?: string; userImage?: string })[]
+  >([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -92,7 +109,9 @@ export default function HomeScreen() {
 
         // Enrich activities with user info
         const enrichedActivities = activities.map((activity) => {
-          const homie = homiesData.find((h) => h._id === activity.data?.userId || h._id === (activity as any).userId);
+          const homie = homiesData.find(
+            (h) => h._id === activity.data?.userId || h._id === (activity as any).userId,
+          );
           return {
             ...activity,
             userName: homie?.name,
@@ -102,8 +121,7 @@ export default function HomeScreen() {
 
         setHomieActivity(enrichedActivities);
       }
-    } catch (error) {
-      console.error('Failed to fetch home data:', error);
+    } catch (_error) {
     } finally {
       setLoading(false);
     }
@@ -121,16 +139,17 @@ export default function HomeScreen() {
 
   // Extract current goals from trick lists - sorted by most recent activity first
   // Prioritize updatedAt (when trick was edited/status changed) over createdAt
-  const currentGoals = trickLists.flatMap((list: TrickList) =>
-    (list.tricks || []).map((trick: TrickListItem) => ({
-      id: trick._id,
-      listId: list._id,
-      name: trick.name,
-      status: mapTrickStatus(trick.status, trick.checked),
-      progress: getStatusProgress(mapTrickStatus(trick.status, trick.checked)),
-      timestamp: trick.updatedAt || trick.createdAt || list.updatedAt || list.createdAt || '',
-    }))
-  )
+  const currentGoals = trickLists
+    .flatMap((list: TrickList) =>
+      (list.tricks || []).map((trick: TrickListItem) => ({
+        id: trick._id,
+        listId: list._id,
+        name: trick.name,
+        status: mapTrickStatus(trick.status, trick.checked),
+        progress: getStatusProgress(mapTrickStatus(trick.status, trick.checked)),
+        timestamp: trick.updatedAt || trick.createdAt || list.updatedAt || list.createdAt || '',
+      })),
+    )
     .sort((a, b) => {
       // Tricks with timestamps come first, sorted newest to oldest
       // Tricks without timestamps go to the end
@@ -141,11 +160,17 @@ export default function HomeScreen() {
     .slice(0, 5);
 
   // Calculate stats
-  const totalLanded = stats?.tricklistCount || trickLists.reduce((acc: number, list: TrickList) =>
-    acc + (list.tricks || []).filter((t: TrickListItem) =>
-      t.status === 'Landed' || t.status === 'Mastered' || t.checked === 'Complete'
-    ).length, 0
-  );
+  const totalLanded =
+    stats?.tricklistCount ||
+    trickLists.reduce(
+      (acc: number, list: TrickList) =>
+        acc +
+        (list.tricks || []).filter(
+          (t: TrickListItem) =>
+            t.status === 'Landed' || t.status === 'Mastered' || t.checked === 'Complete',
+        ).length,
+      0,
+    );
 
   // Quick actions configuration
   const quickActions = [
@@ -178,12 +203,15 @@ export default function HomeScreen() {
   // Get user display name and avatar
   const displayName = user?.name || 'Rider';
   const avatarEmoji = user?.riderProfile?.avatarIcon?.emoji || '🛹';
-  const avatarBg = user?.riderProfile?.avatarIcon?.bg;
+  const _avatarBg = user?.riderProfile?.avatarIcon?.bg;
   const isPremium = user?.subscription?.plan === 'premium';
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
@@ -192,10 +220,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      edges={['top']}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
@@ -212,7 +237,12 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <Pressable
             style={styles.headerLeft}
-            onPress={() => router.push({ pathname: '/(tabs)/profile/[userId]', params: { userId: user?.id || user?._id, from: 'home' } })}
+            onPress={() =>
+              router.push({
+                pathname: '/(tabs)/profile/[userId]',
+                params: { userId: user?.id || user?._id, from: 'home' },
+              })
+            }
           >
             <Avatar
               size="lg"
@@ -225,7 +255,8 @@ export default function HomeScreen() {
               Yo,{' '}
               <Text style={{ color: isDark ? brandColors.primary : brandColors.primaryText }}>
                 {displayName.split(' ')[0]}
-              </Text>!
+              </Text>
+              !
             </Text>
           </Pressable>
 
@@ -243,7 +274,8 @@ export default function HomeScreen() {
               title="Current Goals"
               action={{
                 label: 'View All',
-                onPress: () => router.push({ pathname: '/(tabs)/trickbook', params: { tab: 'mylists' } }),
+                onPress: () =>
+                  router.push({ pathname: '/(tabs)/trickbook', params: { tab: 'mylists' } }),
               }}
             />
           </View>
@@ -298,10 +330,7 @@ export default function HomeScreen() {
           />
 
           {/* Quick Actions */}
-          <QuickActions
-            title="Quick Actions"
-            actions={quickActions}
-          />
+          <QuickActions title="Quick Actions" actions={quickActions} />
         </View>
 
         {/* Homie Activity - Horizontal Scroll */}
@@ -324,12 +353,10 @@ export default function HomeScreen() {
             >
               {homieActivity.map((activity, index) => {
                 // Determine activity type and subject from the activity data
-                const activityType = activity.type === 'post' ? 'added' :
-                                     activity.type === 'spot' ? 'spot' : 'added';
-                const subject = activity.data?.caption ||
-                                activity.data?.name ||
-                                activity.action ||
-                                'content';
+                const activityType =
+                  activity.type === 'post' ? 'added' : activity.type === 'spot' ? 'spot' : 'added';
+                const subject =
+                  activity.data?.caption || activity.data?.name || activity.action || 'content';
 
                 return (
                   <ActivityCard
@@ -357,11 +384,7 @@ export default function HomeScreen() {
             <View style={styles.sectionPadded}>
               <Card padding="lg">
                 <View style={styles.emptyState}>
-                  <Ionicons
-                    name="time-outline"
-                    size={40}
-                    color={theme.textSecondary}
-                  />
+                  <Ionicons name="time-outline" size={40} color={theme.textSecondary} />
                   <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
                     No recent activity from your homies
                   </Text>
@@ -372,11 +395,7 @@ export default function HomeScreen() {
             <View style={styles.sectionPadded}>
               <Card padding="lg">
                 <View style={styles.emptyState}>
-                  <Ionicons
-                    name="people-outline"
-                    size={40}
-                    color={theme.textSecondary}
-                  />
+                  <Ionicons name="people-outline" size={40} color={theme.textSecondary} />
                   <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
                     Connect with homies to see their activity here
                   </Text>

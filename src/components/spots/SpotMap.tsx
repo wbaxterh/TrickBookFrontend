@@ -3,11 +3,11 @@
  * Interactive map showing a spot's location with user location
  */
 
-import React, { useRef, useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Alert, Linking, Platform } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
-import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Linking, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 import { colors, getThemeColors } from '@/constants/colors';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
@@ -22,7 +22,9 @@ export function SpotMap({ latitude, longitude, spotName, height = 200 }: SpotMap
   const { isDark } = useThemeContext();
   const theme = getThemeColors(isDark);
   const mapRef = useRef<MapView>(null);
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(
+    null,
+  );
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
 
   useEffect(() => {
@@ -40,18 +42,19 @@ export function SpotMap({ latitude, longitude, spotName, height = 200 }: SpotMap
           longitude: location.coords.longitude,
         });
       }
-    } catch (error) {
-      console.log('Error getting location:', error);
-    }
+    } catch (_error) {}
   };
 
   const centerOnSpot = () => {
-    mapRef.current?.animateToRegion({
-      latitude,
-      longitude,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
-    }, 500);
+    mapRef.current?.animateToRegion(
+      {
+        latitude,
+        longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      },
+      500,
+    );
   };
 
   const centerOnUser = async () => {
@@ -70,13 +73,16 @@ export function SpotMap({ latitude, longitude, spotName, height = 200 }: SpotMap
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
       });
-      mapRef.current?.animateToRegion({
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      }, 500);
-    } catch (error) {
+      mapRef.current?.animateToRegion(
+        {
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        },
+        500,
+      );
+    } catch (_error) {
       Alert.alert('Error', 'Could not get your location.');
     }
   };
@@ -87,10 +93,7 @@ export function SpotMap({ latitude, longitude, spotName, height = 200 }: SpotMap
       return;
     }
 
-    const coordinates = [
-      { latitude, longitude },
-      userLocation,
-    ];
+    const coordinates = [{ latitude, longitude }, userLocation];
 
     mapRef.current?.fitToCoordinates(coordinates, {
       edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
@@ -99,7 +102,7 @@ export function SpotMap({ latitude, longitude, spotName, height = 200 }: SpotMap
   };
 
   const openDirections = () => {
-    const scheme = Platform.select({
+    const _scheme = Platform.select({
       ios: 'maps:',
       android: 'geo:',
     });
@@ -111,7 +114,9 @@ export function SpotMap({ latitude, longitude, spotName, height = 200 }: SpotMap
     if (url) {
       Linking.openURL(url).catch(() => {
         // Fallback to Google Maps web
-        Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`);
+        Linking.openURL(
+          `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`,
+        );
       });
     }
   };
@@ -142,10 +147,7 @@ export function SpotMap({ latitude, longitude, spotName, height = 200 }: SpotMap
         showsUserLocation={locationPermission}
         showsMyLocationButton={false}
       >
-        <Marker
-          coordinate={{ latitude, longitude }}
-          title={spotName}
-        >
+        <Marker coordinate={{ latitude, longitude }} title={spotName}>
           <View style={styles.markerContainer}>
             <View style={[styles.marker, { backgroundColor: colors.primary }]}>
               <Ionicons name="location" size={20} color={colors.primaryText} />

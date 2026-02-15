@@ -3,9 +3,8 @@
  * Displays trick status: Not Started, Learning, Landed, Mastered
  */
 
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { TrickStatus, STATUS_COLORS } from '@/types/trickbook';
+import { StyleSheet, Text, View } from 'react-native';
+import { STATUS_COLORS, type TrickStatus } from '@/types/trickbook';
 
 interface StatusBadgeProps {
   status: TrickStatus;
@@ -17,13 +16,7 @@ export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
   const isSmall = size === 'sm';
 
   return (
-    <View
-      style={[
-        styles.container,
-        { backgroundColor },
-        isSmall && styles.containerSmall,
-      ]}
-    >
+    <View style={[styles.container, { backgroundColor }, isSmall && styles.containerSmall]}>
       <Text
         style={[
           styles.text,

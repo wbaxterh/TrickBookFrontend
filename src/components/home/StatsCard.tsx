@@ -6,11 +6,11 @@
  * Shows: "Total Landed: 142", "This Month: 12"
  */
 
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import type React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { Card } from '@/components/ui/Card';
 import { SectionHeader } from '@/components/ui/SectionHeader';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { formatNumber } from '@/lib/utils';
 
 interface StatItem {
@@ -33,9 +33,7 @@ export function StatsCard({ stats, title = 'Progress Stats' }: StatsCardProps) {
       <View style={styles.statsContainer}>
         {stats.map((stat, index) => (
           <View key={index} style={styles.statItem}>
-            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
-              {stat.label}:
-            </Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>{stat.label}:</Text>
             <Text style={[styles.statValue, { color: theme.text }]}>
               {formatNumber(stat.value)}
             </Text>
@@ -61,12 +59,8 @@ export function CompactStatItem({ label, value, icon }: CompactStatItemProps) {
   return (
     <View style={styles.compactStatItem}>
       {icon && <View style={styles.compactIcon}>{icon}</View>}
-      <Text style={[styles.compactValue, { color: theme.text }]}>
-        {formatNumber(value)}
-      </Text>
-      <Text style={[styles.compactLabel, { color: theme.textSecondary }]}>
-        {label}
-      </Text>
+      <Text style={[styles.compactValue, { color: theme.text }]}>{formatNumber(value)}</Text>
+      <Text style={[styles.compactLabel, { color: theme.textSecondary }]}>{label}</Text>
     </View>
   );
 }

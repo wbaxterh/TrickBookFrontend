@@ -9,35 +9,35 @@
  * - Accept/Decline requests
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  Pressable,
-  TextInput,
-  FlatList,
-  StyleSheet,
   ActivityIndicator,
-  RefreshControl,
   Alert,
+  FlatList,
   Image,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { useAuthStore } from '@/lib/stores/authStore';
 import {
-  getMyHomies,
-  getDiscoverableUsers,
-  getPendingRequests,
-  sendHomieRequest,
   acceptHomieRequest,
+  getDiscoverableUsers,
+  getMyHomies,
+  getPendingRequests,
+  type Homie,
+  type HomieRequest,
   rejectHomieRequest,
-  Homie,
-  HomieRequest,
+  sendHomieRequest,
 } from '@/lib/api/homies';
 import { getOrCreateConversation } from '@/lib/api/messages';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { useAuthStore } from '@/lib/stores/authStore';
 
 const YELLOW = '#FCF150';
 const DARK = '#1a1a1a';
@@ -89,8 +89,7 @@ export default function HomiesScreen() {
         setReceivedRequests(data.received || []);
         setSentRequests(data.sent || []);
       }
-    } catch (error) {
-      console.error('Error fetching data:', error);
+    } catch (_error) {
     } finally {
       setLoading(false);
     }
@@ -99,7 +98,7 @@ export default function HomiesScreen() {
   useEffect(() => {
     setLoading(true);
     fetchData();
-  }, [activeTab, fetchData]);
+  }, [fetchData]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -116,7 +115,7 @@ export default function HomiesScreen() {
       } else {
         Alert.alert('Error', 'Could not start conversation');
       }
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'Could not start conversation');
     }
   };
@@ -126,7 +125,7 @@ export default function HomiesScreen() {
     const success = await sendHomieRequest(targetUser._id);
     if (success) {
       Alert.alert('Request Sent', `Homie request sent to ${targetUser.name}`);
-      setSentRequests(prev => [...prev, targetUser._id]);
+      setSentRequests((prev) => [...prev, targetUser._id]);
     } else {
       Alert.alert('Error', 'Could not send homie request');
     }
@@ -136,7 +135,7 @@ export default function HomiesScreen() {
   const handleAccept = async (request: HomieRequest) => {
     const success = await acceptHomieRequest(request.from);
     if (success) {
-      setReceivedRequests(prev => prev.filter(r => r.from !== request.from));
+      setReceivedRequests((prev) => prev.filter((r) => r.from !== request.from));
       // Refresh homies list
       const newHomies = await getMyHomies();
       setHomies(newHomies);
@@ -149,7 +148,7 @@ export default function HomiesScreen() {
   const handleReject = async (request: HomieRequest) => {
     const success = await rejectHomieRequest(request.from);
     if (success) {
-      setReceivedRequests(prev => prev.filter(r => r.from !== request.from));
+      setReceivedRequests((prev) => prev.filter((r) => r.from !== request.from));
     } else {
       Alert.alert('Error', 'Could not decline request');
     }
@@ -157,15 +156,15 @@ export default function HomiesScreen() {
 
   // Filter by search
   const filteredHomies = homies.filter(
-    h =>
+    (h) =>
       h.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      h.email?.toLowerCase().includes(searchQuery.toLowerCase())
+      h.email?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const filteredDiscoverable = discoverableUsers.filter(
-    u =>
+    (u) =>
       u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email?.toLowerCase().includes(searchQuery.toLowerCase())
+      u.email?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   return (
@@ -187,7 +186,9 @@ export default function HomiesScreen() {
           style={[styles.tab, activeTab === 'homies' && { backgroundColor: YELLOW }]}
           onPress={() => setActiveTab('homies')}
         >
-          <Text style={[styles.tabText, { color: activeTab === 'homies' ? DARK : theme.textSecondary }]}>
+          <Text
+            style={[styles.tabText, { color: activeTab === 'homies' ? DARK : theme.textSecondary }]}
+          >
             My Homies
           </Text>
         </Pressable>
@@ -195,7 +196,9 @@ export default function HomiesScreen() {
           style={[styles.tab, activeTab === 'find' && { backgroundColor: YELLOW }]}
           onPress={() => setActiveTab('find')}
         >
-          <Text style={[styles.tabText, { color: activeTab === 'find' ? DARK : theme.textSecondary }]}>
+          <Text
+            style={[styles.tabText, { color: activeTab === 'find' ? DARK : theme.textSecondary }]}
+          >
             Find
           </Text>
         </Pressable>
@@ -203,7 +206,12 @@ export default function HomiesScreen() {
           style={[styles.tab, activeTab === 'requests' && { backgroundColor: YELLOW }]}
           onPress={() => setActiveTab('requests')}
         >
-          <Text style={[styles.tabText, { color: activeTab === 'requests' ? DARK : theme.textSecondary }]}>
+          <Text
+            style={[
+              styles.tabText,
+              { color: activeTab === 'requests' ? DARK : theme.textSecondary },
+            ]}
+          >
             Requests{receivedRequests.length > 0 ? ` (${receivedRequests.length})` : ''}
           </Text>
         </Pressable>
@@ -341,7 +349,12 @@ function HomieCard({ homie, theme, onPress, onMessage }: HomieCardProps) {
         {homie.imageUri ? (
           <Image source={{ uri: homie.imageUri }} style={styles.avatar} />
         ) : (
-          <View style={[styles.avatarPlaceholder, { backgroundColor: theme.surfaceElevated || theme.border }]}>
+          <View
+            style={[
+              styles.avatarPlaceholder,
+              { backgroundColor: theme.surfaceElevated || theme.border },
+            ]}
+          >
             <Text style={styles.avatarEmoji}>{sportEmoji}</Text>
           </View>
         )}
@@ -361,7 +374,10 @@ function HomieCard({ homie, theme, onPress, onMessage }: HomieCardProps) {
       </View>
 
       {/* Message Button */}
-      <Pressable style={[styles.messageActionButton, { backgroundColor: YELLOW }]} onPress={onMessage}>
+      <Pressable
+        style={[styles.messageActionButton, { backgroundColor: YELLOW }]}
+        onPress={onMessage}
+      >
         <Ionicons name="chatbubble" size={18} color={DARK} />
       </Pressable>
     </Pressable>
@@ -387,7 +403,12 @@ function DiscoverCard({ user, theme, isPending, onPress, onSendRequest }: Discov
         {user.imageUri ? (
           <Image source={{ uri: user.imageUri }} style={styles.avatar} />
         ) : (
-          <View style={[styles.avatarPlaceholder, { backgroundColor: theme.surfaceElevated || theme.border }]}>
+          <View
+            style={[
+              styles.avatarPlaceholder,
+              { backgroundColor: theme.surfaceElevated || theme.border },
+            ]}
+          >
             <Text style={styles.avatarEmoji}>{sportEmoji}</Text>
           </View>
         )}
@@ -405,14 +426,15 @@ function DiscoverCard({ user, theme, isPending, onPress, onSendRequest }: Discov
 
       {/* Add Button */}
       <Pressable
-        style={[
-          styles.addButton,
-          { backgroundColor: isPending ? theme.border : YELLOW },
-        ]}
+        style={[styles.addButton, { backgroundColor: isPending ? theme.border : YELLOW }]}
         onPress={onSendRequest}
         disabled={isPending}
       >
-        <Ionicons name={isPending ? 'time' : 'person-add'} size={18} color={isPending ? theme.textSecondary : DARK} />
+        <Ionicons
+          name={isPending ? 'time' : 'person-add'}
+          size={18}
+          color={isPending ? theme.textSecondary : DARK}
+        />
       </Pressable>
     </Pressable>
   );
@@ -438,7 +460,12 @@ function RequestCard({ request, theme, onAccept, onReject }: RequestCardProps) {
           {user?.imageUri ? (
             <Image source={{ uri: user.imageUri }} style={styles.avatar} />
           ) : (
-            <View style={[styles.avatarPlaceholder, { backgroundColor: theme.surfaceElevated || theme.border }]}>
+            <View
+              style={[
+                styles.avatarPlaceholder,
+                { backgroundColor: theme.surfaceElevated || theme.border },
+              ]}
+            >
               <Text style={styles.avatarEmoji}>{sportEmoji}</Text>
             </View>
           )}

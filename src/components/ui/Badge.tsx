@@ -5,8 +5,8 @@
  * Reference: /components/ui/badge.jsx from website
  */
 
-import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import type React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 type BadgeVariant = 'default' | 'secondary' | 'success' | 'warning' | 'error' | 'outline';
@@ -26,27 +26,23 @@ interface StatusBadgeProps {
   size?: BadgeSize;
 }
 
-export function Badge({
-  children,
-  variant = 'default',
-  size = 'md',
-}: BadgeProps) {
+export function Badge({ children, variant = 'default', size = 'md' }: BadgeProps) {
   const { theme, colors } = useThemeContext();
 
   const getColors = () => {
     switch (variant) {
       case 'success':
-        return { bg: colors.success + '30', text: colors.success };
+        return { bg: `${colors.success}30`, text: colors.success };
       case 'warning':
-        return { bg: colors.warning + '30', text: colors.warning };
+        return { bg: `${colors.warning}30`, text: colors.warning };
       case 'error':
-        return { bg: colors.error + '30', text: colors.error };
+        return { bg: `${colors.error}30`, text: colors.error };
       case 'secondary':
         return { bg: theme.surface, text: theme.textSecondary };
       case 'outline':
         return { bg: 'transparent', text: theme.text };
       default:
-        return { bg: colors.primary + '30', text: colors.primary };
+        return { bg: `${colors.primary}30`, text: colors.primary };
     }
   };
 
@@ -107,7 +103,6 @@ export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
         return { label: 'Landed', color: colors.status.landed };
       case 'learning':
         return { label: 'Learning', color: colors.status.learning };
-      case 'notStarted':
       default:
         return { label: 'Not Started', color: colors.status.notStarted };
     }
@@ -133,7 +128,7 @@ export function StatusBadge({ status, size = 'md' }: StatusBadgeProps) {
       style={[
         styles.badge,
         {
-          backgroundColor: config.color + '30',
+          backgroundColor: `${config.color}30`,
           paddingHorizontal: sizeStyles.paddingH,
           paddingVertical: sizeStyles.paddingV,
         },

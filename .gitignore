@@ -16,6 +16,7 @@ web-build/
 # Environment & Secrets - NEVER COMMIT
 .env
 .env.*
+!.env.example
 .env.local
 .env.development
 .env.production

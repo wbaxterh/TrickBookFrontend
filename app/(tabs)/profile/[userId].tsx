@@ -4,40 +4,35 @@
  * Works for both viewing own profile and other users' profiles
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  Image,
   ActivityIndicator,
-  StyleSheet,
-  Dimensions,
-  RefreshControl,
   Alert,
+  Dimensions,
+  Image,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { type FeedPost, getUserPosts } from '@/lib/api/feed';
+import { getHomieStatus, type HomieStatus, removeHomie, sendHomieRequest } from '@/lib/api/homies';
+import { getOrCreateConversation } from '@/lib/api/messages';
+import {
+  type ActivityItem,
+  getPublicProfile,
+  getUserActivity,
+  getUserStats,
+  type PublicProfile,
+  type UserStats,
+} from '@/lib/api/user';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
-import {
-  getPublicProfile,
-  getUserStats,
-  getUserActivity,
-  PublicProfile,
-  UserStats,
-  ActivityItem,
-} from '@/lib/api/user';
-import { getUserPosts, FeedPost } from '@/lib/api/feed';
-import {
-  getHomieStatus,
-  sendHomieRequest,
-  removeHomie,
-  HomieStatus,
-} from '@/lib/api/homies';
-import { getOrCreateConversation } from '@/lib/api/messages';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const YELLOW = '#FCF150';
@@ -110,8 +105,7 @@ export default function ProfileScreen() {
         const status = await getHomieStatus(userId);
         setHomieStatus(status);
       }
-    } catch (error) {
-      console.error('Error fetching profile:', error);
+    } catch (_error) {
     } finally {
       setLoading(false);
     }
@@ -138,7 +132,7 @@ export default function ProfileScreen() {
       } else {
         Alert.alert('Error', 'Could not start conversation');
       }
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'Could not start conversation');
     } finally {
       setActionLoading(false);
@@ -157,7 +151,7 @@ export default function ProfileScreen() {
       } else {
         Alert.alert('Error', 'Could not send homie request');
       }
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'Could not send homie request');
     } finally {
       setActionLoading(false);
@@ -184,14 +178,14 @@ export default function ProfileScreen() {
               } else {
                 Alert.alert('Error', 'Could not remove homie');
               }
-            } catch (error) {
+            } catch (_error) {
               Alert.alert('Error', 'Could not remove homie');
             } finally {
               setActionLoading(false);
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -211,9 +205,15 @@ export default function ProfileScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.header}>
-          <Pressable style={[styles.backButton, { backgroundColor: theme.surface }]} onPress={handleBack}>
+          <Pressable
+            style={[styles.backButton, { backgroundColor: theme.surface }]}
+            onPress={handleBack}
+          >
             <Ionicons name="arrow-back" size={24} color={theme.text} />
           </Pressable>
         </View>
@@ -226,9 +226,15 @@ export default function ProfileScreen() {
 
   if (!profile) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.header}>
-          <Pressable style={[styles.backButton, { backgroundColor: theme.surface }]} onPress={handleBack}>
+          <Pressable
+            style={[styles.backButton, { backgroundColor: theme.surface }]}
+            onPress={handleBack}
+          >
             <Ionicons name="arrow-back" size={24} color={theme.text} />
           </Pressable>
         </View>
@@ -240,14 +246,18 @@ export default function ProfileScreen() {
     );
   }
 
-  const isPremium = profile.subscription?.plan === 'premium' &&
+  const isPremium =
+    profile.subscription?.plan === 'premium' &&
     ['active', 'canceled'].includes(profile.subscription?.status || '');
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable style={[styles.backButton, { backgroundColor: theme.surface }]} onPress={handleBack}>
+        <Pressable
+          style={[styles.backButton, { backgroundColor: theme.surface }]}
+          onPress={handleBack}
+        >
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Profile</Text>
@@ -265,7 +275,9 @@ export default function ProfileScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={YELLOW} />}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={YELLOW} />
+        }
       >
         {/* Profile Header */}
         <View style={styles.profileHeader}>
@@ -274,11 +286,23 @@ export default function ProfileScreen() {
             {profile.imageUri ? (
               <Image source={{ uri: profile.imageUri }} style={styles.avatar} />
             ) : profile.riderProfile?.avatarIcon ? (
-              <View style={[styles.avatar, styles.avatarIcon, { backgroundColor: profile.riderProfile.avatarIcon.bg || YELLOW }]}>
+              <View
+                style={[
+                  styles.avatar,
+                  styles.avatarIcon,
+                  { backgroundColor: profile.riderProfile.avatarIcon.bg || YELLOW },
+                ]}
+              >
                 <Text style={styles.avatarEmoji}>{profile.riderProfile.avatarIcon.emoji}</Text>
               </View>
             ) : (
-              <View style={[styles.avatar, styles.avatarPlaceholder, { backgroundColor: theme.surface }]}>
+              <View
+                style={[
+                  styles.avatar,
+                  styles.avatarPlaceholder,
+                  { backgroundColor: theme.surface },
+                ]}
+              >
                 <Ionicons name="person" size={48} color={theme.textSecondary} />
               </View>
             )}
@@ -292,10 +316,14 @@ export default function ProfileScreen() {
           {/* Name & Info */}
           <Text style={[styles.profileName, { color: theme.text }]}>{profile.name}</Text>
           {profile.riderProfile?.nickname && (
-            <Text style={[styles.nickname, { color: theme.textSecondary }]}>@{profile.riderProfile.nickname}</Text>
+            <Text style={[styles.nickname, { color: theme.textSecondary }]}>
+              @{profile.riderProfile.nickname}
+            </Text>
           )}
           {profile.riderProfile?.motto && (
-            <Text style={[styles.motto, { color: theme.textSecondary }]}>"{profile.riderProfile.motto}"</Text>
+            <Text style={[styles.motto, { color: theme.textSecondary }]}>
+              "{profile.riderProfile.motto}"
+            </Text>
           )}
 
           {/* Sports */}
@@ -400,12 +428,16 @@ export default function ProfileScreen() {
         <View style={styles.engagementRow}>
           <View style={[styles.engagementItem, { backgroundColor: theme.surface }]}>
             <Ionicons name="heart" size={20} color="#ef4444" />
-            <Text style={[styles.engagementValue, { color: theme.text }]}>{stats?.totalLove || 0}</Text>
+            <Text style={[styles.engagementValue, { color: theme.text }]}>
+              {stats?.totalLove || 0}
+            </Text>
             <Text style={[styles.engagementLabel, { color: theme.textSecondary }]}>Love</Text>
           </View>
           <View style={[styles.engagementItem, { backgroundColor: theme.surface }]}>
             <Text style={styles.engagementEmoji}>🙏</Text>
-            <Text style={[styles.engagementValue, { color: theme.text }]}>{stats?.totalRespect || 0}</Text>
+            <Text style={[styles.engagementValue, { color: theme.text }]}>
+              {stats?.totalRespect || 0}
+            </Text>
             <Text style={[styles.engagementLabel, { color: theme.textSecondary }]}>Respect</Text>
           </View>
         </View>
@@ -416,13 +448,27 @@ export default function ProfileScreen() {
             style={[styles.tab, activeTab === 'about' && { backgroundColor: YELLOW }]}
             onPress={() => setActiveTab('about')}
           >
-            <Text style={[styles.tabText, { color: activeTab === 'about' ? DARK : theme.textSecondary }]}>About</Text>
+            <Text
+              style={[
+                styles.tabText,
+                { color: activeTab === 'about' ? DARK : theme.textSecondary },
+              ]}
+            >
+              About
+            </Text>
           </Pressable>
           <Pressable
             style={[styles.tab, activeTab === 'activity' && { backgroundColor: YELLOW }]}
             onPress={() => setActiveTab('activity')}
           >
-            <Text style={[styles.tabText, { color: activeTab === 'activity' ? DARK : theme.textSecondary }]}>Activity</Text>
+            <Text
+              style={[
+                styles.tabText,
+                { color: activeTab === 'activity' ? DARK : theme.textSecondary },
+              ]}
+            >
+              Activity
+            </Text>
           </Pressable>
         </View>
 
@@ -436,31 +482,45 @@ export default function ProfileScreen() {
                 {profile.riderProfile.riderStyle && (
                   <View style={styles.infoRow}>
                     <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Style</Text>
-                    <Text style={[styles.infoValue, { color: theme.text }]}>{profile.riderProfile.riderStyle}</Text>
+                    <Text style={[styles.infoValue, { color: theme.text }]}>
+                      {profile.riderProfile.riderStyle}
+                    </Text>
                   </View>
                 )}
                 {profile.riderProfile.stance && (
                   <View style={styles.infoRow}>
                     <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Stance</Text>
-                    <Text style={[styles.infoValue, { color: theme.text }]}>{profile.riderProfile.stance}</Text>
+                    <Text style={[styles.infoValue, { color: theme.text }]}>
+                      {profile.riderProfile.stance}
+                    </Text>
                   </View>
                 )}
                 {profile.riderProfile.sickestTrick && (
                   <View style={styles.infoRow}>
-                    <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Sickest Trick</Text>
-                    <Text style={[styles.infoValue, { color: YELLOW }]}>{profile.riderProfile.sickestTrick}</Text>
+                    <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>
+                      Sickest Trick
+                    </Text>
+                    <Text style={[styles.infoValue, { color: YELLOW }]}>
+                      {profile.riderProfile.sickestTrick}
+                    </Text>
                   </View>
                 )}
                 {profile.riderProfile.homeSpot && (
                   <View style={styles.infoRow}>
-                    <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Home Spot</Text>
-                    <Text style={[styles.infoValue, { color: theme.text }]}>{profile.riderProfile.homeSpot}</Text>
+                    <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>
+                      Home Spot
+                    </Text>
+                    <Text style={[styles.infoValue, { color: theme.text }]}>
+                      {profile.riderProfile.homeSpot}
+                    </Text>
                   </View>
                 )}
                 {profile.riderProfile.nationality && (
                   <View style={styles.infoRow}>
                     <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>From</Text>
-                    <Text style={[styles.infoValue, { color: theme.text }]}>{profile.riderProfile.nationality}</Text>
+                    <Text style={[styles.infoValue, { color: theme.text }]}>
+                      {profile.riderProfile.nationality}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -488,7 +548,13 @@ export default function ProfileScreen() {
                           style={styles.postImage}
                         />
                       ) : (
-                        <View style={[styles.postImage, styles.postPlaceholder, { backgroundColor: theme.surface }]}>
+                        <View
+                          style={[
+                            styles.postImage,
+                            styles.postPlaceholder,
+                            { backgroundColor: theme.surface },
+                          ]}
+                        >
                           <Ionicons name="image" size={24} color={theme.textSecondary} />
                         </View>
                       )}
@@ -509,30 +575,44 @@ export default function ProfileScreen() {
             {activities.length === 0 ? (
               <View style={styles.emptyActivity}>
                 <Ionicons name="time-outline" size={48} color={theme.textSecondary} />
-                <Text style={[styles.emptyText, { color: theme.textSecondary }]}>No recent activity</Text>
+                <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                  No recent activity
+                </Text>
               </View>
             ) : (
               activities.map((activity, index) => (
-                <View key={`${activity.type}-${index}`} style={[styles.activityItem, { backgroundColor: theme.surface }]}>
-                  <View style={[styles.activityIcon, { backgroundColor: YELLOW + '25' }]}>
+                <View
+                  key={`${activity.type}-${index}`}
+                  style={[styles.activityItem, { backgroundColor: theme.surface }]}
+                >
+                  <View style={[styles.activityIcon, { backgroundColor: `${YELLOW}25` }]}>
                     <Ionicons
                       name={
-                        activity.type === 'post' ? 'videocam' :
-                        activity.type === 'reaction' ? 'heart' :
-                        activity.type === 'comment' ? 'chatbubble' : 'location'
+                        activity.type === 'post'
+                          ? 'videocam'
+                          : activity.type === 'reaction'
+                            ? 'heart'
+                            : activity.type === 'comment'
+                              ? 'chatbubble'
+                              : 'location'
                       }
                       size={18}
                       color={YELLOW}
                     />
                   </View>
                   <View style={styles.activityContent}>
-                    <Text style={[styles.activityText, { color: theme.text }]}>{activity.action}</Text>
+                    <Text style={[styles.activityText, { color: theme.text }]}>
+                      {activity.action}
+                    </Text>
                     <Text style={[styles.activityTime, { color: theme.textSecondary }]}>
                       {formatTimeAgo(activity.createdAt)}
                     </Text>
                   </View>
                   {activity.data?.thumbnailUrl && (
-                    <Image source={{ uri: activity.data.thumbnailUrl }} style={styles.activityThumbnail} />
+                    <Image
+                      source={{ uri: activity.data.thumbnailUrl }}
+                      style={styles.activityThumbnail}
+                    />
                   )}
                 </View>
               ))

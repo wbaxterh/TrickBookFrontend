@@ -3,32 +3,31 @@
  * Slides up from bottom, video continues playing behind
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  Modal,
-  Pressable,
-  FlatList,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
   ActivityIndicator,
-  Image,
   Animated,
   Dimensions,
+  FlatList,
+  Image,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
   StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import {
-  getComments,
   addComment,
-  toggleCommentLove,
-  Comment,
-  FeedPost,
+  type Comment,
+  type FeedPost,
   formatTimeAgo,
+  getComments,
+  toggleCommentLove,
 } from '@/lib/api/feed';
 import { useAuthStore } from '@/lib/stores/authStore';
 
@@ -42,11 +41,7 @@ interface CommentsBottomSheetProps {
   onClose: () => void;
 }
 
-export default function CommentsBottomSheet({
-  visible,
-  post,
-  onClose,
-}: CommentsBottomSheetProps) {
+export default function CommentsBottomSheet({ visible, post, onClose }: CommentsBottomSheetProps) {
   const { user, token } = useAuthStore();
   const insets = useSafeAreaInsets();
   const [comments, setComments] = useState<Comment[]>([]);
@@ -91,8 +86,7 @@ export default function CommentsBottomSheet({
       }
       setHasMore(response.pagination.hasMore ?? response.comments.length === 20);
       setPage(pageNum);
-    } catch (error) {
-      console.error('Error fetching comments:', error);
+    } catch (_error) {
     } finally {
       setLoading(false);
     }
@@ -110,8 +104,7 @@ export default function CommentsBottomSheet({
         setNewComment('');
         inputRef.current?.blur();
       }
-    } catch (error) {
-      console.error('Error adding comment:', error);
+    } catch (_error) {
     } finally {
       setSubmitting(false);
     }
@@ -131,7 +124,7 @@ export default function CommentsBottomSheet({
           };
         }
         return c;
-      })
+      }),
     );
 
     await toggleCommentLove(post._id, comment._id);
@@ -189,9 +182,7 @@ export default function CommentsBottomSheet({
           size={16}
           color={item.loved ? '#ef4444' : 'rgba(255,255,255,0.5)'}
         />
-        {item.loveCount > 0 && (
-          <Text style={styles.loveCount}>{item.loveCount}</Text>
-        )}
+        {item.loveCount > 0 && <Text style={styles.loveCount}>{item.loveCount}</Text>}
       </Pressable>
     </View>
   );
@@ -199,12 +190,7 @@ export default function CommentsBottomSheet({
   if (!post) return null;
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={handleClose}
-    >
+    <Modal visible={visible} transparent animationType="none" onRequestClose={handleClose}>
       {/* Backdrop */}
       <Pressable style={styles.backdrop} onPress={handleClose}>
         <View style={styles.backdropInner} />

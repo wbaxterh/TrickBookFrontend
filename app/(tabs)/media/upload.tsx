@@ -3,39 +3,37 @@
  * Allows users to upload videos/images to The Feed
  */
 
-import { useState, useRef, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { ResizeMode, Video } from 'expo-av';
+import { FileSystemUploadType, getInfoAsync, uploadAsync } from 'expo-file-system/legacy';
+import * as ImagePicker from 'expo-image-picker';
+import { router } from 'expo-router';
+import { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  TextInput,
-  Image,
   ActivityIndicator,
-  StyleSheet,
-  Dimensions,
   Alert,
+  Dimensions,
+  Image,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import { getInfoAsync, uploadAsync, FileSystemUploadType } from 'expo-file-system/legacy';
-import { Video, ResizeMode } from 'expo-av';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { useAuthStore } from '@/lib/stores/authStore';
+import { type CreatePostData, createPost } from '@/lib/api/feed';
 import {
   createVideoEntry,
-  getVideoStatus,
-  waitForVideoProcessing,
-  uploadImageToS3,
   SPORT_TYPES,
+  uploadImageToS3,
   VISIBILITY_OPTIONS,
+  waitForVideoProcessing,
 } from '@/lib/api/upload';
-import { createPost, CreatePostData } from '@/lib/api/feed';
-import { API_CONFIG } from '@/constants/api';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { useAuthStore } from '@/lib/stores/authStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const YELLOW = '#FCF150';
@@ -104,8 +102,7 @@ export default function UploadScreen() {
         setError(null);
         setUploadStep('idle');
       }
-    } catch (err) {
-      console.error('Error selecting media:', err);
+    } catch (_err) {
       Alert.alert('Error', 'Failed to select media');
     }
   };
@@ -158,19 +155,12 @@ export default function UploadScreen() {
         throw new Error('Selected file no longer exists. Please select again.');
       }
 
-      console.log('Starting upload:', {
-        mediaType,
-        uri: selectedFile.uri,
-        fileSize: fileInfo.size || selectedFile.fileSize,
-      });
-
       if (mediaType === 'video') {
         await handleVideoUpload();
       } else {
         await handleImageUpload();
       }
     } catch (err: any) {
-      console.error('Upload error:', err);
       setError(err.message || 'Upload failed. Please try again.');
       setUploadStep('error');
     }
@@ -217,16 +207,15 @@ export default function UploadScreen() {
           'Tus-Resumable': '1.0.0',
           'Upload-Length': fileSize.toString(),
           'Upload-Metadata': `filename ${btoa(fileName)},filetype ${btoa(mimeType)}`,
-          'AuthorizationSignature': tusHeaders.AuthorizationSignature,
-          'AuthorizationExpire': tusHeaders.AuthorizationExpire.toString(),
-          'VideoId': tusHeaders.VideoId,
-          'LibraryId': tusHeaders.LibraryId,
+          AuthorizationSignature: tusHeaders.AuthorizationSignature,
+          AuthorizationExpire: tusHeaders.AuthorizationExpire.toString(),
+          VideoId: tusHeaders.VideoId,
+          LibraryId: tusHeaders.LibraryId,
         },
       });
 
       if (!createResponse.ok) {
-        const errorText = await createResponse.text();
-        console.error('TUS create error:', errorText);
+        const _errorText = await createResponse.text();
         throw new Error('Failed to initiate upload');
       }
 
@@ -242,8 +231,6 @@ export default function UploadScreen() {
         const tusUrl = new URL(videoEntry.uploadCredentials.tusEndpoint);
         uploadUrl = `${tusUrl.protocol}//${tusUrl.host}${locationHeader}`;
       }
-
-      console.log('TUS upload URL:', uploadUrl);
       setUploadProgress(10);
       setProcessingStatus('Uploading video file...');
 
@@ -256,21 +243,19 @@ export default function UploadScreen() {
           'Tus-Resumable': '1.0.0',
           'Upload-Offset': '0',
           'Content-Type': 'application/offset+octet-stream',
-          'AuthorizationSignature': tusHeaders.AuthorizationSignature,
-          'AuthorizationExpire': tusHeaders.AuthorizationExpire.toString(),
-          'VideoId': tusHeaders.VideoId,
-          'LibraryId': tusHeaders.LibraryId,
+          AuthorizationSignature: tusHeaders.AuthorizationSignature,
+          AuthorizationExpire: tusHeaders.AuthorizationExpire.toString(),
+          VideoId: tusHeaders.VideoId,
+          LibraryId: tusHeaders.LibraryId,
         },
       });
 
       if (uploadResult.status !== 204 && uploadResult.status !== 200) {
-        console.error('TUS upload error:', uploadResult.status, uploadResult.body);
         throw new Error('Failed to upload video data');
       }
 
       setUploadProgress(100);
     } catch (uploadError: any) {
-      console.error('TUS upload error:', uploadError);
       throw new Error(uploadError.message || 'Failed to upload video');
     }
 
@@ -284,9 +269,12 @@ export default function UploadScreen() {
     setUploadStep('creating');
     setProcessingStatus('Creating post...');
 
-    const aspectRatio = selectedFile.width && selectedFile.height
-      ? (selectedFile.width > selectedFile.height ? '16:9' : '9:16')
-      : '9:16';
+    const aspectRatio =
+      selectedFile.width && selectedFile.height
+        ? selectedFile.width > selectedFile.height
+          ? '16:9'
+          : '9:16'
+        : '9:16';
 
     const postData: CreatePostData = {
       mediaType: 'video',
@@ -330,11 +318,8 @@ export default function UploadScreen() {
     const filename = `feed-${Date.now()}.${isPng ? 'png' : 'jpg'}`;
     const contentType = isPng ? 'image/png' : isHeic ? 'image/heic' : 'image/jpeg';
 
-    const { fileUrl } = await uploadImageToS3(
-      selectedFile.uri,
-      filename,
-      contentType,
-      (progress) => setUploadProgress(progress)
+    const { fileUrl } = await uploadImageToS3(selectedFile.uri, filename, contentType, (progress) =>
+      setUploadProgress(progress),
     );
 
     // Step 2: Create feed post
@@ -405,15 +390,11 @@ export default function UploadScreen() {
               <View style={styles.formatRow}>
                 <View style={styles.formatItem}>
                   <Ionicons name="videocam" size={16} color={theme.textSecondary} />
-                  <Text style={[styles.formatText, { color: theme.textSecondary }]}>
-                    MP4, MOV
-                  </Text>
+                  <Text style={[styles.formatText, { color: theme.textSecondary }]}>MP4, MOV</Text>
                 </View>
                 <View style={styles.formatItem}>
                   <Ionicons name="image" size={16} color={theme.textSecondary} />
-                  <Text style={[styles.formatText, { color: theme.textSecondary }]}>
-                    JPG, PNG
-                  </Text>
+                  <Text style={[styles.formatText, { color: theme.textSecondary }]}>JPG, PNG</Text>
                 </View>
               </View>
               <View style={[styles.selectButton, { backgroundColor: colors.primary }]}>
@@ -586,9 +567,7 @@ export default function UploadScreen() {
                 ) : (
                   <ActivityIndicator size="small" color={YELLOW} />
                 )}
-                <Text style={[styles.progressText, { color: theme.text }]}>
-                  {processingStatus}
-                </Text>
+                <Text style={[styles.progressText, { color: theme.text }]}>{processingStatus}</Text>
               </View>
 
               {(uploadStep === 'uploading' || uploadStep === 'processing') && (

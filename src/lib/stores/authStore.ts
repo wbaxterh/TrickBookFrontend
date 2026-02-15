@@ -3,8 +3,8 @@
  * Zustand store for authentication state
  */
 
-import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
+import { create } from 'zustand';
 import * as authApi from '@/lib/api/auth';
 import { apiClient } from '@/lib/api/client';
 
@@ -118,7 +118,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       // Register the user
-      const registeredUser = await authApi.register(data);
+      const _registeredUser = await authApi.register(data);
 
       // After registration, automatically log them in
       const { token, user } = await authApi.login(data.email, data.password);
@@ -159,8 +159,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: false,
         error: null,
       });
-    } catch (error) {
-      console.error('Logout error:', error);
+    } catch (_error) {
       // Still clear local state even if API fails
       set({
         user: null,
@@ -177,20 +176,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const token = await apiClient.getToken();
       const userJson = await SecureStore.getItemAsync(USER_KEY);
 
-      console.log('[Auth] Loading stored auth - token exists:', !!token, 'user exists:', !!userJson);
-
       if (token && userJson) {
         const user = JSON.parse(userJson) as User;
-        console.log('[Auth] Restoring session for user:', user.email);
         set({ user, token, isAuthenticated: true });
 
         // Optionally refresh user data in background
         get().refreshUser().catch(console.error);
       } else {
-        console.log('[Auth] No stored session found');
       }
-    } catch (error) {
-      console.error('[Auth] Load stored auth error:', error);
+    } catch (_error) {
       // Clear potentially corrupted data
       await SecureStore.deleteItemAsync(TOKEN_KEY);
       await SecureStore.deleteItemAsync(USER_KEY);
@@ -212,8 +206,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       set({ user });
     } catch (error: any) {
-      console.error('Refresh user error:', error);
-
       // If unauthorized, clear auth state
       if (error?.status === 401 || error?.status === 403) {
         get().logout();

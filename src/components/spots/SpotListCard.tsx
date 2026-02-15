@@ -5,11 +5,10 @@
  * Shows: list name, spot count (X spots), chevron
  */
 
-import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { SpotList } from '@/types/spots';
+import type { SpotList } from '@/types/spots';
 
 interface SpotListCardProps {
   list: SpotList;
@@ -21,10 +20,7 @@ export function SpotListCard({ list, onPress }: SpotListCardProps) {
   const spotCount = list.spotCount ?? list.spotIds?.length ?? 0;
 
   return (
-    <Pressable
-      style={[styles.container, { backgroundColor: theme.surface }]}
-      onPress={onPress}
-    >
+    <Pressable style={[styles.container, { backgroundColor: theme.surface }]} onPress={onPress}>
       <View style={styles.iconContainer}>
         <Ionicons name="location" size={24} color={theme.text} />
       </View>

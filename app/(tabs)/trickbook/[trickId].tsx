@@ -9,31 +9,36 @@
  * - Add to TrickList functionality
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
   ActivityIndicator,
-  StyleSheet,
-  Modal,
-  FlatList,
   Alert,
+  FlatList,
   Linking,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { ShareToHomieModal } from '@/components/share';
+import { addTrickToList, getTrickById, getUserTrickLists } from '@/lib/api/trickbook';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
-import { getTrickById, getUserTrickLists, addTrickToList } from '@/lib/api/trickbook';
-import { Trick, TrickList, TrickDifficulty, DIFFICULTY_COLORS } from '@/types/trickbook';
-import { ShareToHomieModal } from '@/components/share';
+import {
+  DIFFICULTY_COLORS,
+  type Trick,
+  type TrickDifficulty,
+  type TrickList,
+} from '@/types/trickbook';
 
 const YELLOW = '#FCF150';
 const DARK = '#1f1f1f';
-const GRAY = '#666666';
+const _GRAY = '#666666';
 
 /**
  * Convert difficulty string to numeric rating (1-4)
@@ -89,10 +94,8 @@ export default function TrickDetailScreen() {
     try {
       setLoading(true);
       const data = await getTrickById(trickId);
-      console.log('[TrickDetail] Loaded trick:', data?.name);
       setTrick(data);
-    } catch (error) {
-      console.error('Failed to load trick:', error);
+    } catch (_error) {
     } finally {
       setLoading(false);
     }
@@ -110,8 +113,7 @@ export default function TrickDetailScreen() {
       setLoadingLists(true);
       const lists = await getUserTrickLists(user.id, token);
       setUserLists(lists);
-    } catch (error) {
-      console.error('Failed to load user lists:', error);
+    } catch (_error) {
     } finally {
       setLoadingLists(false);
     }
@@ -141,7 +143,7 @@ export default function TrickDetailScreen() {
           notes: `From Trickipedia: ${trick.category} - ${trick.difficulty}`,
           trickipediaId: trick._id, // Link back to Trickipedia for "View Tutorial" feature
         },
-        token
+        token,
       );
 
       if (success) {
@@ -150,8 +152,7 @@ export default function TrickDetailScreen() {
       } else {
         Alert.alert('Error', 'Failed to add trick to list');
       }
-    } catch (error) {
-      console.error('Failed to add trick to list:', error);
+    } catch (_error) {
       Alert.alert('Error', 'Something went wrong');
     } finally {
       setAddingToList(null);
@@ -170,7 +171,10 @@ export default function TrickDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={YELLOW} />
         </View>
@@ -180,12 +184,13 @@ export default function TrickDetailScreen() {
 
   if (!trick) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.loadingContainer}>
           <Ionicons name="alert-circle-outline" size={48} color={theme.textSecondary} />
-          <Text style={[styles.errorText, { color: theme.textSecondary }]}>
-            Trick not found
-          </Text>
+          <Text style={[styles.errorText, { color: theme.textSecondary }]}>Trick not found</Text>
           <Pressable style={styles.backButtonLarge} onPress={() => router.back()}>
             <Text style={styles.backButtonLargeText}>Go Back</Text>
           </Pressable>
@@ -205,7 +210,10 @@ export default function TrickDetailScreen() {
       >
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: theme.border }]}>
-          <Pressable style={[styles.backButton, { backgroundColor: theme.surface }]} onPress={() => router.back()}>
+          <Pressable
+            style={[styles.backButton, { backgroundColor: theme.surface }]}
+            onPress={() => router.back()}
+          >
             <Ionicons name="arrow-back" size={24} color={theme.text} />
           </Pressable>
           <View style={styles.headerTitleContainer}>
@@ -262,7 +270,9 @@ export default function TrickDetailScreen() {
             <Text style={[styles.categoryText, { color: theme.text }]}>{trick.category}</Text>
           </View>
           <View style={styles.difficultyContainer}>
-            <View style={[styles.difficultyBadge, { backgroundColor: difficultyInfo.color + '20' }]}>
+            <View
+              style={[styles.difficultyBadge, { backgroundColor: `${difficultyInfo.color}20` }]}
+            >
               <Text style={[styles.difficultyText, { color: difficultyInfo.color }]}>
                 {difficultyInfo.label}
               </Text>
@@ -295,10 +305,7 @@ export default function TrickDetailScreen() {
             <Text style={[styles.sectionTitle, { color: theme.text }]}>Steps & Tips</Text>
             <View style={styles.tipsContainer}>
               {trick.steps.map((step, index) => (
-                <View
-                  key={index}
-                  style={[styles.tipCard, { backgroundColor: theme.surface }]}
-                >
+                <View key={index} style={[styles.tipCard, { backgroundColor: theme.surface }]}>
                   <View style={styles.tipNumber}>
                     <Text style={styles.tipNumberText}>{index + 1}</Text>
                   </View>
@@ -321,7 +328,12 @@ export default function TrickDetailScreen() {
       </ScrollView>
 
       {/* Fixed Bottom Button */}
-      <View style={[styles.bottomContainer, { backgroundColor: theme.background, borderTopColor: theme.border }]}>
+      <View
+        style={[
+          styles.bottomContainer,
+          { backgroundColor: theme.background, borderTopColor: theme.border },
+        ]}
+      >
         <Pressable style={styles.addButton} onPress={handleOpenListModal}>
           <Ionicons name="add-circle-outline" size={22} color={DARK} />
           <Text style={styles.addButtonText}>Add to TrickList</Text>

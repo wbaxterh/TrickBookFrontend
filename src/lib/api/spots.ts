@@ -3,8 +3,8 @@
  * Functions for fetching and managing spots
  */
 
-import { apiClient } from './client';
 import { ENDPOINTS } from '@/constants/api';
+import { apiClient } from './client';
 
 // Types
 export interface SpotPhoto {
@@ -76,11 +76,10 @@ export async function getSportTypes(): Promise<SportType[]> {
   try {
     const response = await apiClient.get<{ sportTypes: SportType[] }>(
       `${ENDPOINTS.spots.list}/sport-types`,
-      { skipAuth: true }
+      { skipAuth: true },
     );
     return response.sportTypes;
-  } catch (error) {
-    console.error('Error fetching sport types:', error);
+  } catch (_error) {
     // Return default sport types if API fails
     return [
       { value: 'skateboarding', label: 'Skateboarding' },
@@ -116,14 +115,11 @@ export async function getSpots(params: GetSpotsParams = {}): Promise<SpotsRespon
     if (params.q) queryParams.append('q', params.q);
 
     const queryString = queryParams.toString();
-    const endpoint = queryString
-      ? `${ENDPOINTS.spots.list}?${queryString}`
-      : ENDPOINTS.spots.list;
+    const endpoint = queryString ? `${ENDPOINTS.spots.list}?${queryString}` : ENDPOINTS.spots.list;
 
     const response = await apiClient.get<SpotsResponse>(endpoint, { skipAuth: true });
     return response;
-  } catch (error) {
-    console.error('Error fetching spots:', error);
+  } catch (_error) {
     return {
       spots: [],
       pagination: {
@@ -142,7 +138,7 @@ export async function getSpots(params: GetSpotsParams = {}): Promise<SpotsRespon
  */
 export async function searchSpots(
   query: string,
-  filters: { city?: string; state?: string; tags?: string } = {}
+  filters: { city?: string; state?: string; tags?: string } = {},
 ): Promise<SpotsResponse> {
   try {
     const queryParams = new URLSearchParams();
@@ -153,11 +149,10 @@ export async function searchSpots(
 
     const response = await apiClient.get<SpotsResponse>(
       `${ENDPOINTS.spots.search}?${queryParams.toString()}`,
-      { skipAuth: true }
+      { skipAuth: true },
     );
     return response;
-  } catch (error) {
-    console.error('Error searching spots:', error);
+  } catch (_error) {
     return {
       spots: [],
       pagination: {
@@ -176,13 +171,9 @@ export async function searchSpots(
  */
 export async function getSpotById(id: string): Promise<Spot | null> {
   try {
-    const response = await apiClient.get<Spot>(
-      ENDPOINTS.spots.detail(id),
-      { skipAuth: true }
-    );
+    const response = await apiClient.get<Spot>(ENDPOINTS.spots.detail(id), { skipAuth: true });
     return response;
-  } catch (error) {
-    console.error('Error fetching spot:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -191,13 +182,12 @@ export async function getSpotById(id: string): Promise<Spot | null> {
  * Create a new spot
  */
 export async function createSpot(
-  spot: Omit<Spot, '_id' | 'createdAt' | 'updatedAt' | 'userId' | 'approvalStatus'>
+  spot: Omit<Spot, '_id' | 'createdAt' | 'updatedAt' | 'userId' | 'approvalStatus'>,
 ): Promise<Spot | null> {
   try {
     const response = await apiClient.post<Spot>(ENDPOINTS.spots.create, spot);
     return response;
-  } catch (error) {
-    console.error('Error creating spot:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -205,18 +195,11 @@ export async function createSpot(
 /**
  * Update a spot
  */
-export async function updateSpot(
-  id: string,
-  updates: Partial<Spot>
-): Promise<Spot | null> {
+export async function updateSpot(id: string, updates: Partial<Spot>): Promise<Spot | null> {
   try {
-    const response = await apiClient.put<Spot>(
-      ENDPOINTS.spots.detail(id),
-      updates
-    );
+    const response = await apiClient.put<Spot>(ENDPOINTS.spots.detail(id), updates);
     return response;
-  } catch (error) {
-    console.error('Error updating spot:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -224,7 +207,9 @@ export async function updateSpot(
 /**
  * Get user's own spots
  */
-export async function getMySpots(params: { page?: number; limit?: number } = {}): Promise<SpotsResponse> {
+export async function getMySpots(
+  params: { page?: number; limit?: number } = {},
+): Promise<SpotsResponse> {
   try {
     const queryParams = new URLSearchParams();
     if (params.page) queryParams.append('page', params.page.toString());
@@ -237,8 +222,7 @@ export async function getMySpots(params: { page?: number; limit?: number } = {})
 
     const response = await apiClient.get<SpotsResponse>(endpoint);
     return response;
-  } catch (error) {
-    console.error('Error fetching my spots:', error);
+  } catch (_error) {
     return {
       spots: [],
       pagination: {
@@ -291,7 +275,7 @@ export interface ReverseGeocodeResult {
 export async function searchPlaces(
   query: string,
   lat?: number,
-  lng?: number
+  lng?: number,
 ): Promise<PlaceSearchResult[]> {
   try {
     const params = new URLSearchParams();
@@ -300,11 +284,10 @@ export async function searchPlaces(
     if (lng) params.append('lng', lng.toString());
 
     const response = await apiClient.get<{ results: PlaceSearchResult[] }>(
-      `${ENDPOINTS.spots.list}/places-search?${params.toString()}`
+      `${ENDPOINTS.spots.list}/places-search?${params.toString()}`,
     );
     return response.results || [];
-  } catch (error) {
-    console.error('Error searching places:', error);
+  } catch (_error) {
     return [];
   }
 }
@@ -314,12 +297,9 @@ export async function searchPlaces(
  */
 export async function getPlaceDetails(placeId: string): Promise<PlaceDetails | null> {
   try {
-    const response = await apiClient.get<PlaceDetails>(
-      `${ENDPOINTS.spots.list}/places/${placeId}`
-    );
+    const response = await apiClient.get<PlaceDetails>(`${ENDPOINTS.spots.list}/places/${placeId}`);
     return response;
-  } catch (error) {
-    console.error('Error getting place details:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -327,17 +307,13 @@ export async function getPlaceDetails(placeId: string): Promise<PlaceDetails | n
 /**
  * Reverse geocode coordinates to get address info
  */
-export async function reverseGeocode(
-  lat: number,
-  lng: number
-): Promise<ReverseGeocodeResult> {
+export async function reverseGeocode(lat: number, lng: number): Promise<ReverseGeocodeResult> {
   try {
     const response = await apiClient.get<ReverseGeocodeResult>(
-      `${ENDPOINTS.spots.list}/reverse-geocode?lat=${lat}&lng=${lng}`
+      `${ENDPOINTS.spots.list}/reverse-geocode?lat=${lat}&lng=${lng}`,
     );
     return response;
-  } catch (error) {
-    console.error('Error reverse geocoding:', error);
+  } catch (_error) {
     return { address: null, city: '', state: '', country: '' };
   }
 }

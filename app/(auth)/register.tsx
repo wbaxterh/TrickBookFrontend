@@ -3,24 +3,24 @@
  * New account creation with profile setup
  */
 
+import { Ionicons } from '@expo/vector-icons';
+import { Link, router } from 'expo-router';
 import { useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
+  Alert,
   KeyboardAvoidingView,
   Platform,
-  Alert,
-  StyleSheet,
+  Pressable,
   ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
-import { Link, router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { Button, IconButton } from '@/components/ui';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
-import { Button, IconButton, Card } from '@/components/ui';
 
 const SPORTS = [
   { id: 'skateboard', emoji: '🛹', label: 'Skateboard' },
@@ -47,9 +47,7 @@ export default function RegisterScreen() {
 
   const toggleSport = (sportId: string) => {
     setSelectedSports((prev) =>
-      prev.includes(sportId)
-        ? prev.filter((id) => id !== sportId)
-        : [...prev, sportId]
+      prev.includes(sportId) ? prev.filter((id) => id !== sportId) : [...prev, sportId],
     );
   };
 
@@ -109,9 +107,7 @@ export default function RegisterScreen() {
         return (
           <>
             <View style={styles.header}>
-              <Text style={[styles.title, { color: theme.text }]}>
-                Create account
-              </Text>
+              <Text style={[styles.title, { color: theme.text }]}>Create account</Text>
               <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
                 Let's get you started with TrickBook
               </Text>
@@ -119,9 +115,7 @@ export default function RegisterScreen() {
 
             <View style={styles.form}>
               <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>
-                  Name
-                </Text>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>Name</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -141,9 +135,7 @@ export default function RegisterScreen() {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>
-                  Email
-                </Text>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>Email</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -171,9 +163,7 @@ export default function RegisterScreen() {
         return (
           <>
             <View style={styles.header}>
-              <Text style={[styles.title, { color: theme.text }]}>
-                Set password
-              </Text>
+              <Text style={[styles.title, { color: theme.text }]}>Set password</Text>
               <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
                 Make it secure, at least 5 characters
               </Text>
@@ -181,9 +171,7 @@ export default function RegisterScreen() {
 
             <View style={styles.form}>
               <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>
-                  Password
-                </Text>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>Password</Text>
                 <View style={styles.passwordContainer}>
                   <TextInput
                     style={[
@@ -216,9 +204,7 @@ export default function RegisterScreen() {
               </View>
 
               <View style={styles.inputGroup}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>
-                  Confirm Password
-                </Text>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>Confirm Password</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -244,9 +230,7 @@ export default function RegisterScreen() {
         return (
           <>
             <View style={styles.header}>
-              <Text style={[styles.title, { color: theme.text }]}>
-                Pick your sports
-              </Text>
+              <Text style={[styles.title, { color: theme.text }]}>Pick your sports</Text>
               <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
                 Select all that apply
               </Text>
@@ -261,9 +245,7 @@ export default function RegisterScreen() {
                     style={[
                       styles.sportCard,
                       {
-                        backgroundColor: isSelected
-                          ? colors.primary + '20'
-                          : theme.surface,
+                        backgroundColor: isSelected ? `${colors.primary}20` : theme.surface,
                         borderColor: isSelected ? colors.primary : theme.border,
                       },
                     ]}
@@ -359,9 +341,7 @@ export default function RegisterScreen() {
               </Text>
               <Link href="/(auth)/login" asChild>
                 <Pressable>
-                  <Text style={[styles.signInLink, { color: colors.primary }]}>
-                    Sign in
-                  </Text>
+                  <Text style={[styles.signInLink, { color: colors.primary }]}>Sign in</Text>
                 </Pressable>
               </Link>
             </View>

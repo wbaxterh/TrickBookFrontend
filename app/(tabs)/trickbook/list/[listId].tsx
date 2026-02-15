@@ -11,40 +11,39 @@
  * - Add new tricks with name, notes, and link
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import {
-  View,
-  Text,
-  Pressable,
-  FlatList,
-  ActivityIndicator,
-  Modal,
-  TextInput,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  StyleSheet,
-  Animated,
-  Linking,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { Swipeable, GestureHandlerRootView } from 'react-native-gesture-handler';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Animated,
+  FlatList,
+  KeyboardAvoidingView,
+  Linking,
+  Modal,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { ShareToHomieModal } from '@/components/share';
+import {
+  addTrickToList,
+  deleteTrickList,
+  editTrick,
+  getTrickList,
+  removeTrickFromList,
+  updateTrickList,
+  updateTrickStatus,
+} from '@/lib/api/trickbook';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
-import {
-  getTrickList,
-  updateTrickStatus,
-  removeTrickFromList,
-  addTrickToList,
-  editTrick,
-  updateTrickList,
-  deleteTrickList,
-} from '@/lib/api/trickbook';
-import { TrickList, TrickListItem, TrickStatus } from '@/types/trickbook';
-import { ShareToHomieModal } from '@/components/share';
-import { SharedContentType, SharedContentPreview } from '@/lib/api/messages';
+import type { TrickList, TrickListItem, TrickStatus } from '@/types/trickbook';
 
 const YELLOW = '#FCF150';
 const DARK = '#1f1f1f';
@@ -101,18 +100,13 @@ export default function TrickListDetailScreen() {
     try {
       setLoading(true);
       const userId = user?.id || user?._id;
-      console.log('[TrickList] Loading list:', listId, 'userId:', userId);
       const data = await getTrickList(listId, token, userId);
-      console.log('[TrickList] Loaded list:', data?.name, 'with', data?.tricks?.length, 'tricks');
       if (data?.tricks) {
         // Log all tricks with their checked status
-        data.tricks.forEach((t, i) => {
-          console.log(`[TrickList] Trick ${i}: "${t.name}" checked="${t.checked}" status="${t.status}"`);
-        });
+        data.tricks.forEach((_t, _i) => {});
       }
       setList(data);
-    } catch (error) {
-      console.error('Failed to load trick list:', error);
+    } catch (_error) {
       Alert.alert('Error', 'Failed to load trick list');
     } finally {
       setLoading(false);
@@ -134,19 +128,18 @@ export default function TrickListDetailScreen() {
       await updateTrickStatus(listId, trick._id, newStatus, token);
 
       // Update local state
-      setList(prev => {
+      setList((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
-          tricks: prev.tricks.map(t =>
+          tricks: prev.tricks.map((t) =>
             t._id === trick._id
               ? { ...t, checked: currentlyComplete ? 'To Do' : 'Completed', status: newStatus }
-              : t
+              : t,
           ),
         };
       });
-    } catch (error) {
-      console.error('Failed to update status:', error);
+    } catch (_error) {
       Alert.alert('Error', 'Failed to update trick status');
     }
   };
@@ -155,32 +148,27 @@ export default function TrickListDetailScreen() {
   const handleDeleteTrick = async (trick: TrickListItem) => {
     if (!listId || !token) return;
 
-    Alert.alert(
-      'Delete Trick',
-      `Delete "${trick.name}" from this list?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await removeTrickFromList(listId, trick._id, token);
-              setList(prev => {
-                if (!prev) return prev;
-                return {
-                  ...prev,
-                  tricks: prev.tricks.filter(t => t._id !== trick._id),
-                };
-              });
-            } catch (error) {
-              console.error('Failed to delete trick:', error);
-              Alert.alert('Error', 'Failed to delete trick');
-            }
-          },
+    Alert.alert('Delete Trick', `Delete "${trick.name}" from this list?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await removeTrickFromList(listId, trick._id, token);
+            setList((prev) => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                tricks: prev.tricks.filter((t) => t._id !== trick._id),
+              };
+            });
+          } catch (_error) {
+            Alert.alert('Error', 'Failed to delete trick');
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   // Open edit modal
@@ -198,29 +186,32 @@ export default function TrickListDetailScreen() {
 
     try {
       setSaving(true);
-      await editTrick(selectedTrick._id, {
-        name: trickName.trim(),
-        link: trickLink.trim(),
-        notes: trickNotes.trim(),
-      }, token);
+      await editTrick(
+        selectedTrick._id,
+        {
+          name: trickName.trim(),
+          link: trickLink.trim(),
+          notes: trickNotes.trim(),
+        },
+        token,
+      );
 
       // Update local state
-      setList(prev => {
+      setList((prev) => {
         if (!prev) return prev;
         return {
           ...prev,
-          tricks: prev.tricks.map(t =>
+          tricks: prev.tricks.map((t) =>
             t._id === selectedTrick._id
               ? { ...t, name: trickName.trim(), link: trickLink.trim(), notes: trickNotes.trim() }
-              : t
+              : t,
           ),
         };
       });
 
       setEditModalVisible(false);
       resetForm();
-    } catch (error) {
-      console.error('Failed to edit trick:', error);
+    } catch (_error) {
       Alert.alert('Error', 'Failed to save changes');
     } finally {
       setSaving(false);
@@ -233,17 +224,20 @@ export default function TrickListDetailScreen() {
 
     try {
       setSaving(true);
-      await addTrickToList(listId, {
-        name: trickName.trim(),
-        link: trickLink.trim(),
-        notes: trickNotes.trim(),
-      }, token);
+      await addTrickToList(
+        listId,
+        {
+          name: trickName.trim(),
+          link: trickLink.trim(),
+          notes: trickNotes.trim(),
+        },
+        token,
+      );
 
       await loadList();
       setAddModalVisible(false);
       resetForm();
-    } catch (error) {
-      console.error('Failed to add trick:', error);
+    } catch (_error) {
       Alert.alert('Error', 'Failed to add trick');
     } finally {
       setSaving(false);
@@ -279,13 +273,12 @@ export default function TrickListDetailScreen() {
       setSaving(true);
       const success = await updateTrickList(listId, newListName.trim(), token);
       if (success) {
-        setList(prev => prev ? { ...prev, name: newListName.trim() } : prev);
+        setList((prev) => (prev ? { ...prev, name: newListName.trim() } : prev));
         setRenameModalVisible(false);
       } else {
         Alert.alert('Error', 'Failed to rename list');
       }
-    } catch (error) {
-      console.error('Failed to rename list:', error);
+    } catch (_error) {
       Alert.alert('Error', 'Failed to rename list');
     } finally {
       setSaving(false);
@@ -312,62 +305,65 @@ export default function TrickListDetailScreen() {
               } else {
                 Alert.alert('Error', 'Failed to delete list');
               }
-            } catch (error) {
-              console.error('Failed to delete list:', error);
+            } catch (_error) {
               Alert.alert('Error', 'Failed to delete list');
             }
           },
         },
-      ]
+      ],
     );
   };
 
   // Render swipe actions
-  const renderLeftActions = (trick: TrickListItem) => (
-    progress: Animated.AnimatedInterpolation<number>,
-    dragX: Animated.AnimatedInterpolation<number>
-  ) => {
-    const scale = dragX.interpolate({
-      inputRange: [0, 100],
-      outputRange: [0, 1],
-      extrapolate: 'clamp',
-    });
+  const renderLeftActions =
+    (trick: TrickListItem) =>
+    (
+      _progress: Animated.AnimatedInterpolation<number>,
+      dragX: Animated.AnimatedInterpolation<number>,
+    ) => {
+      const scale = dragX.interpolate({
+        inputRange: [0, 100],
+        outputRange: [0, 1],
+        extrapolate: 'clamp',
+      });
 
-    return (
-      <Pressable
-        style={[styles.swipeAction, styles.editAction]}
-        onPress={() => openEditModal(trick)}
-      >
-        <Animated.View style={{ transform: [{ scale }] }}>
-          <Ionicons name="pencil" size={24} color="#fff" />
-          <Text style={styles.swipeActionText}>Edit</Text>
-        </Animated.View>
-      </Pressable>
-    );
-  };
+      return (
+        <Pressable
+          style={[styles.swipeAction, styles.editAction]}
+          onPress={() => openEditModal(trick)}
+        >
+          <Animated.View style={{ transform: [{ scale }] }}>
+            <Ionicons name="pencil" size={24} color="#fff" />
+            <Text style={styles.swipeActionText}>Edit</Text>
+          </Animated.View>
+        </Pressable>
+      );
+    };
 
-  const renderRightActions = (trick: TrickListItem) => (
-    progress: Animated.AnimatedInterpolation<number>,
-    dragX: Animated.AnimatedInterpolation<number>
-  ) => {
-    const scale = dragX.interpolate({
-      inputRange: [-100, 0],
-      outputRange: [1, 0],
-      extrapolate: 'clamp',
-    });
+  const renderRightActions =
+    (trick: TrickListItem) =>
+    (
+      _progress: Animated.AnimatedInterpolation<number>,
+      dragX: Animated.AnimatedInterpolation<number>,
+    ) => {
+      const scale = dragX.interpolate({
+        inputRange: [-100, 0],
+        outputRange: [1, 0],
+        extrapolate: 'clamp',
+      });
 
-    return (
-      <Pressable
-        style={[styles.swipeAction, styles.deleteAction]}
-        onPress={() => handleDeleteTrick(trick)}
-      >
-        <Animated.View style={{ transform: [{ scale }] }}>
-          <Ionicons name="trash" size={24} color="#fff" />
-          <Text style={styles.swipeActionText}>Delete</Text>
-        </Animated.View>
-      </Pressable>
-    );
-  };
+      return (
+        <Pressable
+          style={[styles.swipeAction, styles.deleteAction]}
+          onPress={() => handleDeleteTrick(trick)}
+        >
+          <Animated.View style={{ transform: [{ scale }] }}>
+            <Ionicons name="trash" size={24} color="#fff" />
+            <Text style={styles.swipeActionText}>Delete</Text>
+          </Animated.View>
+        </Pressable>
+      );
+    };
 
   // Render trick item
   const renderTrickItem = ({ item }: { item: TrickListItem }) => {
@@ -381,29 +377,24 @@ export default function TrickListDetailScreen() {
         overshootRight={false}
       >
         <Pressable
-          style={[styles.trickRow, { backgroundColor: theme.background, borderBottomColor: theme.border }]}
+          style={[
+            styles.trickRow,
+            { backgroundColor: theme.background, borderBottomColor: theme.border },
+          ]}
           onPress={() => {
             setSelectedTrick(item);
             setDetailModalVisible(true);
           }}
         >
-          <Text style={[styles.trickName, { color: theme.text }]}>
-            {item.name}
-          </Text>
+          <Text style={[styles.trickName, { color: theme.text }]}>{item.name}</Text>
           <Pressable
-            style={[
-              styles.statusButton,
-              { backgroundColor: complete ? YELLOW : GRAY }
-            ]}
+            style={[styles.statusButton, { backgroundColor: complete ? YELLOW : GRAY }]}
             onPress={(e) => {
               e.stopPropagation();
               handleToggleStatus(item);
             }}
           >
-            <Text style={[
-              styles.statusButtonText,
-              { color: complete ? DARK : '#fff' }
-            ]}>
+            <Text style={[styles.statusButtonText, { color: complete ? DARK : '#fff' }]}>
               {complete ? 'COMPLETE' : 'TO DO'}
             </Text>
           </Pressable>
@@ -414,7 +405,10 @@ export default function TrickListDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={YELLOW} />
         </View>
@@ -424,7 +418,10 @@ export default function TrickListDetailScreen() {
 
   if (!list) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.loadingContainer}>
           <Text style={[styles.emptyText, { color: theme.textSecondary }]}>List not found</Text>
           <Pressable style={styles.goBackButton} onPress={() => router.back()}>
@@ -437,7 +434,10 @@ export default function TrickListDetailScreen() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         {/* Header */}
         <View style={[styles.header, { borderBottomColor: theme.border }]}>
           <Pressable style={styles.backButton} onPress={() => router.back()}>
@@ -447,10 +447,7 @@ export default function TrickListDetailScreen() {
           <Text style={[styles.headerTitle, { color: theme.text }]} numberOfLines={1}>
             {list.name}
           </Text>
-          <Pressable
-            style={styles.listEditButton}
-            onPress={() => setListEditModalVisible(true)}
-          >
+          <Pressable style={styles.listEditButton} onPress={() => setListEditModalVisible(true)}>
             <Ionicons name="ellipsis-horizontal" size={24} color={theme.text} />
           </Pressable>
         </View>
@@ -475,7 +472,12 @@ export default function TrickListDetailScreen() {
         />
 
         {/* Fixed Bottom Add Button */}
-        <View style={[styles.bottomContainer, { borderTopColor: theme.border, backgroundColor: theme.background }]}>
+        <View
+          style={[
+            styles.bottomContainer,
+            { borderTopColor: theme.border, backgroundColor: theme.background },
+          ]}
+        >
           <Pressable style={styles.addButton} onPress={() => setAddModalVisible(true)}>
             <Text style={styles.addButtonText}>+ ADD TRICK</Text>
           </Pressable>
@@ -494,10 +496,12 @@ export default function TrickListDetailScreen() {
           <View style={[styles.modalContainer, { backgroundColor: theme.background }]}>
             <SafeAreaView style={styles.container}>
               <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-                <Pressable onPress={() => {
-                  setDetailModalVisible(false);
-                  setSelectedTrick(null);
-                }}>
+                <Pressable
+                  onPress={() => {
+                    setDetailModalVisible(false);
+                    setSelectedTrick(null);
+                  }}
+                >
                   <Text style={[styles.modalHeaderButton, { color: theme.text }]}>Close</Text>
                 </Pressable>
                 <Text style={[styles.modalTitle, { color: theme.text }]}>Trick Details</Text>
@@ -528,17 +532,23 @@ export default function TrickListDetailScreen() {
                         {
                           backgroundColor: isComplete(selectedTrick) ? YELLOW : theme.surface,
                           borderColor: isComplete(selectedTrick) ? YELLOW : theme.border,
-                        }
+                        },
                       ]}
                       onPress={() => {
                         handleToggleStatus(selectedTrick);
-                        setSelectedTrick({ ...selectedTrick, checked: 'Completed', status: 'Mastered' });
+                        setSelectedTrick({
+                          ...selectedTrick,
+                          checked: 'Completed',
+                          status: 'Mastered',
+                        });
                       }}
                     >
-                      <Text style={[
-                        styles.statusOptionText,
-                        { color: isComplete(selectedTrick) ? DARK : theme.textSecondary }
-                      ]}>
+                      <Text
+                        style={[
+                          styles.statusOptionText,
+                          { color: isComplete(selectedTrick) ? DARK : theme.textSecondary },
+                        ]}
+                      >
                         COMPLETE
                       </Text>
                     </Pressable>
@@ -548,17 +558,23 @@ export default function TrickListDetailScreen() {
                         {
                           backgroundColor: !isComplete(selectedTrick) ? GRAY : theme.surface,
                           borderColor: !isComplete(selectedTrick) ? GRAY : theme.border,
-                        }
+                        },
                       ]}
                       onPress={() => {
                         handleToggleStatus(selectedTrick);
-                        setSelectedTrick({ ...selectedTrick, checked: 'To Do', status: 'Not Started' });
+                        setSelectedTrick({
+                          ...selectedTrick,
+                          checked: 'To Do',
+                          status: 'Not Started',
+                        });
                       }}
                     >
-                      <Text style={[
-                        styles.statusOptionText,
-                        { color: !isComplete(selectedTrick) ? '#fff' : theme.textSecondary }
-                      ]}>
+                      <Text
+                        style={[
+                          styles.statusOptionText,
+                          { color: !isComplete(selectedTrick) ? '#fff' : theme.textSecondary },
+                        ]}
+                      >
                         TO DO
                       </Text>
                     </Pressable>
@@ -567,7 +583,9 @@ export default function TrickListDetailScreen() {
                   {/* Notes */}
                   {selectedTrick.notes ? (
                     <>
-                      <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>NOTES</Text>
+                      <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+                        NOTES
+                      </Text>
                       <View style={[styles.infoBox, { backgroundColor: theme.surface }]}>
                         <Text style={{ color: theme.text }}>{selectedTrick.notes}</Text>
                       </View>
@@ -577,7 +595,9 @@ export default function TrickListDetailScreen() {
                   {/* Link */}
                   {selectedTrick.link ? (
                     <>
-                      <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>VIDEO LINK</Text>
+                      <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+                        VIDEO LINK
+                      </Text>
                       <Pressable
                         style={[styles.linkBox, { backgroundColor: theme.surface }]}
                         onPress={() => {
@@ -598,7 +618,9 @@ export default function TrickListDetailScreen() {
                   {/* Trickipedia Link - shown if trick was added from Trickipedia */}
                   {selectedTrick.trickipediaId ? (
                     <>
-                      <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>FROM TRICKIPEDIA</Text>
+                      <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+                        FROM TRICKIPEDIA
+                      </Text>
                       <Pressable
                         style={[styles.trickipediaButton, { backgroundColor: theme.surface }]}
                         onPress={() => {
@@ -646,17 +668,21 @@ export default function TrickListDetailScreen() {
           >
             <SafeAreaView style={styles.container}>
               <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-                <Pressable onPress={() => {
-                  setEditModalVisible(false);
-                  resetForm();
-                }}>
-                  <Text style={[styles.modalHeaderButton, { color: theme.textSecondary }]}>Cancel</Text>
+                <Pressable
+                  onPress={() => {
+                    setEditModalVisible(false);
+                    resetForm();
+                  }}
+                >
+                  <Text style={[styles.modalHeaderButton, { color: theme.textSecondary }]}>
+                    Cancel
+                  </Text>
                 </Pressable>
                 <Text style={[styles.modalTitle, { color: theme.text }]}>Edit Trick</Text>
                 <Pressable
                   style={[
                     styles.saveButton,
-                    (!trickName.trim() || saving) && styles.saveButtonDisabled
+                    (!trickName.trim() || saving) && styles.saveButtonDisabled,
                   ]}
                   onPress={handleSaveEdit}
                   disabled={!trickName.trim() || saving}
@@ -670,9 +696,18 @@ export default function TrickListDetailScreen() {
               </View>
 
               <View style={styles.formContent}>
-                <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>TRICK NAME *</Text>
+                <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+                  TRICK NAME *
+                </Text>
                 <TextInput
-                  style={[styles.textInput, { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border }]}
+                  style={[
+                    styles.textInput,
+                    {
+                      backgroundColor: theme.surface,
+                      color: theme.text,
+                      borderColor: theme.border,
+                    },
+                  ]}
                   placeholder="e.g., Kickflip"
                   placeholderTextColor={theme.textSecondary}
                   value={trickName}
@@ -680,9 +715,18 @@ export default function TrickListDetailScreen() {
                   autoFocus
                 />
 
-                <Text style={[styles.sectionLabel, { color: theme.textSecondary, marginTop: 20 }]}>VIDEO LINK</Text>
+                <Text style={[styles.sectionLabel, { color: theme.textSecondary, marginTop: 20 }]}>
+                  VIDEO LINK
+                </Text>
                 <TextInput
-                  style={[styles.textInput, { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border }]}
+                  style={[
+                    styles.textInput,
+                    {
+                      backgroundColor: theme.surface,
+                      color: theme.text,
+                      borderColor: theme.border,
+                    },
+                  ]}
                   placeholder="https://youtube.com/watch?v=..."
                   placeholderTextColor={theme.textSecondary}
                   value={trickLink}
@@ -691,12 +735,18 @@ export default function TrickListDetailScreen() {
                   keyboardType="url"
                 />
 
-                <Text style={[styles.sectionLabel, { color: theme.textSecondary, marginTop: 20 }]}>NOTES</Text>
+                <Text style={[styles.sectionLabel, { color: theme.textSecondary, marginTop: 20 }]}>
+                  NOTES
+                </Text>
                 <TextInput
                   style={[
                     styles.textInput,
                     styles.textArea,
-                    { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border }
+                    {
+                      backgroundColor: theme.surface,
+                      color: theme.text,
+                      borderColor: theme.border,
+                    },
                   ]}
                   placeholder="Add notes about this trick..."
                   placeholderTextColor={theme.textSecondary}
@@ -727,27 +777,42 @@ export default function TrickListDetailScreen() {
           >
             <SafeAreaView style={styles.container}>
               <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
-                <Pressable onPress={() => {
-                  setAddModalVisible(false);
-                  resetForm();
-                }}>
-                  <Text style={[styles.modalHeaderButton, { color: theme.textSecondary }]}>Cancel</Text>
+                <Pressable
+                  onPress={() => {
+                    setAddModalVisible(false);
+                    resetForm();
+                  }}
+                >
+                  <Text style={[styles.modalHeaderButton, { color: theme.textSecondary }]}>
+                    Cancel
+                  </Text>
                 </Pressable>
                 <Text style={[styles.modalTitle, { color: theme.text }]}>Add Trick</Text>
                 <Pressable onPress={handleAddTrick} disabled={!trickName.trim() || saving}>
-                  <Text style={[
-                    styles.modalHeaderButton,
-                    { color: trickName.trim() ? YELLOW : theme.textSecondary }
-                  ]}>
+                  <Text
+                    style={[
+                      styles.modalHeaderButton,
+                      { color: trickName.trim() ? YELLOW : theme.textSecondary },
+                    ]}
+                  >
                     {saving ? 'Adding...' : 'Add'}
                   </Text>
                 </Pressable>
               </View>
 
               <View style={styles.formContent}>
-                <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>TRICK NAME *</Text>
+                <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+                  TRICK NAME *
+                </Text>
                 <TextInput
-                  style={[styles.textInput, { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border }]}
+                  style={[
+                    styles.textInput,
+                    {
+                      backgroundColor: theme.surface,
+                      color: theme.text,
+                      borderColor: theme.border,
+                    },
+                  ]}
                   placeholder="e.g., Kickflip, Heelflip, 360 flip..."
                   placeholderTextColor={theme.textSecondary}
                   value={trickName}
@@ -755,9 +820,18 @@ export default function TrickListDetailScreen() {
                   autoFocus
                 />
 
-                <Text style={[styles.sectionLabel, { color: theme.textSecondary, marginTop: 20 }]}>VIDEO LINK</Text>
+                <Text style={[styles.sectionLabel, { color: theme.textSecondary, marginTop: 20 }]}>
+                  VIDEO LINK
+                </Text>
                 <TextInput
-                  style={[styles.textInput, { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border }]}
+                  style={[
+                    styles.textInput,
+                    {
+                      backgroundColor: theme.surface,
+                      color: theme.text,
+                      borderColor: theme.border,
+                    },
+                  ]}
                   placeholder="https://youtube.com/watch?v=..."
                   placeholderTextColor={theme.textSecondary}
                   value={trickLink}
@@ -766,12 +840,18 @@ export default function TrickListDetailScreen() {
                   keyboardType="url"
                 />
 
-                <Text style={[styles.sectionLabel, { color: theme.textSecondary, marginTop: 20 }]}>NOTES</Text>
+                <Text style={[styles.sectionLabel, { color: theme.textSecondary, marginTop: 20 }]}>
+                  NOTES
+                </Text>
                 <TextInput
                   style={[
                     styles.textInput,
                     styles.textArea,
-                    { backgroundColor: theme.surface, color: theme.text, borderColor: theme.border }
+                    {
+                      backgroundColor: theme.surface,
+                      color: theme.text,
+                      borderColor: theme.border,
+                    },
                   ]}
                   placeholder="Add notes about this trick..."
                   placeholderTextColor={theme.textSecondary}
@@ -798,9 +878,7 @@ export default function TrickListDetailScreen() {
             onPress={() => setListEditModalVisible(false)}
           >
             <View style={[styles.actionSheet, { backgroundColor: theme.surface }]}>
-              <Text style={[styles.actionSheetTitle, { color: theme.text }]}>
-                {list.name}
-              </Text>
+              <Text style={[styles.actionSheetTitle, { color: theme.text }]}>{list.name}</Text>
               <Pressable
                 style={[styles.actionSheetButton, { borderBottomColor: theme.border }]}
                 onPress={handleOpenShare}
@@ -819,22 +897,15 @@ export default function TrickListDetailScreen() {
                   Rename List
                 </Text>
               </Pressable>
-              <Pressable
-                style={styles.actionSheetButton}
-                onPress={handleDeleteList}
-              >
+              <Pressable style={styles.actionSheetButton} onPress={handleDeleteList}>
                 <Ionicons name="trash-outline" size={22} color={RED} />
-                <Text style={[styles.actionSheetButtonText, { color: RED }]}>
-                  Delete List
-                </Text>
+                <Text style={[styles.actionSheetButtonText, { color: RED }]}>Delete List</Text>
               </Pressable>
               <Pressable
                 style={[styles.actionSheetCancelButton, { backgroundColor: theme.background }]}
                 onPress={() => setListEditModalVisible(false)}
               >
-                <Text style={[styles.actionSheetCancelText, { color: theme.text }]}>
-                  Cancel
-                </Text>
+                <Text style={[styles.actionSheetCancelText, { color: theme.text }]}>Cancel</Text>
               </Pressable>
             </View>
           </Pressable>
@@ -852,13 +923,15 @@ export default function TrickListDetailScreen() {
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           >
             <View style={[styles.renameModal, { backgroundColor: theme.surface }]}>
-              <Text style={[styles.renameTitle, { color: theme.text }]}>
-                Rename List
-              </Text>
+              <Text style={[styles.renameTitle, { color: theme.text }]}>Rename List</Text>
               <TextInput
                 style={[
                   styles.renameInput,
-                  { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }
+                  {
+                    backgroundColor: theme.background,
+                    color: theme.text,
+                    borderColor: theme.border,
+                  },
                 ]}
                 value={newListName}
                 onChangeText={setNewListName}
@@ -880,7 +953,7 @@ export default function TrickListDetailScreen() {
                   style={[
                     styles.renameButton,
                     { backgroundColor: YELLOW },
-                    (!newListName.trim() || saving) && { opacity: 0.5 }
+                    (!newListName.trim() || saving) && { opacity: 0.5 },
                   ]}
                   onPress={handleRenameList}
                   disabled={!newListName.trim() || saving}
@@ -888,9 +961,7 @@ export default function TrickListDetailScreen() {
                   {saving ? (
                     <ActivityIndicator size="small" color={DARK} />
                   ) : (
-                    <Text style={[styles.renameButtonText, { color: DARK }]}>
-                      Save
-                    </Text>
+                    <Text style={[styles.renameButtonText, { color: DARK }]}>Save</Text>
                   )}
                 </Pressable>
               </View>

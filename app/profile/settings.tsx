@@ -8,48 +8,37 @@
  * - Footer: Log Out button + version
  */
 
-import { View, Text, ScrollView, Pressable, Alert, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { SettingsDivider, SettingsItem } from '@/components/ui';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
-import { SettingsItem, SettingsDivider } from '@/components/ui';
 
 export default function SettingsScreen() {
   const { theme, colors } = useThemeContext();
   const { logout } = useAuthStore();
 
   const handleLogout = () => {
-    Alert.alert(
-      'Log Out',
-      'Are you sure you want to log out?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Log Out',
-          style: 'destructive',
-          onPress: async () => {
-            await logout();
-            router.replace('/(auth)/welcome');
-          },
+    Alert.alert('Log Out', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log Out',
+        style: 'destructive',
+        onPress: async () => {
+          await logout();
+          router.replace('/(auth)/welcome');
         },
-      ]
-    );
+      },
+    ]);
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      edges={['top']}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-          hitSlop={8}
-        >
+        <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={8}>
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </Pressable>
       </View>
@@ -117,9 +106,7 @@ export default function SettingsScreen() {
 
         {/* Version */}
         <View style={styles.versionContainer}>
-          <Text style={[styles.versionText, { color: theme.textTertiary }]}>
-            TrickBook v2.0.0
-          </Text>
+          <Text style={[styles.versionText, { color: theme.textTertiary }]}>TrickBook v2.0.0</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

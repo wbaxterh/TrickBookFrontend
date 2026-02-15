@@ -4,10 +4,11 @@
  * Supports: light, dark, system (auto-detect) modes
  */
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { colors, getThemeColors, ThemeColors } from '@/constants/colors';
+import type React from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { useColorScheme } from 'react-native';
+import { colors, getThemeColors, type ThemeColors } from '@/constants/colors';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
 
@@ -43,8 +44,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
       if (saved && ['light', 'dark', 'system'].includes(saved)) {
         setThemePreferenceState(saved as ThemePreference);
       }
-    } catch (error) {
-      console.log('Error loading theme preference:', error);
+    } catch (_error) {
     } finally {
       setIsLoaded(true);
     }
@@ -54,16 +54,12 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     try {
       await AsyncStorage.setItem(THEME_STORAGE_KEY, preference);
       setThemePreferenceState(preference);
-    } catch (error) {
-      console.log('Error saving theme preference:', error);
-    }
+    } catch (_error) {}
   };
 
   // Compute actual dark mode based on preference
   const isDark =
-    themePreference === 'system'
-      ? systemColorScheme === 'dark'
-      : themePreference === 'dark';
+    themePreference === 'system' ? systemColorScheme === 'dark' : themePreference === 'dark';
 
   const theme = getThemeColors(isDark);
 

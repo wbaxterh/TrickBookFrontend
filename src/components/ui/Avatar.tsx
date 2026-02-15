@@ -6,9 +6,8 @@
  * Supports: imageUri, emoji icons with custom bg, verified badge
  */
 
-import React from 'react';
-import { View, Image, Text, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 type AvatarSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl';
@@ -127,12 +126,7 @@ export function Avatar({
         ]}
       >
         {name ? (
-          <Text
-            style={[
-              styles.initials,
-              { fontSize: fontSize * 0.5, color: '#000000' },
-            ]}
-          >
+          <Text style={[styles.initials, { fontSize: fontSize * 0.5, color: '#000000' }]}>
             {getInitials()}
           </Text>
         ) : (
@@ -161,11 +155,7 @@ export function Avatar({
             },
           ]}
         >
-          <Ionicons
-            name="checkmark"
-            size={badgeSize * 0.6}
-            color="#FFFFFF"
-          />
+          <Ionicons name="checkmark" size={badgeSize * 0.6} color="#FFFFFF" />
         </View>
       )}
     </View>

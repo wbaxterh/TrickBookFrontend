@@ -6,11 +6,10 @@
  * Shows: Avatar + "Clark D. landed a Kickflip!"
  */
 
-import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Avatar } from '@/components/ui/Avatar';
 import { Card } from '@/components/ui/Card';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { formatTimeAgo } from '@/lib/utils';
 
 type ActivityType = 'landed' | 'mastered' | 'added' | 'session' | 'spot';
@@ -58,25 +57,16 @@ export function ActivityCard({
   const userName = user.name || 'Homie';
   const firstName = userName.split(' ')[0];
   const lastInitial = userName.split(' ')[1]?.[0];
-  const displayName = lastInitial
-    ? `${firstName} ${lastInitial}.`
-    : firstName;
+  const displayName = lastInitial ? `${firstName} ${lastInitial}.` : firstName;
 
   return (
     <Pressable onPress={onPress}>
       <Card style={styles.card} padding="md">
-        <Avatar
-          size="lg"
-          imageUri={user.imageUri}
-          name={userName}
-          isVerified={user.isVerified}
-        />
+        <Avatar size="lg" imageUri={user.imageUri} name={userName} isVerified={user.isVerified} />
 
         <View style={styles.textContainer}>
           <Text style={[styles.activityText, { color: theme.text }]}>
-            <Text style={styles.userName}>{displayName}</Text>
-            {' '}
-            {getActivityText()}
+            <Text style={styles.userName}>{displayName}</Text> {getActivityText()}
           </Text>
 
           {timestamp && (
@@ -102,11 +92,7 @@ interface CompactActivityCardProps {
   onPress?: () => void;
 }
 
-export function CompactActivityCard({
-  user,
-  text,
-  onPress,
-}: CompactActivityCardProps) {
+export function CompactActivityCard({ user, text, onPress }: CompactActivityCardProps) {
   const { theme } = useThemeContext();
   const userName = user.name || 'Homie';
 
@@ -122,10 +108,7 @@ export function CompactActivityCard({
       onPress={onPress}
     >
       <Avatar size="md" imageUri={user.imageUri} name={userName} />
-      <Text
-        style={[styles.compactText, { color: theme.text }]}
-        numberOfLines={2}
-      >
+      <Text style={[styles.compactText, { color: theme.text }]} numberOfLines={2}>
         {text}
       </Text>
     </Pressable>

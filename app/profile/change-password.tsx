@@ -3,21 +3,13 @@
  * Allow users to update their password
  */
 
-import { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  TextInput,
-  Alert,
-  StyleSheet,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 export default function ChangePasswordScreen() {
   const { theme } = useThemeContext();
@@ -57,22 +49,13 @@ export default function ChangePasswordScreen() {
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      edges={['top']}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-          hitSlop={8}
-        >
+        <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={8}>
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>
-          Change Password
-        </Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Change Password</Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -86,9 +69,7 @@ export default function ChangePasswordScreen() {
         <View style={styles.form}>
           {/* Current Password */}
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: theme.textSecondary }]}>
-              Current Password
-            </Text>
+            <Text style={[styles.label, { color: theme.textSecondary }]}>Current Password</Text>
             <View
               style={[
                 styles.inputContainer,
@@ -108,10 +89,7 @@ export default function ChangePasswordScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
               />
-              <Pressable
-                onPress={() => setShowCurrent(!showCurrent)}
-                hitSlop={8}
-              >
+              <Pressable onPress={() => setShowCurrent(!showCurrent)} hitSlop={8}>
                 <Ionicons
                   name={showCurrent ? 'eye-off-outline' : 'eye-outline'}
                   size={20}
@@ -123,9 +101,7 @@ export default function ChangePasswordScreen() {
 
           {/* New Password */}
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: theme.textSecondary }]}>
-              New Password
-            </Text>
+            <Text style={[styles.label, { color: theme.textSecondary }]}>New Password</Text>
             <View
               style={[
                 styles.inputContainer,
@@ -160,9 +136,7 @@ export default function ChangePasswordScreen() {
 
           {/* Confirm Password */}
           <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: theme.textSecondary }]}>
-              Confirm New Password
-            </Text>
+            <Text style={[styles.label, { color: theme.textSecondary }]}>Confirm New Password</Text>
             <View
               style={[
                 styles.inputContainer,
@@ -182,10 +156,7 @@ export default function ChangePasswordScreen() {
                 autoCapitalize="none"
                 autoCorrect={false}
               />
-              <Pressable
-                onPress={() => setShowConfirm(!showConfirm)}
-                hitSlop={8}
-              >
+              <Pressable onPress={() => setShowConfirm(!showConfirm)} hitSlop={8}>
                 <Ionicons
                   name={showConfirm ? 'eye-off-outline' : 'eye-outline'}
                   size={20}
@@ -198,12 +169,7 @@ export default function ChangePasswordScreen() {
 
         {/* Submit Button */}
         <View style={styles.buttonContainer}>
-          <Button
-            variant="primary"
-            fullWidth
-            onPress={handleChangePassword}
-            disabled={isLoading}
-          >
+          <Button variant="primary" fullWidth onPress={handleChangePassword} disabled={isLoading}>
             {isLoading ? 'Changing Password...' : 'Change Password'}
           </Button>
         </View>

@@ -6,9 +6,9 @@
  * Supports: Navigation (chevron), Toggle (switch), Value display
  */
 
-import React from 'react';
-import { View, Text, Pressable, Switch, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import type React from 'react';
+import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 type SettingsItemVariant = 'navigation' | 'toggle' | 'value' | 'action' | 'destructive';
@@ -61,20 +61,12 @@ export function SettingsItem(props: SettingsItemProps) {
 
   const isDestructive = variant === 'destructive';
   const textColor = isDestructive ? colors.error : theme.text;
-  const actualIconColor = isDestructive
-    ? colors.error
-    : iconColor || theme.textSecondary;
+  const actualIconColor = isDestructive ? colors.error : iconColor || theme.textSecondary;
 
   const renderRightContent = () => {
     switch (variant) {
       case 'navigation':
-        return (
-          <Ionicons
-            name="chevron-forward"
-            size={20}
-            color={theme.textSecondary}
-          />
-        );
+        return <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />;
 
       case 'toggle':
         return (
@@ -93,15 +85,9 @@ export function SettingsItem(props: SettingsItemProps) {
       case 'value':
         return (
           <View style={styles.valueContainer}>
-            <Text style={[styles.valueText, { color: theme.textSecondary }]}>
-              {props.value}
-            </Text>
+            <Text style={[styles.valueText, { color: theme.textSecondary }]}>{props.value}</Text>
             {props.onPress && (
-              <Ionicons
-                name="chevron-forward"
-                size={20}
-                color={theme.textSecondary}
-              />
+              <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
             )}
           </View>
         );
@@ -136,9 +122,7 @@ export function SettingsItem(props: SettingsItemProps) {
         <View style={styles.textContainer}>
           <Text style={[styles.label, { color: textColor }]}>{label}</Text>
           {description && (
-            <Text style={[styles.description, { color: theme.textSecondary }]}>
-              {description}
-            </Text>
+            <Text style={[styles.description, { color: theme.textSecondary }]}>{description}</Text>
           )}
         </View>
       </View>
@@ -152,10 +136,7 @@ export function SettingsItem(props: SettingsItemProps) {
 
   return (
     <Pressable
-      style={({ pressed }) => [
-        styles.row,
-        pressed && isInteractive && { opacity: 0.7 },
-      ]}
+      style={({ pressed }) => [styles.row, pressed && isInteractive && { opacity: 0.7 }]}
       onPress={handlePress}
       disabled={!isInteractive}
     >
@@ -170,14 +151,7 @@ export function SettingsItem(props: SettingsItemProps) {
 export function SettingsDivider() {
   const { theme } = useThemeContext();
 
-  return (
-    <View
-      style={[
-        styles.divider,
-        { backgroundColor: theme.border, marginLeft: 54 },
-      ]}
-    />
-  );
+  return <View style={[styles.divider, { backgroundColor: theme.border, marginLeft: 54 }]} />;
 }
 
 /**
@@ -193,16 +167,9 @@ export function SettingsGroup({ children, title }: SettingsGroupProps) {
 
   return (
     <View style={styles.group}>
-      {title && (
-        <Text style={[styles.groupTitle, { color: theme.textSecondary }]}>
-          {title}
-        </Text>
-      )}
+      {title && <Text style={[styles.groupTitle, { color: theme.textSecondary }]}>{title}</Text>}
       <View
-        style={[
-          styles.groupContent,
-          { backgroundColor: theme.surface, borderColor: theme.border },
-        ]}
+        style={[styles.groupContent, { backgroundColor: theme.surface, borderColor: theme.border }]}
       >
         {children}
       </View>

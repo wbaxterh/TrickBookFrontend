@@ -4,19 +4,28 @@
  * Based on UX best practices from top apps (Duolingo, Calm, TikTok)
  */
 
-import { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, Image, Pressable, Alert, ActivityIndicator, Platform } from 'react-native';
-import { router } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Google from 'expo-auth-session/providers/google';
-import * as WebBrowser from 'expo-web-browser';
-import * as AppleAuthentication from 'expo-apple-authentication';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { Button } from '@/components/ui';
-import { getUserCount } from '@/lib/api/user';
-import { googleSignIn, appleSignIn } from '@/lib/api/auth';
-import { useAuthStore } from '@/lib/stores/authStore';
 import { Ionicons } from '@expo/vector-icons';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import * as Google from 'expo-auth-session/providers/google';
+import { router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Button } from '@/components/ui';
+import { appleSignIn, googleSignIn } from '@/lib/api/auth';
+import { getUserCount } from '@/lib/api/user';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { useAuthStore } from '@/lib/stores/authStore';
 
 // Complete auth session for web browser redirects
 WebBrowser.maybeCompleteAuthSession();
@@ -73,7 +82,6 @@ export default function WelcomeScreen() {
       setUser(user);
       router.replace('/(tabs)');
     } catch (error: any) {
-      console.error('Google sign-in error:', error);
       Alert.alert('Error', error.message || 'Failed to sign in with Google');
     } finally {
       setIsGoogleLoading(false);
@@ -85,9 +93,8 @@ export default function WelcomeScreen() {
     setIsGoogleLoading(true);
     try {
       await promptAsync();
-    } catch (error) {
+    } catch (_error) {
       setIsGoogleLoading(false);
-      console.error('Google prompt error:', error);
     }
   };
 
@@ -106,7 +113,7 @@ export default function WelcomeScreen() {
         const { token, user } = await appleSignIn(
           credential.identityToken,
           credential.fullName,
-          credential.email
+          credential.email,
         );
         setToken(token);
         setUser(user);
@@ -114,7 +121,6 @@ export default function WelcomeScreen() {
       }
     } catch (error: any) {
       if (error.code !== 'ERR_REQUEST_CANCELED') {
-        console.error('Apple sign-in error:', error);
         Alert.alert('Error', error.message || 'Failed to sign in with Apple');
       }
     } finally {
@@ -175,7 +181,7 @@ export default function WelcomeScreen() {
               {
                 backgroundColor: colors.surface,
                 borderColor: theme.border,
-                opacity: (!request || isGoogleLoading) ? 0.6 : 1,
+                opacity: !request || isGoogleLoading ? 0.6 : 1,
               },
             ]}
             onPress={onGoogleSignIn}
@@ -212,9 +218,7 @@ export default function WelcomeScreen() {
               ) : (
                 <>
                   <Ionicons name="logo-apple" size={20} color="#fff" />
-                  <Text style={[styles.ssoButtonText, { color: '#fff' }]}>
-                    Continue with Apple
-                  </Text>
+                  <Text style={[styles.ssoButtonText, { color: '#fff' }]}>Continue with Apple</Text>
                 </>
               )}
             </Pressable>

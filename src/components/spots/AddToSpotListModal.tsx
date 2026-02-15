@@ -8,23 +8,23 @@
  * - Adds spot to selected list(s)
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  Modal,
-  Pressable,
-  FlatList,
-  TextInput,
   ActivityIndicator,
   Alert,
+  FlatList,
+  Modal,
+  Pressable,
   StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { addSpotToList, createSpotList, getSpotLists } from '@/lib/api/spotlists';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
-import { getSpotLists, createSpotList, addSpotToList } from '@/lib/api/spotlists';
-import { SpotList, CreateSpotListInput } from '@/types/spots';
+import type { CreateSpotListInput, SpotList } from '@/types/spots';
 
 const YELLOW = '#FCF150';
 const DARK = '#1f1f1f';
@@ -63,8 +63,7 @@ export function AddToSpotListModal({
     try {
       const data = await getSpotLists();
       setLists(data);
-    } catch (error) {
-      console.error('Error fetching spot lists:', error);
+    } catch (_error) {
     } finally {
       setLoading(false);
     }
@@ -96,19 +95,18 @@ export function AddToSpotListModal({
       if (success) {
         Alert.alert('Success', `Added "${spotName}" to "${list.name}"`);
         // Update local state
-        setLists(prev =>
-          prev.map(l =>
+        setLists((prev) =>
+          prev.map((l) =>
             l._id === list._id
               ? { ...l, spotIds: [...l.spotIds, spotId], spotCount: (l.spotCount || 0) + 1 }
-              : l
-          )
+              : l,
+          ),
         );
         onSuccess?.();
       } else {
         Alert.alert('Error', 'Failed to add spot to list');
       }
-    } catch (error) {
-      console.error('Error adding spot to list:', error);
+    } catch (_error) {
       Alert.alert('Error', 'Failed to add spot to list');
     } finally {
       setAdding(false);
@@ -128,24 +126,20 @@ export function AddToSpotListModal({
         const success = await addSpotToList(newList._id, spotId);
         if (success) {
           Alert.alert('Success', `Created "${newList.name}" and added "${spotName}"`);
-          setLists(prev => [
-            { ...newList, spotIds: [spotId], spotCount: 1 },
-            ...prev,
-          ]);
+          setLists((prev) => [{ ...newList, spotIds: [spotId], spotCount: 1 }, ...prev]);
           setNewListName('');
           setShowCreateInput(false);
           onSuccess?.();
         } else {
           // List created but spot not added
-          setLists(prev => [newList, ...prev]);
+          setLists((prev) => [newList, ...prev]);
           setNewListName('');
           setShowCreateInput(false);
         }
       } else {
         Alert.alert('Error', 'Failed to create list');
       }
-    } catch (error) {
-      console.error('Error creating list:', error);
+    } catch (_error) {
       Alert.alert('Error', 'Failed to create list');
     } finally {
       setCreating(false);
@@ -163,7 +157,7 @@ export function AddToSpotListModal({
         onPress={() => handleAddToList(item)}
         disabled={adding}
       >
-        <View style={[styles.listIcon, { backgroundColor: YELLOW + '25' }]}>
+        <View style={[styles.listIcon, { backgroundColor: `${YELLOW}25` }]}>
           <Ionicons name="location" size={20} color={YELLOW} />
         </View>
         <View style={styles.listInfo}>
@@ -186,12 +180,7 @@ export function AddToSpotListModal({
   };
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="slide"
-      onRequestClose={onClose}
-    >
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable
           style={[styles.content, { backgroundColor: theme.surface }]}
@@ -220,7 +209,11 @@ export function AddToSpotListModal({
                   <TextInput
                     style={[
                       styles.createInput,
-                      { backgroundColor: theme.background, color: theme.text, borderColor: theme.border },
+                      {
+                        backgroundColor: theme.background,
+                        color: theme.text,
+                        borderColor: theme.border,
+                      },
                     ]}
                     placeholder="Enter list name..."
                     placeholderTextColor={theme.textSecondary}
@@ -261,9 +254,7 @@ export function AddToSpotListModal({
                   onPress={() => setShowCreateInput(true)}
                 >
                   <Ionicons name="add" size={22} color={YELLOW} />
-                  <Text style={[styles.createNewText, { color: theme.text }]}>
-                    Create New List
-                  </Text>
+                  <Text style={[styles.createNewText, { color: theme.text }]}>Create New List</Text>
                 </Pressable>
               )}
 

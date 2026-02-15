@@ -5,11 +5,10 @@
  * Shows: thumbnail image, play button, name, difficulty, "Add to List" button
  */
 
-import React from 'react';
-import { View, Text, Image, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { Trick, DIFFICULTY_COLORS, TrickDifficulty } from '@/types/trickbook';
+import { DIFFICULTY_COLORS, type Trick, type TrickDifficulty } from '@/types/trickbook';
 
 interface TrickCardProps {
   trick: Trick;
@@ -22,21 +21,15 @@ export function TrickCard({ trick, onPress, onAddToList }: TrickCardProps) {
 
   const thumbnailUri = trick.images?.[0];
   const hasVideo = !!trick.videoUrl;
-  const difficultyColor = DIFFICULTY_COLORS[trick.difficulty as TrickDifficulty] || theme.textSecondary;
+  const difficultyColor =
+    DIFFICULTY_COLORS[trick.difficulty as TrickDifficulty] || theme.textSecondary;
 
   return (
-    <Pressable
-      style={[styles.container, { backgroundColor: theme.surface }]}
-      onPress={onPress}
-    >
+    <Pressable style={[styles.container, { backgroundColor: theme.surface }]} onPress={onPress}>
       {/* Thumbnail */}
       <View style={styles.imageContainer}>
         {thumbnailUri ? (
-          <Image
-            source={{ uri: thumbnailUri }}
-            style={styles.image}
-            resizeMode="cover"
-          />
+          <Image source={{ uri: thumbnailUri }} style={styles.image} resizeMode="cover" />
         ) : (
           <View style={[styles.imagePlaceholder, { backgroundColor: theme.surfaceElevated }]}>
             <Ionicons name="videocam-outline" size={32} color={theme.textSecondary} />
@@ -58,9 +51,7 @@ export function TrickCard({ trick, onPress, onAddToList }: TrickCardProps) {
         <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>
           {trick.name}
         </Text>
-        <Text style={[styles.difficulty, { color: difficultyColor }]}>
-          {trick.difficulty}
-        </Text>
+        <Text style={[styles.difficulty, { color: difficultyColor }]}>{trick.difficulty}</Text>
 
         {/* Add to List Button */}
         <Pressable

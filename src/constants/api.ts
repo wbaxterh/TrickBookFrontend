@@ -7,17 +7,13 @@
 const isDevelopment = __DEV__;
 
 // Use your computer's local IP for physical devices (localhost only works on simulators)
-const DEV_API_HOST = '10.117.162.103';
+const DEV_API_HOST = '192.168.5.131';
 
 export const API_CONFIG = {
   // Base URLs
-  baseUrl: isDevelopment
-    ? `http://${DEV_API_HOST}:9000/api`
-    : 'https://api.thetrickbook.com/api',
+  baseUrl: isDevelopment ? `http://${DEV_API_HOST}:9000/api` : 'https://api.thetrickbook.com/api',
 
-  socketUrl: isDevelopment
-    ? `http://${DEV_API_HOST}:9000`
-    : 'https://api.thetrickbook.com',
+  socketUrl: isDevelopment ? `http://${DEV_API_HOST}:9000` : 'https://api.thetrickbook.com',
 
   // Bunny.net CDN for video streaming
   bunnyCdnHostname: 'vz-9b8a66dd-b7b.b-cdn.net',
@@ -32,9 +28,9 @@ export const API_CONFIG = {
 
   // Cache times (ms)
   cache: {
-    short: 1000 * 60,      // 1 minute
+    short: 1000 * 60, // 1 minute
     medium: 1000 * 60 * 5, // 5 minutes
-    long: 1000 * 60 * 30,  // 30 minutes
+    long: 1000 * 60 * 30, // 30 minutes
   },
 };
 
@@ -42,23 +38,23 @@ export const API_CONFIG = {
 export const ENDPOINTS = {
   // Auth
   auth: {
-    login: '/auth',                    // POST - email, password -> { token }
-    register: '/users',                // POST - name, email, password, sports
-    googleAuth: '/auth/google-auth',   // POST - tokenId
-    appleAuth: '/auth/apple-auth',     // POST - identityToken, fullName, email
+    login: '/auth', // POST - email, password -> { token }
+    register: '/users', // POST - name, email, password, sports
+    googleAuth: '/auth/google-auth', // POST - tokenId
+    appleAuth: '/auth/apple-auth', // POST - identityToken, fullName, email
     forgotPassword: '/users/forgot-password',
     resetPassword: '/users/reset-password',
   },
 
   // User
   user: {
-    me: '/user/me',                               // GET - current user
-    count: '/user/count',                         // GET - total user count (public)
-    profile: (id: string) => `/user/${id}`,       // GET - user by ID
-    publicProfile: (id: string) => `/user/${id}/public`,  // GET - public profile
-    stats: (id: string) => `/user/${id}/stats`,   // GET - user stats
-    activity: (id: string) => `/user/${id}/activity`,     // GET - user activity
-    update: (id: string) => `/user/${id}`,        // PUT - update profile
+    me: '/user/me', // GET - current user
+    count: '/user/count', // GET - total user count (public)
+    profile: (id: string) => `/user/${id}`, // GET - user by ID
+    publicProfile: (id: string) => `/user/${id}/public`, // GET - public profile
+    stats: (id: string) => `/user/${id}/stats`, // GET - user stats
+    activity: (id: string) => `/user/${id}/activity`, // GET - user activity
+    update: (id: string) => `/user/${id}`, // PUT - update profile
     search: '/user/search',
   },
 
@@ -161,8 +157,10 @@ export const ENDPOINTS = {
     removeReaction: (postId: string, type: string) => `/feed/${postId}/reaction/${type}`,
     comments: (postId: string) => `/feed/${postId}/comments`,
     comment: (postId: string) => `/feed/${postId}/comments`,
-    commentReplies: (postId: string, commentId: string) => `/feed/${postId}/comments/${commentId}/replies`,
-    loveComment: (postId: string, commentId: string) => `/feed/${postId}/comments/${commentId}/love`,
+    commentReplies: (postId: string, commentId: string) =>
+      `/feed/${postId}/comments/${commentId}/replies`,
+    loveComment: (postId: string, commentId: string) =>
+      `/feed/${postId}/comments/${commentId}/love`,
     deleteComment: (postId: string, commentId: string) => `/feed/${postId}/comments/${commentId}`,
     save: (postId: string) => `/feed/${postId}/save`,
     view: (postId: string) => `/feed/${postId}/view`,

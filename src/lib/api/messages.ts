@@ -3,8 +3,8 @@
  * Functions for direct messaging between homies
  */
 
-import { apiClient } from './client';
 import { ENDPOINTS } from '@/constants/api';
+import { apiClient } from './client';
 
 // Types
 export type SharedContentType = 'tricklist' | 'trick' | 'spot' | 'spotlist' | 'video';
@@ -76,8 +76,7 @@ export async function getConversations(): Promise<Conversation[]> {
   try {
     const response = await apiClient.get<Conversation[]>(ENDPOINTS.messages.conversations);
     return response;
-  } catch (error) {
-    console.error('Error getting conversations:', error);
+  } catch (_error) {
     return [];
   }
 }
@@ -87,10 +86,11 @@ export async function getConversations(): Promise<Conversation[]> {
  */
 export async function getConversation(conversationId: string): Promise<Conversation | null> {
   try {
-    const response = await apiClient.get<Conversation>(ENDPOINTS.messages.conversation(conversationId));
+    const response = await apiClient.get<Conversation>(
+      ENDPOINTS.messages.conversation(conversationId),
+    );
     return response;
-  } catch (error) {
-    console.error('Error getting conversation:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -100,13 +100,11 @@ export async function getConversation(conversationId: string): Promise<Conversat
  */
 export async function startConversation(targetUserId: string): Promise<Conversation | null> {
   try {
-    const response = await apiClient.post<Conversation>(
-      ENDPOINTS.messages.startConversation,
-      { targetUserId }
-    );
+    const response = await apiClient.post<Conversation>(ENDPOINTS.messages.startConversation, {
+      targetUserId,
+    });
     return response;
-  } catch (error) {
-    console.error('Error starting conversation:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -116,7 +114,7 @@ export async function startConversation(targetUserId: string): Promise<Conversat
  */
 export async function getMessages(
   conversationId: string,
-  params: { page?: number; limit?: number } = {}
+  params: { page?: number; limit?: number } = {},
 ): Promise<MessagesResponse> {
   try {
     const queryParams = new URLSearchParams();
@@ -130,8 +128,7 @@ export async function getMessages(
 
     const response = await apiClient.get<MessagesResponse>(endpoint);
     return response;
-  } catch (error) {
-    console.error('Error getting messages:', error);
+  } catch (_error) {
     return { messages: [] };
   }
 }
@@ -141,16 +138,14 @@ export async function getMessages(
  */
 export async function sendMessage(
   conversationId: string,
-  content: string
+  content: string,
 ): Promise<Message | null> {
   try {
-    const response = await apiClient.post<Message>(
-      ENDPOINTS.messages.sendMessage(conversationId),
-      { content }
-    );
+    const response = await apiClient.post<Message>(ENDPOINTS.messages.sendMessage(conversationId), {
+      content,
+    });
     return response;
-  } catch (error) {
-    console.error('Error sending message:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -162,8 +157,7 @@ export async function markAsRead(conversationId: string): Promise<boolean> {
   try {
     await apiClient.put(ENDPOINTS.messages.markRead(conversationId), {});
     return true;
-  } catch (error) {
-    console.error('Error marking as read:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -175,8 +169,7 @@ export async function getUnreadCount(): Promise<number> {
   try {
     const response = await apiClient.get<{ unreadCount: number }>(ENDPOINTS.messages.unreadCount);
     return response.unreadCount || 0;
-  } catch (error) {
-    console.error('Error getting unread count:', error);
+  } catch (_error) {
     return 0;
   }
 }
@@ -189,8 +182,7 @@ export async function getOrCreateConversation(targetUserId: string): Promise<Con
   try {
     // Try to start a conversation - backend should return existing if one exists
     return await startConversation(targetUserId);
-  } catch (error) {
-    console.error('Error getting/creating conversation:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -202,7 +194,7 @@ export async function getOrCreateConversation(targetUserId: string): Promise<Con
 export async function sendSharedContent(
   targetUserId: string,
   sharedContent: SharedContent,
-  optionalMessage?: string
+  optionalMessage?: string,
 ): Promise<{ success: boolean; conversationId?: string; message?: Message }> {
   try {
     // Get or create conversation first
@@ -217,7 +209,7 @@ export async function sendSharedContent(
       {
         content: optionalMessage || null,
         sharedContent,
-      }
+      },
     );
 
     return {
@@ -225,8 +217,7 @@ export async function sendSharedContent(
       conversationId: conversation._id,
       message: response,
     };
-  } catch (error) {
-    console.error('Error sending shared content:', error);
+  } catch (_error) {
     return { success: false };
   }
 }
@@ -237,7 +228,7 @@ export async function sendSharedContent(
 export function createSharedContentPreview(
   contentType: SharedContentType,
   contentId: string,
-  preview: SharedContentPreview
+  preview: SharedContentPreview,
 ): SharedContent {
   return {
     contentType,

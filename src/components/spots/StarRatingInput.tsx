@@ -3,9 +3,8 @@
  * Interactive star rating selector and display
  */
 
-import React from 'react';
-import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { colors, getThemeColors } from '@/constants/colors';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
@@ -66,13 +65,9 @@ export function StarRatingInput({
 
   return (
     <View style={styles.container}>
-      <View style={styles.starsContainer}>
-        {[1, 2, 3, 4, 5].map(renderStar)}
-      </View>
+      <View style={styles.starsContainer}>{[1, 2, 3, 4, 5].map(renderStar)}</View>
       {showLabel && (
-        <Text style={[styles.label, { color: theme.textSecondary }]}>
-          {getRatingLabel()}
-        </Text>
+        <Text style={[styles.label, { color: theme.textSecondary }]}>{getRatingLabel()}</Text>
       )}
     </View>
   );

@@ -10,7 +10,14 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "postinstall": "patch-package"
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "format:check": "biome format .",
+    "typecheck": "tsc --noEmit",
+    "validate": "biome check . && tsc --noEmit",
+    "postinstall": "patch-package",
+    "prepare": "husky"
   },
   "dependencies": {
     "@expo/config-plugins": "~54.0.4",
@@ -74,7 +81,19 @@
   },
   "devDependencies": {
     "@babel/core": "^7.12.9",
-    "@types/react": "~19.1.10"
+    "@biomejs/biome": "^2.3.14",
+    "@types/react": "~19.1.10",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7"
   },
-  "private": true
+  "private": true,
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "biome check --write",
+      "biome format --write"
+    ],
+    "*.{json,css}": [
+      "biome format --write"
+    ]
+  }
 }

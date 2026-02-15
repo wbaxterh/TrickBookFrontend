@@ -3,10 +3,10 @@
  * Shows user notifications
  */
 
-import { View, Text, FlatList, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { FlatList, Pressable, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 // Mock data
@@ -79,10 +79,7 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <SafeAreaView
-      style={{ flex: 1, backgroundColor: theme.background }}
-      edges={['top']}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }} edges={['top']}>
       {/* Header */}
       <View className="flex-row items-center px-6 py-4">
         <Pressable
@@ -104,21 +101,11 @@ export default function NotificationsScreen() {
         ItemSeparatorComponent={() => <View style={{ height: 8 }} />}
         ListEmptyComponent={
           <View className="items-center py-12">
-            <Ionicons
-              name="notifications-off-outline"
-              size={48}
-              color={theme.textSecondary}
-            />
-            <Text
-              className="mt-4 text-lg font-semibold"
-              style={{ color: theme.text }}
-            >
+            <Ionicons name="notifications-off-outline" size={48} color={theme.textSecondary} />
+            <Text className="mt-4 text-lg font-semibold" style={{ color: theme.text }}>
               No notifications
             </Text>
-            <Text
-              className="mt-1 text-center"
-              style={{ color: theme.textSecondary }}
-            >
+            <Text className="mt-1 text-center" style={{ color: theme.textSecondary }}>
               You're all caught up!
             </Text>
           </View>
@@ -127,12 +114,12 @@ export default function NotificationsScreen() {
           <Pressable
             className="flex-row items-center p-4 rounded-xl"
             style={{
-              backgroundColor: item.read ? theme.surface : colors.primary + '15',
+              backgroundColor: item.read ? theme.surface : `${colors.primary}15`,
             }}
           >
             <View
               className="w-10 h-10 rounded-full items-center justify-center mr-3"
-              style={{ backgroundColor: getNotificationColor(item.type) + '20' }}
+              style={{ backgroundColor: `${getNotificationColor(item.type)}20` }}
             >
               <Ionicons
                 name={getNotificationIcon(item.type) as any}
@@ -142,9 +129,7 @@ export default function NotificationsScreen() {
             </View>
             <View className="flex-1">
               <Text className="text-sm" style={{ color: theme.text }}>
-                {item.user && (
-                  <Text className="font-semibold">{item.user} </Text>
-                )}
+                {item.user && <Text className="font-semibold">{item.user} </Text>}
                 {item.message}
               </Text>
               <Text className="text-xs mt-1" style={{ color: theme.textSecondary }}>
@@ -152,10 +137,7 @@ export default function NotificationsScreen() {
               </Text>
             </View>
             {!item.read && (
-              <View
-                className="w-2 h-2 rounded-full"
-                style={{ backgroundColor: colors.primary }}
-              />
+              <View className="w-2 h-2 rounded-full" style={{ backgroundColor: colors.primary }} />
             )}
           </Pressable>
         )}

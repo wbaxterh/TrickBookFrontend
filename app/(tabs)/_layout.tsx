@@ -4,9 +4,9 @@
  * Profile is navigable but hidden from tab bar (accessed via profile pic on home screen)
  */
 
+import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import { Platform } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { colors } from '@/constants/colors';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 

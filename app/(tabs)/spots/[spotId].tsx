@@ -3,26 +3,26 @@
  * Shows detailed info about a specific spot
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  Image,
+  ActivityIndicator,
   Dimensions,
-  StyleSheet,
+  Image,
   Linking,
   Platform,
-  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { getSpotById, Spot } from '@/lib/api/spots';
-import { SpotMap, SpotReviewsList } from '@/components/spots';
 import { ShareToHomieModal } from '@/components/share';
+import { SpotMap, SpotReviewsList } from '@/components/spots';
+import { getSpotById, type Spot } from '@/lib/api/spots';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const YELLOW = '#FCF150';
@@ -50,8 +50,7 @@ export default function SpotDetailScreen() {
       } else {
         setError('Spot not found');
       }
-    } catch (err) {
-      console.error('Failed to load spot:', err);
+    } catch (_err) {
       setError('Failed to load spot');
     } finally {
       setLoading(false);
@@ -67,7 +66,10 @@ export default function SpotDetailScreen() {
     if (!spot?.tags) return [];
     // Tags might be comma-separated or already an array
     if (typeof spot.tags === 'string') {
-      return spot.tags.split(',').map(t => t.trim()).filter(Boolean);
+      return spot.tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean);
     }
     return [];
   };
@@ -106,7 +108,10 @@ export default function SpotDetailScreen() {
   // Loading state
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={YELLOW} />
         </View>
@@ -117,7 +122,10 @@ export default function SpotDetailScreen() {
   // Error or not found state
   if (error || !spot) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.loadingContainer}>
           <Ionicons name="alert-circle-outline" size={48} color={theme.textSecondary} />
           <Text style={[styles.errorText, { color: theme.textSecondary }]}>
@@ -156,19 +164,13 @@ export default function SpotDetailScreen() {
           <View style={styles.imageOverlay} />
 
           {/* Back button */}
-          <Pressable
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
+          <Pressable style={styles.backButton} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
           </Pressable>
 
           {/* Action buttons */}
           <View style={styles.headerActions}>
-            <Pressable
-              style={styles.actionButton}
-              onPress={() => setIsFavorite(!isFavorite)}
-            >
+            <Pressable style={styles.actionButton} onPress={() => setIsFavorite(!isFavorite)}>
               <Ionicons
                 name={isFavorite ? 'heart' : 'heart-outline'}
                 size={22}
@@ -198,9 +200,13 @@ export default function SpotDetailScreen() {
               <Text style={[styles.address, { color: theme.textSecondary }]}>{fullAddress}</Text>
             </View>
             {spot.rating !== undefined && spot.rating > 0 && (
-              <View style={[styles.ratingBadge, { backgroundColor: isDark ? '#2a2a2a' : '#f5f5f5' }]}>
+              <View
+                style={[styles.ratingBadge, { backgroundColor: isDark ? '#2a2a2a' : '#f5f5f5' }]}
+              >
                 <Ionicons name="star" size={18} color={YELLOW} />
-                <Text style={[styles.ratingText, { color: theme.text }]}>{spot.rating.toFixed(1)}</Text>
+                <Text style={[styles.ratingText, { color: theme.text }]}>
+                  {spot.rating.toFixed(1)}
+                </Text>
               </View>
             )}
           </View>
@@ -210,11 +216,18 @@ export default function SpotDetailScreen() {
             {spot.distance !== undefined && (
               <>
                 <View style={styles.statItem}>
-                  <View style={[styles.statIconContainer, { backgroundColor: isDark ? '#2a2a2a' : '#f0f0f0' }]}>
+                  <View
+                    style={[
+                      styles.statIconContainer,
+                      { backgroundColor: isDark ? '#2a2a2a' : '#f0f0f0' },
+                    ]}
+                  >
                     <Ionicons name="navigate-outline" size={18} color={YELLOW} />
                   </View>
                   <View>
-                    <Text style={[styles.statValue, { color: theme.text }]}>{spot.distance.toFixed(1)} mi</Text>
+                    <Text style={[styles.statValue, { color: theme.text }]}>
+                      {spot.distance.toFixed(1)} mi
+                    </Text>
                     <Text style={[styles.statLabel, { color: theme.textSecondary }]}>away</Text>
                   </View>
                 </View>
@@ -225,11 +238,18 @@ export default function SpotDetailScreen() {
             {spot.reviewCount !== undefined && spot.reviewCount > 0 && (
               <>
                 <View style={styles.statItem}>
-                  <View style={[styles.statIconContainer, { backgroundColor: isDark ? '#2a2a2a' : '#f0f0f0' }]}>
+                  <View
+                    style={[
+                      styles.statIconContainer,
+                      { backgroundColor: isDark ? '#2a2a2a' : '#f0f0f0' },
+                    ]}
+                  >
                     <Ionicons name="chatbubble-outline" size={18} color={YELLOW} />
                   </View>
                   <View>
-                    <Text style={[styles.statValue, { color: theme.text }]}>{spot.reviewCount}</Text>
+                    <Text style={[styles.statValue, { color: theme.text }]}>
+                      {spot.reviewCount}
+                    </Text>
                     <Text style={[styles.statLabel, { color: theme.textSecondary }]}>reviews</Text>
                   </View>
                 </View>
@@ -240,11 +260,18 @@ export default function SpotDetailScreen() {
             {/* Sport Types */}
             {spot.sportTypes && spot.sportTypes.length > 0 && (
               <View style={styles.statItem}>
-                <View style={[styles.statIconContainer, { backgroundColor: isDark ? '#2a2a2a' : '#f0f0f0' }]}>
+                <View
+                  style={[
+                    styles.statIconContainer,
+                    { backgroundColor: isDark ? '#2a2a2a' : '#f0f0f0' },
+                  ]}
+                >
                   <Ionicons name="bicycle-outline" size={18} color={YELLOW} />
                 </View>
                 <View>
-                  <Text style={[styles.statValue, { color: theme.text }]}>{spot.sportTypes.length}</Text>
+                  <Text style={[styles.statValue, { color: theme.text }]}>
+                    {spot.sportTypes.length}
+                  </Text>
                   <Text style={[styles.statLabel, { color: theme.textSecondary }]}>sports</Text>
                 </View>
               </View>
@@ -322,7 +349,12 @@ export default function SpotDetailScreen() {
                   height={200}
                 />
               ) : (
-                <View style={[styles.mapPlaceholder, { backgroundColor: isDark ? '#2a2a2a' : '#f0f0f0' }]}>
+                <View
+                  style={[
+                    styles.mapPlaceholder,
+                    { backgroundColor: isDark ? '#2a2a2a' : '#f0f0f0' },
+                  ]}
+                >
                   <Ionicons name="map" size={48} color={theme.textSecondary} />
                   <Text style={[styles.mapPlaceholderText, { color: theme.textSecondary }]}>
                     Location not available
@@ -332,7 +364,9 @@ export default function SpotDetailScreen() {
 
               {/* Address row */}
               <View style={[styles.addressRow, { marginTop: 16 }]}>
-                <View style={[styles.addressIcon, { backgroundColor: isDark ? '#2a2a2a' : '#f5f5f5' }]}>
+                <View
+                  style={[styles.addressIcon, { backgroundColor: isDark ? '#2a2a2a' : '#f5f5f5' }]}
+                >
                   <Ionicons name="location" size={18} color={YELLOW} />
                 </View>
                 <View style={styles.addressInfo}>
@@ -358,7 +392,9 @@ export default function SpotDetailScreen() {
       </ScrollView>
 
       {/* Bottom Action Bar */}
-      <View style={[styles.bottomBar, { backgroundColor: theme.surface, borderTopColor: theme.border }]}>
+      <View
+        style={[styles.bottomBar, { backgroundColor: theme.surface, borderTopColor: theme.border }]}
+      >
         <Pressable
           style={[styles.directionsButton, { backgroundColor: YELLOW }]}
           onPress={handleGetDirections}

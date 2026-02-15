@@ -3,25 +3,25 @@
  * Modal for creating or editing a spot review
  */
 
-import React, { useState, useEffect } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
 import {
-  View,
-  StyleSheet,
-  Text,
-  Modal,
-  TouchableOpacity,
-  TextInput,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { colors, getThemeColors } from '@/constants/colors';
+import { createSpotReview, type SpotReview, updateSpotReview } from '@/lib/api/spotReviews';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { StarRatingInput } from './StarRatingInput';
-import { SpotReview, createSpotReview, updateSpotReview } from '@/lib/api/spotReviews';
 
 interface AddReviewModalProps {
   visible: boolean;
@@ -59,7 +59,7 @@ export function AddReviewModal({
       setRating(0);
       setContent('');
     }
-  }, [existingReview, visible]);
+  }, [existingReview]);
 
   const handleSubmit = async () => {
     if (rating === 0) {
@@ -106,7 +106,7 @@ export function AddReviewModal({
         [
           { text: 'Keep Editing', style: 'cancel' },
           { text: 'Discard', style: 'destructive', onPress: onClose },
-        ]
+        ],
       );
     } else {
       onClose();
@@ -137,21 +137,12 @@ export function AddReviewModal({
 
         <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
           {/* Spot Name */}
-          <Text style={[styles.spotName, { color: theme.text }]}>
-            {spotName}
-          </Text>
+          <Text style={[styles.spotName, { color: theme.text }]}>{spotName}</Text>
 
           {/* Star Rating */}
           <View style={styles.ratingSection}>
-            <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
-              Your Rating
-            </Text>
-            <StarRatingInput
-              rating={rating}
-              onRatingChange={setRating}
-              size={40}
-              showLabel
-            />
+            <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>Your Rating</Text>
+            <StarRatingInput rating={rating} onRatingChange={setRating} size={40} showLabel />
           </View>
 
           {/* Review Content */}

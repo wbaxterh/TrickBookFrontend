@@ -3,31 +3,31 @@
  * Displays reviews section with rating summary and review list
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  View,
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
   TouchableOpacity,
-  ActivityIndicator,
-  FlatList,
-  RefreshControl,
-  Alert,
+  View,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { colors, getThemeColors } from '@/constants/colors';
+import {
+  deleteSpotReview,
+  getSpotReviews,
+  type SpotReview,
+  type SpotReviewsResponse,
+  toggleReviewHelpful,
+} from '@/lib/api/spotReviews';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
-import {
-  SpotReview,
-  SpotReviewsResponse,
-  getSpotReviews,
-  toggleReviewHelpful,
-  deleteSpotReview,
-} from '@/lib/api/spotReviews';
-import { StarRatingInput } from './StarRatingInput';
-import { ReviewCard } from './ReviewCard';
 import { AddReviewModal } from './AddReviewModal';
+import { ReviewCard } from './ReviewCard';
+import { StarRatingInput } from './StarRatingInput';
 
 interface SpotReviewsListProps {
   spotId: string;
@@ -53,29 +53,31 @@ export function SpotReviewsList({
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingReview, setEditingReview] = useState<SpotReview | undefined>();
 
-  const fetchReviews = useCallback(async (page: number = 1, append: boolean = false) => {
-    try {
-      const data = await getSpotReviews(spotId, { page, limit: 20 });
-      if (append && reviewsData) {
-        setReviewsData({
-          ...data,
-          reviews: [...reviewsData.reviews, ...data.reviews],
-        });
-      } else {
-        setReviewsData(data);
+  const fetchReviews = useCallback(
+    async (page: number = 1, append: boolean = false) => {
+      try {
+        const data = await getSpotReviews(spotId, { page, limit: 20 });
+        if (append && reviewsData) {
+          setReviewsData({
+            ...data,
+            reviews: [...reviewsData.reviews, ...data.reviews],
+          });
+        } else {
+          setReviewsData(data);
+        }
+      } catch (_error) {
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+        setLoadingMore(false);
       }
-    } catch (error) {
-      console.error('Error fetching reviews:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setLoadingMore(false);
-    }
-  }, [spotId, reviewsData]);
+    },
+    [spotId, reviewsData],
+  );
 
   useEffect(() => {
     fetchReviews();
-  }, [spotId]);
+  }, [fetchReviews]);
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
@@ -83,11 +85,7 @@ export function SpotReviewsList({
   }, [fetchReviews]);
 
   const handleLoadMore = useCallback(() => {
-    if (
-      loadingMore ||
-      !reviewsData ||
-      !reviewsData.pagination.hasMore
-    ) {
+    if (loadingMore || !reviewsData || !reviewsData.pagination.hasMore) {
       return;
     }
     setLoadingMore(true);
@@ -96,11 +94,9 @@ export function SpotReviewsList({
 
   const handleAddReview = () => {
     if (!isAuthenticated) {
-      Alert.alert(
-        'Sign In Required',
-        'You need to be signed in to write a review.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Sign In Required', 'You need to be signed in to write a review.', [
+        { text: 'OK' },
+      ]);
       return;
     }
     setEditingReview(undefined);
@@ -113,54 +109,50 @@ export function SpotReviewsList({
   };
 
   const handleDeleteReview = async (reviewId: string) => {
-    Alert.alert(
-      'Delete Review',
-      'Are you sure you want to delete this review?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const success = await deleteSpotReview(reviewId);
-            if (success) {
-              handleRefresh();
-            } else {
-              Alert.alert('Error', 'Failed to delete review.');
-            }
-          },
+    Alert.alert('Delete Review', 'Are you sure you want to delete this review?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const success = await deleteSpotReview(reviewId);
+          if (success) {
+            handleRefresh();
+          } else {
+            Alert.alert('Error', 'Failed to delete review.');
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const handleHelpful = async (reviewId: string) => {
     const result = await toggleReviewHelpful(reviewId);
     if (result && reviewsData) {
       const updatedReviews = reviewsData.reviews.map((r) =>
-        r._id === reviewId ? { ...r, helpfulCount: result.helpfulCount } : r
+        r._id === reviewId ? { ...r, helpfulCount: result.helpfulCount } : r,
       );
       setReviewsData({ ...reviewsData, reviews: updatedReviews });
     }
   };
 
-  const handleReviewSubmitted = (review: SpotReview) => {
+  const handleReviewSubmitted = (_review: SpotReview) => {
     handleRefresh();
   };
 
   const renderRatingSummary = () => {
     const distribution = reviewsData?.ratingDistribution || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     const total = Object.values(distribution).reduce((sum, count) => sum + count, 0);
-    const avgRating = spotRating || (reviewsData && reviewsData.reviews.length > 0
-      ? reviewsData.reviews.reduce((sum, r) => sum + r.rating, 0) / reviewsData.reviews.length
-      : 0);
+    const avgRating =
+      spotRating ||
+      (reviewsData && reviewsData.reviews.length > 0
+        ? reviewsData.reviews.reduce((sum, r) => sum + r.rating, 0) / reviewsData.reviews.length
+        : 0);
 
     return (
       <View style={[styles.summaryCard, { backgroundColor: theme.surface }]}>
         <View style={styles.summaryLeft}>
-          <Text style={[styles.avgRating, { color: theme.text }]}>
-            {avgRating.toFixed(1)}
-          </Text>
+          <Text style={[styles.avgRating, { color: theme.text }]}>{avgRating.toFixed(1)}</Text>
           <StarRatingInput rating={avgRating} readonly size={16} />
           <Text style={[styles.totalReviews, { color: theme.textSecondary }]}>
             {total} {total === 1 ? 'review' : 'reviews'}
@@ -172,9 +164,7 @@ export function SpotReviewsList({
             const percentage = total > 0 ? (count / total) * 100 : 0;
             return (
               <View key={star} style={styles.barRow}>
-                <Text style={[styles.barLabel, { color: theme.textSecondary }]}>
-                  {star}
-                </Text>
+                <Text style={[styles.barLabel, { color: theme.textSecondary }]}>{star}</Text>
                 <View style={[styles.barBackground, { backgroundColor: theme.surfaceElevated }]}>
                   <View
                     style={[
@@ -194,17 +184,13 @@ export function SpotReviewsList({
   const renderHeader = () => (
     <View>
       <View style={styles.sectionHeader}>
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>
-          Reviews
-        </Text>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>Reviews</Text>
         <TouchableOpacity
           style={[styles.addButton, { backgroundColor: colors.primary }]}
           onPress={handleAddReview}
         >
           <Ionicons name="add" size={20} color={colors.primaryText} />
-          <Text style={[styles.addButtonText, { color: colors.primaryText }]}>
-            Write a Review
-          </Text>
+          <Text style={[styles.addButtonText, { color: colors.primaryText }]}>Write a Review</Text>
         </TouchableOpacity>
       </View>
       {renderRatingSummary()}
@@ -214,9 +200,7 @@ export function SpotReviewsList({
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <Ionicons name="chatbubble-outline" size={48} color={theme.textTertiary} />
-      <Text style={[styles.emptyTitle, { color: theme.text }]}>
-        No Reviews Yet
-      </Text>
+      <Text style={[styles.emptyTitle, { color: theme.text }]}>No Reviews Yet</Text>
       <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
         Be the first to share your experience at this spot!
       </Text>

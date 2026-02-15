@@ -3,8 +3,8 @@
  * Functions for user-generated content, reactions, and comments
  */
 
-import { apiClient } from './client';
 import { ENDPOINTS } from '@/constants/api';
+import { apiClient } from './client';
 
 // Types
 export interface FeedUser {
@@ -97,11 +97,9 @@ export interface CommentsResponse {
 /**
  * Get algorithmic feed (homies prioritized, recent first)
  */
-export async function getFeed(params: {
-  page?: number;
-  limit?: number;
-  sort?: 'recent' | 'trending' | 'algorithmic';
-} = {}): Promise<FeedResponse> {
+export async function getFeed(
+  params: { page?: number; limit?: number; sort?: 'recent' | 'trending' | 'algorithmic' } = {},
+): Promise<FeedResponse> {
   try {
     const queryParams = new URLSearchParams();
     if (params.page) queryParams.append('page', params.page.toString());
@@ -111,14 +109,11 @@ export async function getFeed(params: {
     queryParams.append('prioritizeHomies', 'true');
 
     const queryString = queryParams.toString();
-    const endpoint = queryString
-      ? `${ENDPOINTS.feed.list}?${queryString}`
-      : ENDPOINTS.feed.list;
+    const endpoint = queryString ? `${ENDPOINTS.feed.list}?${queryString}` : ENDPOINTS.feed.list;
 
     const response = await apiClient.get<FeedResponse>(endpoint);
     return response;
-  } catch (error) {
-    console.error('Error getting feed:', error);
+  } catch (_error) {
     return { posts: [], pagination: { page: 1, limit: 20, hasMore: false } };
   }
 }
@@ -126,11 +121,9 @@ export async function getFeed(params: {
 /**
  * Get trending posts
  */
-export async function getTrending(params: {
-  page?: number;
-  limit?: number;
-  sport?: string;
-} = {}): Promise<FeedResponse> {
+export async function getTrending(
+  params: { page?: number; limit?: number; sport?: string } = {},
+): Promise<FeedResponse> {
   try {
     const queryParams = new URLSearchParams();
     if (params.page) queryParams.append('page', params.page.toString());
@@ -144,8 +137,7 @@ export async function getTrending(params: {
 
     const response = await apiClient.get<FeedResponse>(endpoint, { skipAuth: true });
     return response;
-  } catch (error) {
-    console.error('Error getting trending:', error);
+  } catch (_error) {
     return { posts: [], pagination: { page: 1, limit: 20 } };
   }
 }
@@ -155,7 +147,7 @@ export async function getTrending(params: {
  */
 export async function getUserPosts(
   userId: string,
-  params: { page?: number; limit?: number } = {}
+  params: { page?: number; limit?: number } = {},
 ): Promise<FeedResponse> {
   try {
     const queryParams = new URLSearchParams();
@@ -169,8 +161,7 @@ export async function getUserPosts(
 
     const response = await apiClient.get<FeedResponse>(endpoint);
     return response;
-  } catch (error) {
-    console.error('Error getting user posts:', error);
+  } catch (_error) {
     return { posts: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } };
   }
 }
@@ -180,7 +171,7 @@ export async function getUserPosts(
  */
 export async function getFeedBySport(
   sportType: string,
-  params: { page?: number; limit?: number } = {}
+  params: { page?: number; limit?: number } = {},
 ): Promise<FeedResponse> {
   try {
     const queryParams = new URLSearchParams();
@@ -194,8 +185,7 @@ export async function getFeedBySport(
 
     const response = await apiClient.get<FeedResponse>(endpoint, { skipAuth: true });
     return response;
-  } catch (error) {
-    console.error('Error getting sport feed:', error);
+  } catch (_error) {
     return { posts: [], pagination: { page: 1, limit: 20 } };
   }
 }
@@ -207,8 +197,7 @@ export async function getPost(postId: string): Promise<FeedPost | null> {
   try {
     const response = await apiClient.get<FeedPost>(ENDPOINTS.feed.post(postId));
     return response;
-  } catch (error) {
-    console.error('Error getting post:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -216,24 +205,20 @@ export async function getPost(postId: string): Promise<FeedPost | null> {
 /**
  * Get saved posts
  */
-export async function getSavedPosts(params: {
-  page?: number;
-  limit?: number;
-} = {}): Promise<FeedResponse> {
+export async function getSavedPosts(
+  params: { page?: number; limit?: number } = {},
+): Promise<FeedResponse> {
   try {
     const queryParams = new URLSearchParams();
     if (params.page) queryParams.append('page', params.page.toString());
     if (params.limit) queryParams.append('limit', params.limit.toString());
 
     const queryString = queryParams.toString();
-    const endpoint = queryString
-      ? `${ENDPOINTS.feed.saved}?${queryString}`
-      : ENDPOINTS.feed.saved;
+    const endpoint = queryString ? `${ENDPOINTS.feed.saved}?${queryString}` : ENDPOINTS.feed.saved;
 
     const response = await apiClient.get<FeedResponse>(endpoint);
     return response;
-  } catch (error) {
-    console.error('Error getting saved posts:', error);
+  } catch (_error) {
     return { posts: [], pagination: { page: 1, limit: 20 } };
   }
 }
@@ -264,8 +249,7 @@ export async function createPost(data: CreatePostData): Promise<FeedPost | null>
   try {
     const response = await apiClient.post<FeedPost>(ENDPOINTS.feed.create, data);
     return response;
-  } catch (error) {
-    console.error('Error creating post:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -275,13 +259,12 @@ export async function createPost(data: CreatePostData): Promise<FeedPost | null>
  */
 export async function updatePost(
   postId: string,
-  data: Partial<Pick<FeedPost, 'caption' | 'visibility' | 'sportTypes' | 'tricks'>>
+  data: Partial<Pick<FeedPost, 'caption' | 'visibility' | 'sportTypes' | 'tricks'>>,
 ): Promise<FeedPost | null> {
   try {
     const response = await apiClient.put<FeedPost>(ENDPOINTS.feed.update(postId), data);
     return response;
-  } catch (error) {
-    console.error('Error updating post:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -293,8 +276,7 @@ export async function deletePost(postId: string): Promise<boolean> {
   try {
     await apiClient.delete(ENDPOINTS.feed.delete(postId));
     return true;
-  } catch (error) {
-    console.error('Error deleting post:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -308,7 +290,7 @@ export async function deletePost(postId: string): Promise<boolean> {
  */
 export async function addReaction(
   postId: string,
-  type: 'love' | 'respect'
+  type: 'love' | 'respect',
 ): Promise<{ loveCount: number; respectCount: number } | null> {
   try {
     const response = await apiClient.post<{
@@ -317,8 +299,7 @@ export async function addReaction(
       respectCount: number;
     }>(ENDPOINTS.feed.reaction(postId), { type });
     return { loveCount: response.loveCount, respectCount: response.respectCount };
-  } catch (error) {
-    console.error('Error adding reaction:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -328,7 +309,7 @@ export async function addReaction(
  */
 export async function removeReaction(
   postId: string,
-  type: 'love' | 'respect'
+  type: 'love' | 'respect',
 ): Promise<{ loveCount: number; respectCount: number } | null> {
   try {
     const response = await apiClient.delete<{
@@ -337,8 +318,7 @@ export async function removeReaction(
       respectCount: number;
     }>(ENDPOINTS.feed.removeReaction(postId, type));
     return { loveCount: response.loveCount, respectCount: response.respectCount };
-  } catch (error) {
-    console.error('Error removing reaction:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -352,7 +332,7 @@ export async function removeReaction(
  */
 export async function getComments(
   postId: string,
-  params: { page?: number; limit?: number } = {}
+  params: { page?: number; limit?: number } = {},
 ): Promise<CommentsResponse> {
   try {
     const queryParams = new URLSearchParams();
@@ -366,8 +346,7 @@ export async function getComments(
 
     const response = await apiClient.get<CommentsResponse>(endpoint, { skipAuth: true });
     return response;
-  } catch (error) {
-    console.error('Error getting comments:', error);
+  } catch (_error) {
     return { comments: [], pagination: { page: 1, limit: 20 } };
   }
 }
@@ -378,7 +357,7 @@ export async function getComments(
 export async function addComment(
   postId: string,
   content: string,
-  parentCommentId?: string
+  parentCommentId?: string,
 ): Promise<Comment | null> {
   try {
     const response = await apiClient.post<Comment>(ENDPOINTS.feed.comment(postId), {
@@ -386,8 +365,7 @@ export async function addComment(
       parentCommentId,
     });
     return response;
-  } catch (error) {
-    console.error('Error adding comment:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -399,8 +377,7 @@ export async function deleteComment(postId: string, commentId: string): Promise<
   try {
     await apiClient.delete(ENDPOINTS.feed.deleteComment(postId, commentId));
     return true;
-  } catch (error) {
-    console.error('Error deleting comment:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -411,7 +388,7 @@ export async function deleteComment(postId: string, commentId: string): Promise<
 export async function getCommentReplies(
   postId: string,
   commentId: string,
-  params: { page?: number; limit?: number } = {}
+  params: { page?: number; limit?: number } = {},
 ): Promise<{ replies: Comment[]; pagination: { page: number; limit: number; hasMore: boolean } }> {
   try {
     const queryParams = new URLSearchParams();
@@ -428,8 +405,7 @@ export async function getCommentReplies(
       pagination: { page: number; limit: number; hasMore: boolean };
     }>(endpoint, { skipAuth: true });
     return response;
-  } catch (error) {
-    console.error('Error getting replies:', error);
+  } catch (_error) {
     return { replies: [], pagination: { page: 1, limit: 10, hasMore: false } };
   }
 }
@@ -439,16 +415,15 @@ export async function getCommentReplies(
  */
 export async function toggleCommentLove(
   postId: string,
-  commentId: string
+  commentId: string,
 ): Promise<{ loved: boolean; loveCount: number } | null> {
   try {
     const response = await apiClient.post<{ loved: boolean; loveCount: number }>(
       ENDPOINTS.feed.loveComment(postId, commentId),
-      {}
+      {},
     );
     return response;
-  } catch (error) {
-    console.error('Error toggling comment love:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -464,8 +439,7 @@ export async function toggleSavePost(postId: string, save: boolean): Promise<boo
   try {
     await apiClient.post(ENDPOINTS.feed.save(postId), { save });
     return true;
-  } catch (error) {
-    console.error('Error saving post:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -475,13 +449,12 @@ export async function toggleSavePost(postId: string, save: boolean): Promise<boo
  */
 export async function trackPostView(
   postId: string,
-  data?: { watchDuration?: number; completed?: boolean }
+  data?: { watchDuration?: number; completed?: boolean },
 ): Promise<boolean> {
   try {
     await apiClient.post(ENDPOINTS.feed.view(postId), data || {}, { skipAuth: true });
     return true;
-  } catch (error) {
-    console.error('Error tracking view:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -493,8 +466,7 @@ export async function reportPost(postId: string, reason: string): Promise<boolea
   try {
     await apiClient.post(ENDPOINTS.feed.report(postId), { reason });
     return true;
-  } catch (error) {
-    console.error('Error reporting post:', error);
+  } catch (_error) {
     return false;
   }
 }

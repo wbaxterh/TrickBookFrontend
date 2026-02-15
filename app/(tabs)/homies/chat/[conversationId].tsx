@@ -3,35 +3,35 @@
  * Real-time messaging with a homie
  */
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  Pressable,
+  ActivityIndicator,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
-  Image,
-  StyleSheet,
+  Pressable,
   RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { useAuthStore } from '@/lib/stores/authStore';
 import {
+  type Conversation,
   getConversation,
   getMessages,
-  sendMessage as sendMessageApi,
+  type Message,
   markAsRead,
-  Message,
-  Conversation,
-  Participant,
-  SharedContent,
+  type Participant,
+  type SharedContent,
+  sendMessage as sendMessageApi,
 } from '@/lib/api/messages';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { useAuthStore } from '@/lib/stores/authStore';
 
 const YELLOW = '#FCF150';
 const DARK = '#1a1a1a';
@@ -113,13 +113,27 @@ function SharedContentBubble({
       onPress={handlePress}
     >
       <View style={styles.sharedContentHeader}>
-        <View style={[styles.sharedContentIcon, { backgroundColor: isMe ? 'rgba(0,0,0,0.15)' : colors.primary + '20' }]}>
+        <View
+          style={[
+            styles.sharedContentIcon,
+            { backgroundColor: isMe ? 'rgba(0,0,0,0.15)' : `${colors.primary}20` },
+          ]}
+        >
           <Ionicons name={getIcon() as any} size={18} color={isMe ? DARK : colors.primary} />
         </View>
-        <Text style={[styles.sharedContentType, { color: isMe ? 'rgba(0,0,0,0.6)' : theme.textSecondary }]}>
+        <Text
+          style={[
+            styles.sharedContentType,
+            { color: isMe ? 'rgba(0,0,0,0.6)' : theme.textSecondary },
+          ]}
+        >
           {getTypeLabel()}
         </Text>
-        <Ionicons name="chevron-forward" size={16} color={isMe ? 'rgba(0,0,0,0.4)' : theme.textSecondary} />
+        <Ionicons
+          name="chevron-forward"
+          size={16}
+          color={isMe ? 'rgba(0,0,0,0.4)' : theme.textSecondary}
+        />
       </View>
       {sharedContent.preview && (
         <View style={styles.sharedContentPreview}>
@@ -138,7 +152,10 @@ function SharedContentBubble({
             </Text>
             {sharedContent.preview.subtitle && (
               <Text
-                style={[styles.sharedContentSubtitle, { color: isMe ? 'rgba(0,0,0,0.6)' : theme.textSecondary }]}
+                style={[
+                  styles.sharedContentSubtitle,
+                  { color: isMe ? 'rgba(0,0,0,0.6)' : theme.textSecondary },
+                ]}
                 numberOfLines={1}
               >
                 {sharedContent.preview.subtitle}
@@ -171,31 +188,33 @@ export default function ChatScreen() {
   const flatListRef = useRef<FlatList>(null);
 
   // Fetch conversation and messages
-  const fetchData = useCallback(async (isRefresh: boolean = false) => {
-    if (!conversationId) return;
+  const fetchData = useCallback(
+    async (isRefresh: boolean = false) => {
+      if (!conversationId) return;
 
-    try {
-      const [convoData, messagesData] = await Promise.all([
-        getConversation(conversationId),
-        getMessages(conversationId, { page: 1, limit: 50 }),
-      ]);
+      try {
+        const [convoData, messagesData] = await Promise.all([
+          getConversation(conversationId),
+          getMessages(conversationId, { page: 1, limit: 50 }),
+        ]);
 
-      setConversation(convoData);
-      // Reverse messages so newest is first (inverted FlatList shows first item at bottom)
-      const msgs = messagesData.messages || [];
-      setMessages(msgs.reverse());
-      setHasMore(messagesData.pagination?.hasMore || false);
-      setPage(1);
+        setConversation(convoData);
+        // Reverse messages so newest is first (inverted FlatList shows first item at bottom)
+        const msgs = messagesData.messages || [];
+        setMessages(msgs.reverse());
+        setHasMore(messagesData.pagination?.hasMore || false);
+        setPage(1);
 
-      // Mark as read
-      await markAsRead(conversationId);
-    } catch (error) {
-      console.error('Error fetching chat data:', error);
-    } finally {
-      setLoading(false);
-      if (isRefresh) setRefreshing(false);
-    }
-  }, [conversationId]);
+        // Mark as read
+        await markAsRead(conversationId);
+      } catch (_error) {
+      } finally {
+        setLoading(false);
+        if (isRefresh) setRefreshing(false);
+      }
+    },
+    [conversationId],
+  );
 
   useEffect(() => {
     fetchData();
@@ -213,7 +232,7 @@ export default function ChatScreen() {
       if (conversationId) {
         markAsRead(conversationId);
       }
-    }, [conversationId])
+    }, [conversationId]),
   );
 
   // Load more messages (pagination) - older messages
@@ -226,7 +245,7 @@ export default function ChatScreen() {
     if (messagesData.messages) {
       // Reverse and append older messages at the end
       const olderMessages = messagesData.messages.reverse();
-      setMessages(prev => [...prev, ...olderMessages]);
+      setMessages((prev) => [...prev, ...olderMessages]);
       setPage(nextPage);
       setHasMore(messagesData.pagination?.hasMore || false);
     }
@@ -238,7 +257,7 @@ export default function ChatScreen() {
       return conversation.otherUser;
     }
     if (conversation?.participantDetails) {
-      return conversation.participantDetails.find(p => p._id !== userId);
+      return conversation.participantDetails.find((p) => p._id !== userId);
     }
     return undefined;
   };
@@ -257,15 +276,14 @@ export default function ChatScreen() {
       const newMessage = await sendMessageApi(conversationId, messageContent);
       if (newMessage) {
         // Add to beginning since list is inverted
-        setMessages(prev => [newMessage, ...prev]);
+        setMessages((prev) => [newMessage, ...prev]);
 
         // Scroll to bottom
         setTimeout(() => {
           flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
         }, 100);
       }
-    } catch (error) {
-      console.error('Error sending message:', error);
+    } catch (_error) {
       // Restore input on error
       setInputText(messageContent);
     } finally {
@@ -301,7 +319,10 @@ export default function ChatScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={YELLOW} />
         </View>
@@ -356,11 +377,7 @@ export default function ChatScreen() {
           onEndReached={loadMoreMessages}
           onEndReachedThreshold={0.5}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={YELLOW}
-            />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={YELLOW} />
           }
           ListEmptyComponent={
             <View style={styles.emptyMessages}>
@@ -406,7 +423,12 @@ export default function ChatScreen() {
                       {formatTime(item.createdAt)}
                     </Text>
                     {isMe && item.status === 'read' && (
-                      <Ionicons name="checkmark-done" size={14} color={colors.primary} style={styles.readIcon} />
+                      <Ionicons
+                        name="checkmark-done"
+                        size={14}
+                        color={colors.primary}
+                        style={styles.readIcon}
+                      />
                     )}
                   </View>
                 </View>

@@ -5,8 +5,8 @@
  * Reference: /components/ui/card.jsx from website
  */
 
-import React from 'react';
-import { View, ViewProps, StyleSheet } from 'react-native';
+import type React from 'react';
+import { StyleSheet, View, type ViewProps } from 'react-native';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 interface CardProps extends ViewProps {

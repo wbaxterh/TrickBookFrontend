@@ -3,8 +3,8 @@
  * Functions for managing homies (friends) relationships
  */
 
-import { apiClient } from './client';
 import { ENDPOINTS } from '@/constants/api';
+import { apiClient } from './client';
 
 // Types
 export interface Homie {
@@ -45,8 +45,7 @@ export async function getNetworkStatus(): Promise<NetworkStatus | null> {
   try {
     const response = await apiClient.get<NetworkStatus>(ENDPOINTS.homies.networkStatus);
     return response;
-  } catch (error) {
-    console.error('Error getting network status:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -58,8 +57,7 @@ export async function toggleNetwork(userId: string, enabled: boolean): Promise<b
   try {
     await apiClient.put(ENDPOINTS.homies.toggleNetwork(userId), { network: enabled });
     return true;
-  } catch (error) {
-    console.error('Error toggling network:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -71,8 +69,7 @@ export async function getDiscoverableUsers(): Promise<Homie[]> {
   try {
     const response = await apiClient.get<Homie[]>(ENDPOINTS.homies.discoverable);
     return response;
-  } catch (error) {
-    console.error('Error getting discoverable users:', error);
+  } catch (_error) {
     return [];
   }
 }
@@ -84,8 +81,7 @@ export async function getMyHomies(): Promise<Homie[]> {
   try {
     const response = await apiClient.get<Homie[]>(ENDPOINTS.homies.list);
     return response;
-  } catch (error) {
-    console.error('Error getting homies:', error);
+  } catch (_error) {
     return [];
   }
 }
@@ -97,8 +93,7 @@ export async function getPendingRequests(): Promise<PendingRequests> {
   try {
     const response = await apiClient.get<PendingRequests>(ENDPOINTS.homies.requests);
     return response;
-  } catch (error) {
-    console.error('Error getting pending requests:', error);
+  } catch (_error) {
     return { received: [], sent: [] };
   }
 }
@@ -110,8 +105,7 @@ export async function sendHomieRequest(targetUserId: string): Promise<boolean> {
   try {
     await apiClient.post(ENDPOINTS.homies.sendRequest(targetUserId), {});
     return true;
-  } catch (error) {
-    console.error('Error sending homie request:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -123,8 +117,7 @@ export async function acceptHomieRequest(requesterId: string): Promise<boolean> 
   try {
     await apiClient.post(ENDPOINTS.homies.accept(requesterId), {});
     return true;
-  } catch (error) {
-    console.error('Error accepting homie request:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -136,8 +129,7 @@ export async function rejectHomieRequest(requesterId: string): Promise<boolean> 
   try {
     await apiClient.post(ENDPOINTS.homies.reject(requesterId), {});
     return true;
-  } catch (error) {
-    console.error('Error rejecting homie request:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -149,8 +141,7 @@ export async function removeHomie(homieId: string): Promise<boolean> {
   try {
     await apiClient.delete(ENDPOINTS.homies.remove(homieId));
     return true;
-  } catch (error) {
-    console.error('Error removing homie:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -160,10 +151,11 @@ export async function removeHomie(homieId: string): Promise<boolean> {
  */
 export async function getHomieStatus(targetId: string): Promise<HomieStatus> {
   try {
-    const response = await apiClient.get<{ status: HomieStatus }>(ENDPOINTS.homies.status(targetId));
+    const response = await apiClient.get<{ status: HomieStatus }>(
+      ENDPOINTS.homies.status(targetId),
+    );
     return response.status;
-  } catch (error) {
-    console.error('Error getting homie status:', error);
+  } catch (_error) {
     return 'none';
   }
 }

@@ -3,12 +3,12 @@
  * FAQ, contact, legal links
  */
 
-import { View, Text, ScrollView, Pressable, Linking, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { SettingsDivider, SettingsGroup, SettingsItem } from '@/components/ui';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { SettingsItem, SettingsDivider, SettingsGroup } from '@/components/ui';
 
 const SUPPORT_EMAIL = 'support@thetrickbook.com';
 const WEBSITE_URL = 'https://thetrickbook.com';
@@ -31,22 +31,13 @@ export default function SupportScreen() {
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      edges={['top']}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-          hitSlop={8}
-        >
+        <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={8}>
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>
-          Help & Support
-        </Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Help & Support</Text>
         <View style={styles.headerSpacer} />
       </View>
 

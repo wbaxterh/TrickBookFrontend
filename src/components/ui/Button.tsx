@@ -6,16 +6,16 @@
  * Primary uses gold (#FFD700) with dark text
  */
 
-import React from 'react';
-import {
-  Pressable,
-  Text,
-  StyleSheet,
-  ActivityIndicator,
-  View,
-  PressableProps,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import type React from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  type PressableProps,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'outline' | 'destructive';
@@ -71,11 +71,10 @@ export function Button({
       case 'destructive':
         return {
           bg: colors.error,
-          bgPressed: colors.error + 'CC',
+          bgPressed: `${colors.error}CC`,
           text: '#FFFFFF',
           border: 'transparent',
         };
-      case 'primary':
       default:
         return {
           bg: colors.primary,
@@ -215,18 +214,14 @@ export function IconButton({
           backgroundColor: pressed
             ? variant === 'ghost'
               ? theme.surface
-              : variantStyles.bg + 'CC'
+              : `${variantStyles.bg}CC`
             : variantStyles.bg,
         },
         style,
       ]}
       {...props}
     >
-      <Ionicons
-        name={icon}
-        size={sizeStyles.iconSize}
-        color={variantStyles.color}
-      />
+      <Ionicons name={icon} size={sizeStyles.iconSize} color={variantStyles.color} />
     </Pressable>
   );
 }

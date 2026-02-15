@@ -4,9 +4,9 @@
  */
 
 export { Avatar } from './Avatar';
-export { Badge, StatusBadge, CountBadge } from './Badge';
+export { Badge, CountBadge, StatusBadge } from './Badge';
 export { Button, IconButton } from './Button';
-export { Card, CardHeader, CardContent, CardFooter } from './Card';
+export { Card, CardContent, CardFooter, CardHeader } from './Card';
 export { ProgressBar, SegmentedProgressBar } from './ProgressBar';
 export { SectionHeader } from './SectionHeader';
-export { SettingsItem, SettingsDivider, SettingsGroup } from './SettingsItem';
+export { SettingsDivider, SettingsGroup, SettingsItem } from './SettingsItem';

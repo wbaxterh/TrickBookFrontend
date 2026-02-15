@@ -5,10 +5,9 @@
  * Matches "CURRENT GOALS", "PROGRESS STATS" style from design
  */
 
-import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors as brandColors } from '@/constants/colors';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 interface SectionHeaderProps {
   title: string;
@@ -19,11 +18,7 @@ interface SectionHeaderProps {
   uppercase?: boolean;
 }
 
-export function SectionHeader({
-  title,
-  action,
-  uppercase = true,
-}: SectionHeaderProps) {
+export function SectionHeader({ title, action, uppercase = true }: SectionHeaderProps) {
   const { theme, isDark } = useThemeContext();
 
   // Use dark amber for action links in light mode for better contrast
@@ -45,9 +40,7 @@ export function SectionHeader({
 
       {action && (
         <Pressable onPress={action.onPress} hitSlop={8}>
-          <Text style={[styles.action, { color: actionColor }]}>
-            {action.label}
-          </Text>
+          <Text style={[styles.action, { color: actionColor }]}>{action.label}</Text>
         </Pressable>
       )}
     </View>

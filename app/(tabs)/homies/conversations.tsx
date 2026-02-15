@@ -3,29 +3,29 @@
  * List of all direct message conversations
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  Pressable,
-  FlatList,
-  StyleSheet,
   ActivityIndicator,
-  RefreshControl,
+  FlatList,
   Image,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import { type Conversation, getConversations } from '@/lib/api/messages';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
-import { getConversations, Conversation } from '@/lib/api/messages';
 
 const YELLOW = '#FCF150';
 const DARK = '#1a1a1a';
 
 // Sport emojis mapping
-const SPORT_EMOJIS: Record<string, string> = {
+const _SPORT_EMOJIS: Record<string, string> = {
   skateboarding: '🛹',
   snowboarding: '🏂',
   skiing: '⛷️',
@@ -49,8 +49,7 @@ export default function ConversationsScreen() {
     try {
       const data = await getConversations();
       setConversations(data);
-    } catch (error) {
-      console.error('Error fetching conversations:', error);
+    } catch (_error) {
     } finally {
       setLoading(false);
     }
@@ -88,7 +87,7 @@ export default function ConversationsScreen() {
     }
     // Find in participantDetails
     if (conversation.participantDetails) {
-      return conversation.participantDetails.find(p => p._id !== user?._id);
+      return conversation.participantDetails.find((p) => p._id !== user?._id);
     }
     return null;
   };
@@ -153,7 +152,12 @@ export default function ConversationsScreen() {
                   {otherUser?.imageUri ? (
                     <Image source={{ uri: otherUser.imageUri }} style={styles.avatar} />
                   ) : (
-                    <View style={[styles.avatarPlaceholder, { backgroundColor: theme.surfaceElevated || theme.border }]}>
+                    <View
+                      style={[
+                        styles.avatarPlaceholder,
+                        { backgroundColor: theme.surfaceElevated || theme.border },
+                      ]}
+                    >
                       <Text style={styles.avatarEmoji}>{sportEmoji}</Text>
                     </View>
                   )}

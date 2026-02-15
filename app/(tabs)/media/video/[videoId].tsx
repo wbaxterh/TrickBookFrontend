@@ -4,33 +4,33 @@
  * Supports HLS (Bunny.net) via expo-video and Google Drive via WebView
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+import * as ScreenOrientation from 'expo-screen-orientation';
+import { useVideoPlayer, VideoView } from 'expo-video';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  Image,
   ActivityIndicator,
-  StyleSheet,
   Dimensions,
+  Image,
+  Pressable,
+  ScrollView,
   StatusBar,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { WebView } from 'react-native-webview';
-import { useVideoPlayer, VideoView } from 'expo-video';
-import * as ScreenOrientation from 'expo-screen-orientation';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import {
-  getVideo,
-  getStreamUrl,
-  CouchVideo,
-  StreamUrlResponse,
-  getThumbnailUrl,
+  type CouchVideo,
   formatDuration,
+  getStreamUrl,
+  getThumbnailUrl,
+  getVideo,
+  type StreamUrlResponse,
 } from '@/lib/api/couch';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const YELLOW = '#FCF150';
@@ -111,16 +111,9 @@ export default function VideoDetailScreen() {
         getVideo(videoId),
         getStreamUrl(videoId),
       ]);
-      console.log('=== VIDEO DEBUG ===');
-      console.log('Stream type:', streamResponse?.type);
-      console.log('HLS URL:', streamResponse?.hlsUrl);
-      console.log('Embed URL:', streamResponse?.embedUrl);
-      console.log('Stream URL:', streamResponse?.streamUrl);
-      console.log('===================');
       setVideo(videoData);
       setStreamData(streamResponse);
-    } catch (error) {
-      console.error('Error fetching video:', error);
+    } catch (_error) {
     } finally {
       setLoading(false);
     }
@@ -141,7 +134,10 @@ export default function VideoDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={YELLOW} />
         </View>
@@ -151,7 +147,10 @@ export default function VideoDetailScreen() {
 
   if (!video) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.header}>
           <Pressable
             style={[styles.backButton, { backgroundColor: theme.surface }]}
@@ -193,10 +192,7 @@ export default function VideoDetailScreen() {
           ) : isPlaying && hasDriveEmbed ? (
             <DriveVideoPlayer embedUrl={streamData.embedUrl!} />
           ) : (
-            <Pressable
-              style={styles.thumbnailContainer}
-              onPress={canPlay ? handlePlay : undefined}
-            >
+            <Pressable style={styles.thumbnailContainer} onPress={canPlay ? handlePlay : undefined}>
               {thumbnailUrl ? (
                 <Image
                   source={{ uri: thumbnailUrl }}

@@ -54,10 +54,7 @@ class ApiClient {
   /**
    * Make an API request
    */
-  async request<T>(
-    endpoint: string,
-    options: RequestOptions = {}
-  ): Promise<T> {
+  async request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
     const {
       timeout = API_CONFIG.timeout,
       skipAuth = false,
@@ -86,7 +83,6 @@ class ApiClient {
 
     try {
       const url = endpoint.startsWith('http') ? endpoint : `${this.baseUrl}${endpoint}`;
-      console.log('[API] Request:', fetchOptions.method || 'GET', url);
 
       const response = await fetch(url, {
         ...fetchOptions,
@@ -95,7 +91,6 @@ class ApiClient {
       });
 
       clearTimeout(timeoutId);
-      console.log('[API] Response status:', response.status);
 
       // Parse response
       let data: any;
@@ -108,7 +103,6 @@ class ApiClient {
 
       // Handle errors
       if (!response.ok) {
-        console.log('[API] Error response:', data);
         const error: ApiError = {
           message: data?.error || data?.message || 'Request failed',
           status: response.status,

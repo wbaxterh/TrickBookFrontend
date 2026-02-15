@@ -3,7 +3,7 @@
  * Type definitions for spots and spot lists
  */
 
-import { Spot } from '@/lib/api/spots';
+import type { Spot } from '@/lib/api/spots';
 
 /**
  * SpotList - A user's collection of saved spots

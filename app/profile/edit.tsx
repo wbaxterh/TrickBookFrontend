@@ -9,26 +9,26 @@
  * - Rider Details (fun optional fields)
  */
 
-import { useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  Pressable,
-  TextInput,
-  Alert,
-  ActivityIndicator,
-  StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import { router } from 'expo-router';
+import { useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Avatar, Button } from '@/components/ui';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
-import { Avatar, Card, Button } from '@/components/ui';
 
 // Sport categories matching website
 const SPORT_CATEGORIES = [
@@ -132,13 +132,11 @@ export default function EditProfileScreen() {
 
   const toggleSport = (sportId: string) => {
     setSelectedSports((prev) =>
-      prev.includes(sportId)
-        ? prev.filter((id) => id !== sportId)
-        : [...prev, sportId]
+      prev.includes(sportId) ? prev.filter((id) => id !== sportId) : [...prev, sportId],
     );
   };
 
-  const handleSelectIcon = (icon: typeof DEFAULT_AVATARS[0]) => {
+  const handleSelectIcon = (icon: (typeof DEFAULT_AVATARS)[0]) => {
     setRiderProfile((prev) => ({
       ...prev,
       avatarType: 'icon',
@@ -192,9 +190,7 @@ export default function EditProfileScreen() {
         riderProfile: riderProfile,
       });
 
-      Alert.alert('Success', 'Profile updated!', [
-        { text: 'OK', onPress: () => router.back() },
-      ]);
+      Alert.alert('Success', 'Profile updated!', [{ text: 'OK', onPress: () => router.back() }]);
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to update profile');
     } finally {
@@ -203,17 +199,15 @@ export default function EditProfileScreen() {
   };
 
   // Get current avatar display
-  const currentAvatar = riderProfile.avatarType === 'upload' && imageUri
-    ? { imageUri }
-    : riderProfile.avatarIcon
-    ? { emoji: riderProfile.avatarIcon.emoji, backgroundColor: riderProfile.avatarIcon.bg }
-    : { emoji: '🛹' };
+  const currentAvatar =
+    riderProfile.avatarType === 'upload' && imageUri
+      ? { imageUri }
+      : riderProfile.avatarIcon
+        ? { emoji: riderProfile.avatarIcon.emoji, backgroundColor: riderProfile.avatarIcon.bg }
+        : { emoji: '🛹' };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      edges={['top']}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <Pressable
@@ -223,9 +217,7 @@ export default function EditProfileScreen() {
         >
           <Ionicons name="close" size={24} color={theme.text} />
         </Pressable>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>
-          Edit Profile
-        </Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Edit Profile</Text>
         <Pressable
           style={[
             styles.saveButton,
@@ -254,9 +246,7 @@ export default function EditProfileScreen() {
         >
           {/* Profile Picture Section */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Profile Picture
-            </Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Profile Picture</Text>
             <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
               Upload a photo or choose an icon
             </Text>
@@ -275,9 +265,7 @@ export default function EditProfileScreen() {
                   onPress={handlePickImage}
                 >
                   <Ionicons name="camera-outline" size={18} color={theme.text} />
-                  <Text style={[styles.uploadButtonText, { color: theme.text }]}>
-                    Upload Photo
-                  </Text>
+                  <Text style={[styles.uploadButtonText, { color: theme.text }]}>Upload Photo</Text>
                 </Pressable>
 
                 <View style={styles.iconGrid}>
@@ -305,15 +293,11 @@ export default function EditProfileScreen() {
 
           {/* Basic Info Section */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Basic Info
-            </Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Basic Info</Text>
 
             {/* Name */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: theme.textSecondary }]}>
-                Name
-              </Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>Name</Text>
               <TextInput
                 style={[
                   styles.input,
@@ -332,9 +316,7 @@ export default function EditProfileScreen() {
 
             {/* Email (read-only) */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: theme.textSecondary }]}>
-                Email
-              </Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>Email</Text>
               <View
                 style={[
                   styles.input,
@@ -357,9 +339,7 @@ export default function EditProfileScreen() {
             {/* Nickname & Rider Style row */}
             <View style={styles.row}>
               <View style={[styles.inputGroup, styles.flex1]}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>
-                  Nickname
-                </Text>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>Nickname</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -377,9 +357,7 @@ export default function EditProfileScreen() {
               </View>
 
               <View style={[styles.inputGroup, styles.flex1]}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>
-                  Rider Style
-                </Text>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>Rider Style</Text>
                 <Pressable
                   style={[
                     styles.input,
@@ -393,18 +371,12 @@ export default function EditProfileScreen() {
                 >
                   <Text
                     style={{
-                      color: riderProfile.riderStyle
-                        ? theme.text
-                        : theme.textSecondary,
+                      color: riderProfile.riderStyle ? theme.text : theme.textSecondary,
                     }}
                   >
                     {riderProfile.riderStyle || 'Select style...'}
                   </Text>
-                  <Ionicons
-                    name="chevron-down"
-                    size={18}
-                    color={theme.textSecondary}
-                  />
+                  <Ionicons name="chevron-down" size={18} color={theme.textSecondary} />
                 </Pressable>
               </View>
             </View>
@@ -423,7 +395,7 @@ export default function EditProfileScreen() {
                     style={[
                       styles.pickerOption,
                       riderProfile.riderStyle === style && {
-                        backgroundColor: colors.primary + '20',
+                        backgroundColor: `${colors.primary}20`,
                       },
                     ]}
                     onPress={() => {
@@ -433,10 +405,7 @@ export default function EditProfileScreen() {
                   >
                     <Text
                       style={{
-                        color:
-                          riderProfile.riderStyle === style
-                            ? colors.primary
-                            : theme.text,
+                        color: riderProfile.riderStyle === style ? colors.primary : theme.text,
                       }}
                     >
                       {style}
@@ -448,9 +417,7 @@ export default function EditProfileScreen() {
 
             {/* Motto */}
             <View style={styles.inputGroup}>
-              <Text style={[styles.label, { color: theme.textSecondary }]}>
-                Motto
-              </Text>
+              <Text style={[styles.label, { color: theme.textSecondary }]}>Motto</Text>
               <TextInput
                 style={[
                   styles.input,
@@ -470,9 +437,7 @@ export default function EditProfileScreen() {
 
           {/* Sports Section */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Sports
-            </Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Sports</Text>
             <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
               Select all the sports you ride
             </Text>
@@ -486,9 +451,7 @@ export default function EditProfileScreen() {
                     style={[
                       styles.sportOption,
                       {
-                        backgroundColor: isSelected
-                          ? colors.primary + '20'
-                          : theme.surface,
+                        backgroundColor: isSelected ? `${colors.primary}20` : theme.surface,
                         borderColor: isSelected ? colors.primary : theme.border,
                       },
                     ]}
@@ -511,9 +474,7 @@ export default function EditProfileScreen() {
 
           {/* Rider Details Section */}
           <View style={styles.section}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Rider Details
-            </Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Rider Details</Text>
             <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
               Optional fun stuff for your profile
             </Text>
@@ -521,9 +482,7 @@ export default function EditProfileScreen() {
             {/* Age & Nationality */}
             <View style={styles.row}>
               <View style={[styles.inputGroup, styles.flex1]}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>
-                  Age
-                </Text>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>Age</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -542,9 +501,7 @@ export default function EditProfileScreen() {
               </View>
 
               <View style={[styles.inputGroup, styles.flex1]}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>
-                  Nationality
-                </Text>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>Nationality</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -565,9 +522,7 @@ export default function EditProfileScreen() {
             {/* Sickest Trick & Alternate Sport */}
             <View style={styles.row}>
               <View style={[styles.inputGroup, styles.flex1]}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>
-                  Sickest Trick
-                </Text>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>Sickest Trick</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -585,9 +540,7 @@ export default function EditProfileScreen() {
               </View>
 
               <View style={[styles.inputGroup, styles.flex1]}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>
-                  Alternate Sport
-                </Text>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>Alternate Sport</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -651,9 +604,7 @@ export default function EditProfileScreen() {
             {/* Dream Date & Favorite Movie */}
             <View style={styles.row}>
               <View style={[styles.inputGroup, styles.flex1]}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>
-                  Dream Date
-                </Text>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>Dream Date</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -671,9 +622,7 @@ export default function EditProfileScreen() {
               </View>
 
               <View style={[styles.inputGroup, styles.flex1]}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>
-                  Favorite Movie
-                </Text>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>Favorite Movie</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -694,9 +643,7 @@ export default function EditProfileScreen() {
             {/* Favorite Music & Reading */}
             <View style={styles.row}>
               <View style={[styles.inputGroup, styles.flex1]}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>
-                  Favorite Music
-                </Text>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>Favorite Music</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -714,9 +661,7 @@ export default function EditProfileScreen() {
               </View>
 
               <View style={[styles.inputGroup, styles.flex1]}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>
-                  Favorite Reading
-                </Text>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>Favorite Reading</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -737,9 +682,7 @@ export default function EditProfileScreen() {
             {/* Favorite Spot & Other Hobbies */}
             <View style={styles.row}>
               <View style={[styles.inputGroup, styles.flex1]}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>
-                  Favorite Spot
-                </Text>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>Favorite Spot</Text>
                 <TextInput
                   style={[
                     styles.input,
@@ -757,9 +700,7 @@ export default function EditProfileScreen() {
               </View>
 
               <View style={[styles.inputGroup, styles.flex1]}>
-                <Text style={[styles.label, { color: theme.textSecondary }]}>
-                  Other Hobbies
-                </Text>
+                <Text style={[styles.label, { color: theme.textSecondary }]}>Other Hobbies</Text>
                 <TextInput
                   style={[
                     styles.input,

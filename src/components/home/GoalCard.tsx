@@ -6,11 +6,10 @@
  * Shows: Trick name, status badge, progress bar, "update" button
  */
 
-import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Card } from '@/components/ui/Card';
 import { ProgressBar } from '@/components/ui/ProgressBar';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 type TrickStatus = 'notStarted' | 'learning' | 'landed' | 'mastered';
 
@@ -21,12 +20,7 @@ interface GoalCardProps {
   onUpdate?: () => void;
 }
 
-export function GoalCard({
-  trickName,
-  status,
-  progress = 0,
-  onUpdate,
-}: GoalCardProps) {
+export function GoalCard({ trickName, status, progress = 0, onUpdate }: GoalCardProps) {
   const { theme, colors } = useThemeContext();
 
   const getStatusConfig = () => {
@@ -37,7 +31,6 @@ export function GoalCard({
         return { label: 'Landed!', color: colors.status.landed };
       case 'learning':
         return { label: 'Learning', color: colors.status.learning };
-      case 'notStarted':
       default:
         return { label: 'Not Started', color: colors.status.notStarted };
     }
@@ -46,22 +39,14 @@ export function GoalCard({
   const statusConfig = getStatusConfig();
 
   return (
-    <Card
-      style={styles.card}
-      padding="md"
-    >
+    <Card style={styles.card} padding="md">
       {/* Trick Name */}
-      <Text
-        style={[styles.trickName, { color: theme.text }]}
-        numberOfLines={1}
-      >
+      <Text style={[styles.trickName, { color: theme.text }]} numberOfLines={1}>
         {trickName}
       </Text>
 
       {/* Status Label */}
-      <Text style={[styles.statusLabel, { color: statusConfig.color }]}>
-        {statusConfig.label}
-      </Text>
+      <Text style={[styles.statusLabel, { color: statusConfig.color }]}>{statusConfig.label}</Text>
 
       {/* Progress Bar */}
       <View style={styles.progressContainer}>

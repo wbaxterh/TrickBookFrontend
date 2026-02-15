@@ -5,11 +5,10 @@
  * Shows: list name, progress (X/Y Landed), gold progress bar, chevron
  */
 
-import React from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { TrickList, calculateProgress } from '@/types/trickbook';
+import { calculateProgress, type TrickList } from '@/types/trickbook';
 
 interface TrickListCardProps {
   list: TrickList;
@@ -20,15 +19,11 @@ export function TrickListCard({ list, onPress }: TrickListCardProps) {
   const { theme, colors } = useThemeContext();
 
   const progress = calculateProgress(list.tricks || []);
-  const progressPercent = progress.total > 0
-    ? ((progress.landed + progress.mastered) / progress.total) * 100
-    : 0;
+  const progressPercent =
+    progress.total > 0 ? ((progress.landed + progress.mastered) / progress.total) * 100 : 0;
 
   return (
-    <Pressable
-      style={[styles.container, { backgroundColor: theme.surface }]}
-      onPress={onPress}
-    >
+    <Pressable style={[styles.container, { backgroundColor: theme.surface }]} onPress={onPress}>
       <View style={styles.content}>
         <Text style={[styles.name, { color: theme.text }]} numberOfLines={1}>
           {list.name}

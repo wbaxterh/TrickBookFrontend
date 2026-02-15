@@ -3,8 +3,8 @@
  * Functions for curated action sports films, documentaries, and edits
  */
 
-import { apiClient } from './client';
 import { ENDPOINTS } from '@/constants/api';
+import { apiClient } from './client';
 
 // Types matching backend schema
 export interface CouchVideo {
@@ -73,18 +73,20 @@ export interface StreamUrlResponse {
   thumbnailUrl?: string;
   // Google Drive fields
   streamUrl?: string;
-  embedUrl?: string;  // Use this for WebView playback
+  embedUrl?: string; // Use this for WebView playback
 }
 
 /**
  * Get all videos (with optional filters)
  */
-export async function getVideos(params: {
-  sport?: string;
-  collection?: string;
-  sort?: 'createdAt' | 'title' | 'releaseYear' | 'popular';
-  limit?: number;
-} = {}): Promise<CouchVideo[]> {
+export async function getVideos(
+  params: {
+    sport?: string;
+    collection?: string;
+    sort?: 'createdAt' | 'title' | 'releaseYear' | 'popular';
+    limit?: number;
+  } = {},
+): Promise<CouchVideo[]> {
   try {
     const queryParams = new URLSearchParams();
     if (params.sport && params.sport !== 'all') queryParams.append('sport', params.sport);
@@ -99,8 +101,7 @@ export async function getVideos(params: {
 
     const response = await apiClient.get<CouchVideo[]>(endpoint, { skipAuth: true });
     return response;
-  } catch (error) {
-    console.error('Error getting videos:', error);
+  } catch (_error) {
     return [];
   }
 }
@@ -110,10 +111,11 @@ export async function getVideos(params: {
  */
 export async function getVideo(videoId: string): Promise<CouchVideo | null> {
   try {
-    const response = await apiClient.get<CouchVideo>(ENDPOINTS.couch.video(videoId), { skipAuth: true });
+    const response = await apiClient.get<CouchVideo>(ENDPOINTS.couch.video(videoId), {
+      skipAuth: true,
+    });
     return response;
-  } catch (error) {
-    console.error('Error getting video:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -124,10 +126,11 @@ export async function getVideo(videoId: string): Promise<CouchVideo | null> {
  */
 export async function getStreamUrl(videoId: string): Promise<StreamUrlResponse | null> {
   try {
-    const response = await apiClient.get<StreamUrlResponse>(ENDPOINTS.couch.stream(videoId), { skipAuth: true });
+    const response = await apiClient.get<StreamUrlResponse>(ENDPOINTS.couch.stream(videoId), {
+      skipAuth: true,
+    });
     return response;
-  } catch (error) {
-    console.error('Error getting stream URL:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -139,8 +142,7 @@ export async function getFeatured(): Promise<CouchVideo | null> {
   try {
     const response = await apiClient.get<CouchVideo>(ENDPOINTS.couch.featured, { skipAuth: true });
     return response;
-  } catch (error) {
-    console.error('Error getting featured:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -160,8 +162,7 @@ export async function getCollections(sport?: string): Promise<CouchCollection[]>
 
     const response = await apiClient.get<CouchCollection[]>(endpoint, { skipAuth: true });
     return response;
-  } catch (error) {
-    console.error('Error getting collections:', error);
+  } catch (_error) {
     return [];
   }
 }
@@ -173,11 +174,10 @@ export async function getCollection(collectionId: string): Promise<CouchCollecti
   try {
     const response = await apiClient.get<CouchCollection>(
       ENDPOINTS.couch.collection(collectionId),
-      { skipAuth: true }
+      { skipAuth: true },
     );
     return response;
-  } catch (error) {
-    console.error('Error getting collection:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -185,14 +185,15 @@ export async function getCollection(collectionId: string): Promise<CouchCollecti
 /**
  * Get user's reactions on a video
  */
-export async function getUserReaction(videoId: string): Promise<{ love: boolean; respect: boolean } | null> {
+export async function getUserReaction(
+  videoId: string,
+): Promise<{ love: boolean; respect: boolean } | null> {
   try {
     const response = await apiClient.get<{ love: boolean; respect: boolean }>(
-      ENDPOINTS.couch.reaction(videoId)
+      ENDPOINTS.couch.reaction(videoId),
     );
     return response;
-  } catch (error) {
-    console.error('Error getting user reaction:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -204,8 +205,7 @@ export async function addReaction(videoId: string, type: 'love' | 'respect'): Pr
   try {
     await apiClient.post(ENDPOINTS.couch.reaction(videoId), { type });
     return true;
-  } catch (error) {
-    console.error('Error adding reaction:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -217,8 +217,7 @@ export async function removeReaction(videoId: string, type: 'love' | 'respect'):
   try {
     await apiClient.delete(ENDPOINTS.couch.removeReaction(videoId, type));
     return true;
-  } catch (error) {
-    console.error('Error removing reaction:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -239,10 +238,16 @@ export interface CouchComment {
   createdAt: string;
 }
 
-export async function getComments(videoId: string, params: {
-  page?: number;
-  limit?: number;
-} = {}): Promise<{ comments: CouchComment[]; pagination: { page: number; limit: number; total: number; hasMore: boolean } }> {
+export async function getComments(
+  videoId: string,
+  params: {
+    page?: number;
+    limit?: number;
+  } = {},
+): Promise<{
+  comments: CouchComment[];
+  pagination: { page: number; limit: number; total: number; hasMore: boolean };
+}> {
   try {
     const queryParams = new URLSearchParams();
     if (params.page) queryParams.append('page', params.page.toString());
@@ -253,13 +258,12 @@ export async function getComments(videoId: string, params: {
       ? `${ENDPOINTS.couch.comments(videoId)}?${queryString}`
       : ENDPOINTS.couch.comments(videoId);
 
-    const response = await apiClient.get<{ comments: CouchComment[]; pagination: { page: number; limit: number; total: number; hasMore: boolean } }>(
-      endpoint,
-      { skipAuth: true }
-    );
+    const response = await apiClient.get<{
+      comments: CouchComment[];
+      pagination: { page: number; limit: number; total: number; hasMore: boolean };
+    }>(endpoint, { skipAuth: true });
     return response;
-  } catch (error) {
-    console.error('Error getting comments:', error);
+  } catch (_error) {
     return { comments: [], pagination: { page: 1, limit: 20, total: 0, hasMore: false } };
   }
 }
@@ -267,15 +271,18 @@ export async function getComments(videoId: string, params: {
 /**
  * Add comment to a video
  */
-export async function addComment(videoId: string, content: string, parentCommentId?: string): Promise<CouchComment | null> {
+export async function addComment(
+  videoId: string,
+  content: string,
+  parentCommentId?: string,
+): Promise<CouchComment | null> {
   try {
-    const response = await apiClient.post<CouchComment>(
-      ENDPOINTS.couch.comments(videoId),
-      { content, parentCommentId }
-    );
+    const response = await apiClient.post<CouchComment>(ENDPOINTS.couch.comments(videoId), {
+      content,
+      parentCommentId,
+    });
     return response;
-  } catch (error) {
-    console.error('Error adding comment:', error);
+  } catch (_error) {
     return null;
   }
 }

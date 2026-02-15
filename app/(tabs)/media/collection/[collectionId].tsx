@@ -3,30 +3,30 @@
  * Shows all videos in a collection from The Couch
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  FlatList,
-  Pressable,
-  Image,
   ActivityIndicator,
+  FlatList,
+  Image,
+  Pressable,
   StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
-import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import {
-  getCollection,
-  MediaCollection,
-  MediaVideo,
-  getTypeLabel,
   formatDuration,
+  getCollection,
+  getTypeLabel,
+  type MediaCollection,
+  type MediaVideo,
 } from '@/lib/api/couch';
+import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 const YELLOW = '#FCF150';
-const DARK = '#1a1a1a';
+const _DARK = '#1a1a1a';
 
 export default function CollectionDetailScreen() {
   const { collectionId } = useLocalSearchParams<{ collectionId: string }>();
@@ -41,8 +41,7 @@ export default function CollectionDetailScreen() {
     try {
       const data = await getCollection(collectionId);
       setCollection(data);
-    } catch (error) {
-      console.error('Error fetching collection:', error);
+    } catch (_error) {
     } finally {
       setLoading(false);
     }
@@ -54,7 +53,10 @@ export default function CollectionDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={YELLOW} />
         </View>
@@ -64,7 +66,10 @@ export default function CollectionDetailScreen() {
 
   if (!collection) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.header}>
           <Pressable
             style={[styles.backButton, { backgroundColor: theme.surface }]}
@@ -113,9 +118,7 @@ export default function CollectionDetailScreen() {
                   <Ionicons name="film-outline" size={48} color={theme.textSecondary} />
                 </View>
               )}
-              <Text style={[styles.collectionTitle, { color: theme.text }]}>
-                {collection.name}
-              </Text>
+              <Text style={[styles.collectionTitle, { color: theme.text }]}>{collection.name}</Text>
               {collection.description && (
                 <Text style={[styles.collectionDescription, { color: theme.textSecondary }]}>
                   {collection.description}
@@ -135,13 +138,13 @@ export default function CollectionDetailScreen() {
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
             <Ionicons name="film-outline" size={48} color={theme.textSecondary} />
-            <Text style={[styles.emptyText, { color: theme.text }]}>No videos in this collection</Text>
+            <Text style={[styles.emptyText, { color: theme.text }]}>
+              No videos in this collection
+            </Text>
           </View>
         }
         ItemSeparatorComponent={() => <View style={styles.separator} />}
-        renderItem={({ item }) => (
-          <VideoListItem video={item} theme={theme} colors={colors} />
-        )}
+        renderItem={({ item }) => <VideoListItem video={item} theme={theme} colors={colors} />}
       />
     </SafeAreaView>
   );

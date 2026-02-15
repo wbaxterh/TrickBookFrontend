@@ -3,8 +3,8 @@
  * Functions for managing spot reviews and ratings
  */
 
-import { apiClient } from './client';
 import { ENDPOINTS } from '@/constants/api';
+import { apiClient } from './client';
 
 // Types
 export interface ReviewUser {
@@ -68,7 +68,7 @@ export interface UpdateReviewData {
  */
 export async function getSpotReviews(
   spotId: string,
-  params: { page?: number; limit?: number; sort?: string } = {}
+  params: { page?: number; limit?: number; sort?: string } = {},
 ): Promise<SpotReviewsResponse> {
   try {
     const queryParams = new URLSearchParams();
@@ -83,8 +83,7 @@ export async function getSpotReviews(
 
     const response = await apiClient.get<SpotReviewsResponse>(endpoint, { skipAuth: true });
     return response;
-  } catch (error) {
-    console.error('Error fetching spot reviews:', error);
+  } catch (_error) {
     return {
       reviews: [],
       ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
@@ -107,7 +106,6 @@ export async function createSpotReview(data: CreateReviewData): Promise<SpotRevi
     const response = await apiClient.post<SpotReview>(ENDPOINTS.spotReviews.create, data);
     return response;
   } catch (error: any) {
-    console.error('Error creating review:', error);
     // Rethrow with message for UI to display
     if (error.message) {
       throw new Error(error.message);
@@ -121,16 +119,12 @@ export async function createSpotReview(data: CreateReviewData): Promise<SpotRevi
  */
 export async function updateSpotReview(
   reviewId: string,
-  data: UpdateReviewData
+  data: UpdateReviewData,
 ): Promise<SpotReview | null> {
   try {
-    const response = await apiClient.put<SpotReview>(
-      ENDPOINTS.spotReviews.update(reviewId),
-      data
-    );
+    const response = await apiClient.put<SpotReview>(ENDPOINTS.spotReviews.update(reviewId), data);
     return response;
-  } catch (error) {
-    console.error('Error updating review:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -142,8 +136,7 @@ export async function deleteSpotReview(reviewId: string): Promise<boolean> {
   try {
     await apiClient.delete(ENDPOINTS.spotReviews.delete(reviewId));
     return true;
-  } catch (error) {
-    console.error('Error deleting review:', error);
+  } catch (_error) {
     return false;
   }
 }
@@ -152,16 +145,15 @@ export async function deleteSpotReview(reviewId: string): Promise<boolean> {
  * Toggle helpful mark on a review
  */
 export async function toggleReviewHelpful(
-  reviewId: string
+  reviewId: string,
 ): Promise<{ helpful: boolean; helpfulCount: number } | null> {
   try {
     const response = await apiClient.post<{ helpful: boolean; helpfulCount: number }>(
       ENDPOINTS.spotReviews.helpful(reviewId),
-      {}
+      {},
     );
     return response;
-  } catch (error) {
-    console.error('Error toggling helpful:', error);
+  } catch (_error) {
     return null;
   }
 }
@@ -171,7 +163,7 @@ export async function toggleReviewHelpful(
  */
 export async function getUserReviews(
   userId: string,
-  params: { page?: number; limit?: number } = {}
+  params: { page?: number; limit?: number } = {},
 ): Promise<{ reviews: (SpotReview & { spot?: any })[]; pagination: any }> {
   try {
     const queryParams = new URLSearchParams();
@@ -183,13 +175,11 @@ export async function getUserReviews(
       ? `${ENDPOINTS.spotReviews.byUser(userId)}?${queryString}`
       : ENDPOINTS.spotReviews.byUser(userId);
 
-    const response = await apiClient.get<{ reviews: SpotReview[]; pagination: any }>(
-      endpoint,
-      { skipAuth: true }
-    );
+    const response = await apiClient.get<{ reviews: SpotReview[]; pagination: any }>(endpoint, {
+      skipAuth: true,
+    });
     return response;
-  } catch (error) {
-    console.error('Error fetching user reviews:', error);
+  } catch (_error) {
     return {
       reviews: [],
       pagination: {

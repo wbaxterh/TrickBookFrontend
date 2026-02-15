@@ -3,25 +3,31 @@
  * Shows the user's own posts with edit/delete functionality
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  FlatList,
-  Pressable,
-  Image,
   ActivityIndicator,
-  StyleSheet,
-  Dimensions,
   Alert,
+  Dimensions,
+  FlatList,
+  Image,
+  Pressable,
   RefreshControl,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  deletePost,
+  type FeedPost,
+  formatCount,
+  formatTimeAgo,
+  getUserPosts,
+} from '@/lib/api/feed';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
-import { getUserPosts, deletePost, FeedPost, formatTimeAgo, formatCount } from '@/lib/api/feed';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const GRID_GAP = 2;
@@ -43,25 +49,27 @@ export default function MyPostsScreen() {
   const [selectedPost, setSelectedPost] = useState<FeedPost | null>(null);
   const [showActionSheet, setShowActionSheet] = useState(false);
 
-  const fetchPosts = useCallback(async (pageNum: number = 1, refresh: boolean = false) => {
-    if (!user?.id) return;
+  const fetchPosts = useCallback(
+    async (pageNum: number = 1, refresh: boolean = false) => {
+      if (!user?.id) return;
 
-    try {
-      const response = await getUserPosts(user.id, { page: pageNum, limit: 30 });
+      try {
+        const response = await getUserPosts(user.id, { page: pageNum, limit: 30 });
 
-      if (refresh || pageNum === 1) {
-        setPosts(response.posts);
-      } else {
-        setPosts((prev) => [...prev, ...response.posts]);
+        if (refresh || pageNum === 1) {
+          setPosts(response.posts);
+        } else {
+          setPosts((prev) => [...prev, ...response.posts]);
+        }
+        setHasMore(response.pagination.hasMore ?? response.posts.length === 30);
+        setPage(pageNum);
+      } catch (_error) {
+      } finally {
+        setLoading(false);
       }
-      setHasMore(response.pagination.hasMore ?? response.posts.length === 30);
-      setPage(pageNum);
-    } catch (error) {
-      console.error('Error fetching user posts:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.id]);
+    },
+    [user?.id],
+  );
 
   useEffect(() => {
     fetchPosts(1, true);
@@ -106,7 +114,7 @@ export default function MyPostsScreen() {
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -127,16 +135,9 @@ export default function MyPostsScreen() {
     const thumbnailUrl = item.thumbnailUrl || item.imageUrls?.[0];
 
     return (
-      <Pressable
-        style={styles.gridItem}
-        onPress={() => handlePostPress(item)}
-      >
+      <Pressable style={styles.gridItem} onPress={() => handlePostPress(item)}>
         {thumbnailUrl ? (
-          <Image
-            source={{ uri: thumbnailUrl }}
-            style={styles.gridImage}
-            resizeMode="cover"
-          />
+          <Image source={{ uri: thumbnailUrl }} style={styles.gridImage} resizeMode="cover" />
         ) : (
           <View style={[styles.gridImage, styles.gridPlaceholder]}>
             <Ionicons
@@ -171,7 +172,10 @@ export default function MyPostsScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top']}
+      >
         <View style={styles.header}>
           <Pressable
             style={[styles.backButton, { backgroundColor: theme.surface }]}
@@ -300,10 +304,7 @@ export default function MyPostsScreen() {
                 <Text style={[styles.actionButtonText, { color: theme.text }]}>Edit Post</Text>
               </Pressable>
 
-              <Pressable
-                style={[styles.actionButton, styles.deleteButton]}
-                onPress={handleDelete}
-              >
+              <Pressable style={[styles.actionButton, styles.deleteButton]} onPress={handleDelete}>
                 <Ionicons name="trash-outline" size={20} color="#ef4444" />
                 <Text style={[styles.actionButtonText, { color: '#ef4444' }]}>Delete Post</Text>
               </Pressable>

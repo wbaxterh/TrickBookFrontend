@@ -5,20 +5,13 @@
  * Aligns with Website settings Profile/Billing tabs
  */
 
-import { View, Text, ScrollView, Pressable, Alert, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Avatar, Button, SettingsDivider, SettingsGroup, SettingsItem } from '@/components/ui';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
-import {
-  Avatar,
-  Button,
-  Card,
-  SettingsItem,
-  SettingsDivider,
-  SettingsGroup,
-} from '@/components/ui';
 
 export default function AccountScreen() {
   const { theme, colors } = useThemeContext();
@@ -34,7 +27,7 @@ export default function AccountScreen() {
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Upgrade', onPress: () => {} },
-      ]
+      ],
     );
   };
 
@@ -51,22 +44,15 @@ export default function AccountScreen() {
             // TODO: Implement account deletion
           },
         },
-      ]
+      ],
     );
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      edges={['top']}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Pressable
-          style={styles.backButton}
-          onPress={() => router.back()}
-          hitSlop={8}
-        >
+        <Pressable style={styles.backButton} onPress={() => router.back()} hitSlop={8}>
           <Ionicons name="arrow-back" size={24} color={theme.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Account</Text>
@@ -87,9 +73,7 @@ export default function AccountScreen() {
             emoji="🛹"
             isVerified={isPremium}
           />
-          <Text style={[styles.userName, { color: theme.text }]}>
-            {user?.name || 'Rider'}
-          </Text>
+          <Text style={[styles.userName, { color: theme.text }]}>{user?.name || 'Rider'}</Text>
           <Text style={[styles.userEmail, { color: theme.textSecondary }]}>
             {user?.email || 'email@example.com'}
           </Text>
@@ -117,9 +101,7 @@ export default function AccountScreen() {
                   <Text style={[styles.planName, { color: theme.text }]}>
                     {isPremium ? 'TrickBook Plus' : 'Free Plan'}
                   </Text>
-                  <Text
-                    style={[styles.planStatus, { color: theme.textSecondary }]}
-                  >
+                  <Text style={[styles.planStatus, { color: theme.textSecondary }]}>
                     {isPremium ? 'Active subscription' : 'Limited features'}
                   </Text>
                 </View>
@@ -128,24 +110,16 @@ export default function AccountScreen() {
 
             {!isPremium && (
               <>
-                <View
-                  style={[styles.divider, { backgroundColor: theme.border }]}
-                />
+                <View style={[styles.divider, { backgroundColor: theme.border }]} />
                 <View style={styles.upgradeSection}>
-                  <Text style={[styles.upgradeTitle, { color: theme.text }]}>
-                    Upgrade to Plus
-                  </Text>
+                  <Text style={[styles.upgradeTitle, { color: theme.text }]}>Upgrade to Plus</Text>
                   <View style={styles.featureList}>
                     <FeatureItem text="Unlimited spot lists" theme={theme} colors={colors} />
                     <FeatureItem text="Unlimited spots per list" theme={theme} colors={colors} />
                     <FeatureItem text="Verified badge" theme={theme} colors={colors} />
                     <FeatureItem text="Priority support" theme={theme} colors={colors} />
                   </View>
-                  <Button
-                    variant="primary"
-                    fullWidth
-                    onPress={handleUpgrade}
-                  >
+                  <Button variant="primary" fullWidth onPress={handleUpgrade}>
                     Upgrade - $10/month
                   </Button>
                 </View>
@@ -154,9 +128,7 @@ export default function AccountScreen() {
 
             {isPremium && (
               <>
-                <View
-                  style={[styles.divider, { backgroundColor: theme.border }]}
-                />
+                <View style={[styles.divider, { backgroundColor: theme.border }]} />
                 <Pressable
                   style={styles.manageButton}
                   onPress={() => {
@@ -166,11 +138,7 @@ export default function AccountScreen() {
                   <Text style={[styles.manageText, { color: colors.primary }]}>
                     Manage Subscription
                   </Text>
-                  <Ionicons
-                    name="chevron-forward"
-                    size={20}
-                    color={colors.primary}
-                  />
+                  <Ionicons name="chevron-forward" size={20} color={colors.primary} />
                 </Pressable>
               </>
             )}
