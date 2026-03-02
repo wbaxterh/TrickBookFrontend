@@ -177,17 +177,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const userJson = await SecureStore.getItemAsync(USER_KEY);
 
       if (token && userJson) {
-        const user = JSON.parse(userJson) as User;
+        let user: User;
+        try {
+          user = JSON.parse(userJson) as User;
+        } catch (_parseError) {
+          // Only clear user data if JSON is actually corrupted, keep the token
+          await SecureStore.deleteItemAsync(USER_KEY);
+          set({ isLoading: false });
+          return;
+        }
+
         set({ user, token, isAuthenticated: true });
 
-        // Optionally refresh user data in background
-        get().refreshUser().catch(console.error);
-      } else {
+        // Refresh user data in background — don't let failures affect auth state
+        get()
+          .refreshUser()
+          .catch(() => {});
       }
     } catch (_error) {
-      // Clear potentially corrupted data
-      await SecureStore.deleteItemAsync(TOKEN_KEY);
-      await SecureStore.deleteItemAsync(USER_KEY);
+      // SecureStore read failed (transient iOS Keychain error) —
+      // do NOT wipe credentials, just proceed as unauthenticated for this session
     } finally {
       set({ isLoading: false });
     }
@@ -206,8 +215,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       set({ user });
     } catch (error: any) {
-      // If unauthorized, clear auth state
-      if (error?.status === 401 || error?.status === 403) {
+      // Only logout on 403 (forbidden) — a clear signal the account is blocked/deleted.
+      // Don't logout on 401 because transient token read failures or network issues
+      // can cause false 401s, permanently locking the user out.
+      if (error?.status === 403) {
         get().logout();
       }
     }
