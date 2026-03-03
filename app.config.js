@@ -41,7 +41,7 @@ export default {
     ios: {
       supportsTablet: true,
       bundleIdentifier: 'com.thetrickbook.trickbook',
-      buildNumber: '5',
+      buildNumber: '6',
       config: {
         googleMapsApiKey: GOOGLE_MAPS_API_KEY,
       },
@@ -55,7 +55,7 @@ export default {
     },
     android: {
       package: 'com.thetrickbook.trickbook',
-      versionCode: 5,
+      versionCode: 6,
       adaptiveIcon: {
         foregroundImage: './assets/images/adaptive-icon.png',
         backgroundColor: '#121212',
