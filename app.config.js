@@ -28,6 +28,12 @@ export default {
             'TrickBook uses your location to find nearby spots and show directions.',
         },
       ],
+      [
+        '@react-native-google-signin/google-signin',
+        {
+          iosUrlScheme: 'com.googleusercontent.apps.624774098704-r7eqvb0jc4i3or885fk3k1u3l5uqlqmd',
+        },
+      ],
     ],
     splash: {
       image: './assets/images/splash.png',

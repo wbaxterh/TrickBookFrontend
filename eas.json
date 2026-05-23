@@ -61,6 +61,7 @@
     "production": {},
     "playstore": {
       "android": {
+        "serviceAccountKeyPath": "../../secrets/trickbook-0fd5cf54c409.json",
         "track": "internal",
         "releaseStatus": "draft"
       }

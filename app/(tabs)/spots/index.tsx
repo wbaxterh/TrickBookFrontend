@@ -489,38 +489,22 @@ export default function SpotsScreen() {
                     }}
                     anchor={{ x: 0.5, y: 1 }}
                   >
-                    <Pressable
-                      style={styles.markerTouchable}
-                      onPress={() => {
-                        setSelectedSpot(spot);
-                        mapRef.current?.animateToRegion(
+                    <View style={styles.markerContainer}>
+                      <View
+                        style={[
+                          styles.marker,
                           {
-                            latitude: spot.latitude,
-                            longitude: spot.longitude,
-                            latitudeDelta: 0.05,
-                            longitudeDelta: 0.05,
+                            backgroundColor: YELLOW,
+                            borderColor: selectedSpot?._id === spot._id ? DARK : '#B8A800',
+                            borderWidth: selectedSpot?._id === spot._id ? 3 : 2,
+                            transform: [{ scale: selectedSpot?._id === spot._id ? 1.2 : 1 }],
                           },
-                          300,
-                        );
-                      }}
-                    >
-                      <View style={styles.markerContainer}>
-                        <View
-                          style={[
-                            styles.marker,
-                            {
-                              backgroundColor: YELLOW,
-                              borderColor: selectedSpot?._id === spot._id ? DARK : '#B8A800',
-                              borderWidth: selectedSpot?._id === spot._id ? 3 : 2,
-                              transform: [{ scale: selectedSpot?._id === spot._id ? 1.2 : 1 }],
-                            },
-                          ]}
-                        >
-                          <Ionicons name="location" size={18} color={DARK} />
-                        </View>
-                        <View style={[styles.markerPoint, { borderTopColor: YELLOW }]} />
+                        ]}
+                      >
+                        <Ionicons name="location" size={18} color={DARK} />
                       </View>
-                    </Pressable>
+                      <View style={[styles.markerPoint, { borderTopColor: YELLOW }]} />
+                    </View>
                   </Marker>
                 ))}
               </MapView>
@@ -1259,11 +1243,9 @@ const styles = StyleSheet.create({
     shadowRadius: 5,
     elevation: 6,
   },
-  markerTouchable: {
-    padding: 10,
-  },
   markerContainer: {
     alignItems: 'center',
+    padding: 4,
   },
   marker: {
     width: 40,
@@ -1272,11 +1254,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.4,
-    shadowRadius: 4,
-    elevation: 8,
   },
   markerPoint: {
     width: 0,

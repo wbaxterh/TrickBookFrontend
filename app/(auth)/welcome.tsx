@@ -5,10 +5,13 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import {
+  GoogleSignin,
+  isErrorWithCode,
+  statusCodes,
+} from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import * as Google from 'expo-auth-session/providers/google';
 import { router } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -27,16 +30,11 @@ import { getUserCount } from '@/lib/api/user';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
 
-// Complete auth session for web browser redirects
-WebBrowser.maybeCompleteAuthSession();
-
-// Google OAuth Client IDs - Replace with your actual client IDs from Google Cloud Console
-const GOOGLE_CONFIG = {
-  expoClientId: 'YOUR_EXPO_CLIENT_ID.apps.googleusercontent.com',
+// Configure Google Sign-In with the web client ID (used for ID token audience)
+GoogleSignin.configure({
   iosClientId: '624774098704-r7eqvb0jc4i3or885fk3k1u3l5uqlqmd.apps.googleusercontent.com',
-  androidClientId: '624774098704-a40nro8bfkcof849onrsb0uhuebpe5eh.apps.googleusercontent.com',
-  webClientId: '624774098704-j2q01j9g7pj41f8poqbvkvho9f7v3mco.apps.googleusercontent.com', // Same as backend GOOGLE_CLIENT_ID
-};
+  webClientId: '624774098704-j2q01j9g7pj41f8poqbvkvho9f7v3mco.apps.googleusercontent.com',
+});
 
 // Format number with K/M suffix
 function formatCount(count: number): string {
@@ -56,44 +54,37 @@ export default function WelcomeScreen() {
   const [isAppleLoading, setIsAppleLoading] = useState(false);
   const { setToken, setUser } = useAuthStore();
 
-  // Set up Google OAuth request
-  const [request, response, promptAsync] = Google.useIdTokenAuthRequest({
-    clientId: GOOGLE_CONFIG.webClientId,
-    iosClientId: GOOGLE_CONFIG.iosClientId,
-    androidClientId: GOOGLE_CONFIG.androidClientId,
-  });
-
-  // Handle Google OAuth response
-  useEffect(() => {
-    if (response?.type === 'success') {
-      const { id_token } = response.params;
-      handleGoogleSignIn(id_token);
-    } else if (response?.type === 'error') {
-      setIsGoogleLoading(false);
-      Alert.alert('Error', 'Google sign-in failed. Please try again.');
-    }
-  }, [response]);
-
-  // Send ID token to backend
-  const handleGoogleSignIn = async (idToken: string) => {
-    try {
-      const { token, user } = await googleSignIn(idToken);
-      setToken(token);
-      setUser(user);
-      router.replace('/(tabs)');
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to sign in with Google');
-    } finally {
-      setIsGoogleLoading(false);
-    }
-  };
-
-  // Trigger Google sign-in
+  // Trigger native Google sign-in
   const onGoogleSignIn = async () => {
     setIsGoogleLoading(true);
     try {
-      await promptAsync();
-    } catch (_error) {
+      await GoogleSignin.hasPlayServices();
+      const response = await GoogleSignin.signIn();
+
+      if (response.type === 'success' && response.data.idToken) {
+        // Send ID token to backend for verification
+        const { token, user } = await googleSignIn(response.data.idToken);
+        setToken(token);
+        setUser(user);
+        router.replace('/(tabs)');
+      } else {
+        Alert.alert('Error', 'Google sign-in failed. Please try again.');
+      }
+    } catch (error: any) {
+      if (isErrorWithCode(error)) {
+        if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+          // User cancelled — do nothing
+        } else if (error.code === statusCodes.IN_PROGRESS) {
+          // Sign-in already in progress
+        } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+          Alert.alert('Error', 'Google Play Services is not available on this device.');
+        } else {
+          Alert.alert('Error', error.message || 'Failed to sign in with Google');
+        }
+      } else {
+        Alert.alert('Error', error.message || 'Failed to sign in with Google');
+      }
+    } finally {
       setIsGoogleLoading(false);
     }
   };
@@ -181,11 +172,11 @@ export default function WelcomeScreen() {
               {
                 backgroundColor: colors.surface,
                 borderColor: theme.border,
-                opacity: !request || isGoogleLoading ? 0.6 : 1,
+                opacity: isGoogleLoading ? 0.6 : 1,
               },
             ]}
             onPress={onGoogleSignIn}
-            disabled={!request || isGoogleLoading}
+            disabled={isGoogleLoading}
           >
             {isGoogleLoading ? (
               <ActivityIndicator size="small" color={theme.text} />
