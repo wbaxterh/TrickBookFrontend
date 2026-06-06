@@ -235,22 +235,12 @@ export async function deleteImage(key: string): Promise<void> {
 }
 
 // =============================================
-// SPORT TYPES
+// SPORT TYPES — use getSportTypes() from spots API for dynamic list
+// This re-export provides backward compatibility for existing imports
 // =============================================
 
-export const SPORT_TYPES = [
-  { value: 'skateboarding', label: 'Skateboarding' },
-  { value: 'snowboarding', label: 'Snowboarding' },
-  { value: 'skiing', label: 'Skiing' },
-  { value: 'bmx', label: 'BMX' },
-  { value: 'mtb', label: 'MTB' },
-  { value: 'scooter', label: 'Scooter' },
-  { value: 'surf', label: 'Surf' },
-  { value: 'wakeboarding', label: 'Wakeboarding' },
-  { value: 'rollerblading', label: 'Rollerblading' },
-] as const;
-
-export type SportType = (typeof SPORT_TYPES)[number]['value'];
+export type { SportType } from './spots';
+export { getSportTypes } from './spots';
 
 // =============================================
 // VISIBILITY OPTIONS

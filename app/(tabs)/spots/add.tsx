@@ -34,9 +34,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   createSpot,
   getSportTypes,
+  getSpotCategories,
   type PlaceSearchResult,
   reverseGeocode,
   type SportType,
+  type SpotCategory,
   searchPlaces,
 } from '@/lib/api/spots';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
@@ -46,14 +48,7 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const YELLOW = '#FCF150';
 const DARK = '#1a1a1a';
 
-// Categories for spots
-const SPOT_CATEGORIES = [
-  { id: 'park', name: 'Park', icon: 'leaf' },
-  { id: 'street', name: 'Street', icon: 'business' },
-  { id: 'indoor', name: 'Indoor', icon: 'home' },
-  { id: 'diy', name: 'DIY', icon: 'construct' },
-  { id: 'other', name: 'Other', icon: 'ellipsis-horizontal' },
-] as const;
+// Spot categories are fetched from API in the component
 
 // Dark mode map styling
 const darkMapStyle = [
@@ -103,6 +98,7 @@ export default function AddSpotScreen() {
   const [selectedSports, setSelectedSports] = useState<string[]>([]);
   const [isPublic, setIsPublic] = useState(true);
   const [sportTypes, setSportTypes] = useState<SportType[]>([]);
+  const [spotCategories, setSpotCategories] = useState<SpotCategory[]>([]);
 
   // UI state
   const [loading, setLoading] = useState(false);
@@ -131,13 +127,10 @@ export default function AddSpotScreen() {
     })();
   }, []);
 
-  // Fetch sport types
+  // Fetch sport types and spot categories
   useEffect(() => {
-    const fetchSportTypes = async () => {
-      const types = await getSportTypes();
-      setSportTypes(types);
-    };
-    fetchSportTypes();
+    getSportTypes().then(setSportTypes);
+    getSpotCategories().then(setSpotCategories);
   }, []);
 
   // Handle map press to drop pin
@@ -602,7 +595,7 @@ export default function AddSpotScreen() {
           {/* Category */}
           <Text style={[styles.label, { color: theme.text }]}>Category *</Text>
           <View style={styles.categoryContainer}>
-            {SPOT_CATEGORIES.map((cat) => (
+            {spotCategories.map((cat) => (
               <Pressable
                 key={cat.id}
                 style={[

@@ -21,7 +21,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { type FeedPost, getPost, updatePost } from '@/lib/api/feed';
-import { SPORT_TYPES, VISIBILITY_OPTIONS } from '@/lib/api/upload';
+import { getSportTypes, type SportType } from '@/lib/api/spots';
+import { VISIBILITY_OPTIONS } from '@/lib/api/upload';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 const YELLOW = '#FCF150';
@@ -34,6 +35,11 @@ export default function EditPostScreen() {
   const [post, setPost] = useState<FeedPost | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [sportTypes, setSportTypes] = useState<SportType[]>([]);
+
+  useEffect(() => {
+    getSportTypes().then(setSportTypes);
+  }, []);
 
   // Form state
   const [caption, setCaption] = useState('');
@@ -244,7 +250,7 @@ export default function EditPostScreen() {
               Sport Type <Text style={{ color: '#ef4444' }}>*</Text>
             </Text>
             <View style={styles.chipContainer}>
-              {SPORT_TYPES.map((sport) => (
+              {sportTypes.map((sport) => (
                 <Pressable
                   key={sport.value}
                   style={[

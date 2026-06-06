@@ -25,9 +25,9 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { type CreatePostData, createPost } from '@/lib/api/feed';
+import { getSportTypes, type SportType } from '@/lib/api/spots';
 import {
   createVideoEntry,
-  SPORT_TYPES,
   uploadImageToS3,
   VISIBILITY_OPTIONS,
   waitForVideoProcessing,
@@ -45,6 +45,12 @@ type MediaType = 'video' | 'image' | null;
 export default function UploadScreen() {
   const { theme, colors } = useThemeContext();
   const { user, token } = useAuthStore();
+
+  // Sport types (fetched from API)
+  const [sportTypes, setSportTypes] = useState<SportType[]>([]);
+  useEffect(() => {
+    getSportTypes().then(setSportTypes);
+  }, []);
 
   // Form state
   const [selectedFile, setSelectedFile] = useState<ImagePicker.ImagePickerAsset | null>(null);
@@ -77,7 +83,7 @@ export default function UploadScreen() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.All,
+        mediaTypes: ['images', 'videos'],
         allowsEditing: false,
         quality: 1,
         videoMaxDuration: 180, // 3 minutes max
@@ -102,8 +108,12 @@ export default function UploadScreen() {
         setError(null);
         setUploadStep('idle');
       }
-    } catch (_err) {
-      Alert.alert('Error', 'Failed to select media');
+    } catch (err) {
+      console.error('Media picker error:', err);
+      Alert.alert(
+        'Error',
+        `Failed to select media: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      );
     }
   };
 
@@ -451,7 +461,7 @@ export default function UploadScreen() {
               Sport Type <Text style={{ color: '#ef4444' }}>*</Text>
             </Text>
             <View style={styles.chipContainer}>
-              {SPORT_TYPES.map((sport) => (
+              {sportTypes.map((sport) => (
                 <Pressable
                   key={sport.value}
                   style={[

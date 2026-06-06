@@ -30,7 +30,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SpotListCard as SpotListCardComponent } from '@/components/spots';
 import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 import { createSpotList, getSpotLists } from '@/lib/api/spotlists';
-import { getSportTypes, getSpots, type SportType, type Spot } from '@/lib/api/spots';
+import {
+  getSportTypes,
+  getSpotCategories,
+  getSpots,
+  type SportType,
+  type Spot,
+  type SpotCategory,
+} from '@/lib/api/spots';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
 import type { CreateSpotListInput, SpotList } from '@/types/spots';
@@ -44,28 +51,8 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const YELLOW = '#FCF150';
 const DARK = '#1a1a1a';
 
-// Spot categories with icons
-const SPOT_CATEGORIES = [
-  { id: 'all', name: 'All', icon: 'location' },
-  { id: 'park', name: 'Parks', icon: 'leaf' },
-  { id: 'street', name: 'Street', icon: 'business' },
-  { id: 'indoor', name: 'Indoor', icon: 'home' },
-  { id: 'diy', name: 'DIY', icon: 'construct' },
-] as const;
-
-// Default sport types (used as fallback)
-const DEFAULT_SPORT_TYPES: SportType[] = [
-  { value: 'all', label: 'All Sports' },
-  { value: 'skateboarding', label: 'Skateboarding' },
-  { value: 'snowboarding', label: 'Snowboarding' },
-  { value: 'skiing', label: 'Skiing' },
-  { value: 'bmx', label: 'BMX' },
-  { value: 'mtb', label: 'MTB' },
-  { value: 'scooter', label: 'Scooter' },
-  { value: 'rollerblading', label: 'Rollerblading' },
-  { value: 'surfing', label: 'Surfing' },
-  { value: 'wakeboarding', label: 'Wakeboarding' },
-];
+// Spot categories and sport types are fetched from API in the component
+const ALL_SPOT_CATEGORY: SpotCategory = { id: 'all', name: 'All', icon: 'location' };
 
 // Sport icons mapping
 const SPORT_ICONS: Record<string, string> = {
@@ -111,7 +98,8 @@ export default function SpotsScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [spots, setSpots] = useState<Spot[]>([]);
-  const [sportTypes, setSportTypes] = useState<SportType[]>(DEFAULT_SPORT_TYPES);
+  const [sportTypes, setSportTypes] = useState<SportType[]>([]);
+  const [spotCategories, setSpotCategories] = useState<SpotCategory[]>([ALL_SPOT_CATEGORY]);
   const [_totalCount, setTotalCount] = useState(0);
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(
@@ -174,14 +162,14 @@ export default function SpotsScreen() {
     })();
   }, []);
 
-  // Fetch sport types on mount
+  // Fetch sport types and spot categories on mount
   useEffect(() => {
-    const fetchSportTypes = async () => {
-      const types = await getSportTypes();
-      // Add "All Sports" option at the beginning
+    getSportTypes().then((types) => {
       setSportTypes([{ value: 'all', label: 'All Sports' }, ...types]);
-    };
-    fetchSportTypes();
+    });
+    getSpotCategories().then((cats) => {
+      setSpotCategories([ALL_SPOT_CATEGORY, ...cats]);
+    });
   }, []);
 
   // Debounce search query
@@ -385,7 +373,7 @@ export default function SpotsScreen() {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.categoriesScroll}
             >
-              {SPOT_CATEGORIES.map((cat) => (
+              {spotCategories.map((cat) => (
                 <Pressable
                   key={cat.id}
                   style={[
@@ -730,7 +718,7 @@ export default function SpotsScreen() {
                   <Text style={[styles.filterSectionTitle, { color: theme.text, marginTop: 20 }]}>
                     Category
                   </Text>
-                  {SPOT_CATEGORIES.map((cat) => (
+                  {spotCategories.map((cat) => (
                     <Pressable
                       key={cat.id}
                       style={[

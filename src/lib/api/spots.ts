@@ -48,6 +48,12 @@ export interface SportType {
   label: string;
 }
 
+export interface SpotCategory {
+  id: string;
+  name: string;
+  icon: string;
+}
+
 export interface SpotsResponse {
   spots: Spot[];
   pagination: {
@@ -91,6 +97,28 @@ export async function getSportTypes(): Promise<SportType[]> {
       { value: 'rollerblading', label: 'Rollerblading' },
       { value: 'surfing', label: 'Surfing' },
       { value: 'wakeboarding', label: 'Wakeboarding' },
+    ];
+  }
+}
+
+/**
+ * Get available spot categories (park, street, etc.)
+ */
+export async function getSpotCategories(): Promise<SpotCategory[]> {
+  try {
+    const response = await apiClient.get<{ spotCategories: SpotCategory[] }>(
+      `${ENDPOINTS.spots.list}/spot-categories`,
+      { skipAuth: true },
+    );
+    return response.spotCategories;
+  } catch (_error) {
+    return [
+      { id: 'park', name: 'Park', icon: 'leaf' },
+      { id: 'street', name: 'Street', icon: 'business' },
+      { id: 'indoor', name: 'Indoor', icon: 'home' },
+      { id: 'diy', name: 'DIY', icon: 'construct' },
+      { id: 'resort', name: 'Resort', icon: 'snow' },
+      { id: 'other', name: 'Other', icon: 'ellipsis-horizontal' },
     ];
   }
 }
