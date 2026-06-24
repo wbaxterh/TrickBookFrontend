@@ -75,6 +75,11 @@ export interface RegisterData {
 const TOKEN_KEY = 'auth_token';
 const USER_KEY = 'auth_user';
 
+// Use AFTER_FIRST_UNLOCK so credentials survive cold starts and background launches
+const SECURE_STORE_OPTIONS: SecureStore.SecureStoreOptions = {
+  keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
+};
+
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: null,
@@ -97,7 +102,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await apiClient.setToken(token);
 
       // Store user data locally for offline access
-      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
+      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user), SECURE_STORE_OPTIONS);
 
       set({
         user,
@@ -127,7 +132,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await apiClient.setToken(token);
 
       // Store user data
-      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
+      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user), SECURE_STORE_OPTIONS);
 
       set({
         user,
@@ -146,12 +151,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   logout: async () => {
     try {
+      // Unregister this device's push token BEFORE clearing the auth token —
+      // the DELETE call needs the JWT to identify the user. Also wipe any
+      // locally-scheduled reminder notifications so a future user on this
+      // device doesn't get the previous account's reminders.
+      try {
+        const { unregisterThisDeviceToken, clearAllLocalReminders } = await import(
+          '@/lib/notifications'
+        );
+        await unregisterThisDeviceToken();
+        await clearAllLocalReminders();
+      } catch (_e) {
+        // Non-fatal: continue with logout even if cleanup fails.
+      }
+
       // Clear API token
       await authApi.logout();
 
       // Clear local storage
-      await SecureStore.deleteItemAsync(TOKEN_KEY);
-      await SecureStore.deleteItemAsync(USER_KEY);
+      await SecureStore.deleteItemAsync(TOKEN_KEY, SECURE_STORE_OPTIONS);
+      await SecureStore.deleteItemAsync(USER_KEY, SECURE_STORE_OPTIONS);
 
       set({
         user: null,
@@ -170,29 +189,54 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   loadStoredAuth: async () => {
+    // If already authenticated in memory, just do a background refresh
+    if (get().isAuthenticated && get().token) {
+      get()
+        .refreshUser()
+        .catch(() => {});
+      return;
+    }
+
     set({ isLoading: true });
     try {
       // Check for stored token
       const token = await apiClient.getToken();
-      const userJson = await SecureStore.getItemAsync(USER_KEY);
 
-      if (token && userJson) {
-        let user: User;
+      if (!token) {
+        set({ isLoading: false });
+        return;
+      }
+
+      const userJson = await SecureStore.getItemAsync(USER_KEY, SECURE_STORE_OPTIONS);
+
+      if (userJson) {
+        let user: User | undefined;
         try {
           user = JSON.parse(userJson) as User;
         } catch (_parseError) {
-          // Only clear user data if JSON is actually corrupted, keep the token
-          await SecureStore.deleteItemAsync(USER_KEY);
-          set({ isLoading: false });
-          return;
+          // JSON corrupted — clear user data but keep token, fetch fresh below
+          await SecureStore.deleteItemAsync(USER_KEY, SECURE_STORE_OPTIONS);
         }
 
-        set({ user, token, isAuthenticated: true });
+        if (user) {
+          set({ user, token, isAuthenticated: true });
 
-        // Refresh user data in background — don't let failures affect auth state
-        get()
-          .refreshUser()
-          .catch(() => {});
+          // Refresh user data in background — don't let failures affect auth state
+          get()
+            .refreshUser()
+            .catch(() => {});
+          return;
+        }
+      }
+
+      // We have a token but no user data — try to fetch the user from the server
+      // This recovers sessions where SecureStore lost the user JSON but kept the token
+      try {
+        const freshUser = await authApi.getCurrentUser();
+        await SecureStore.setItemAsync(USER_KEY, JSON.stringify(freshUser), SECURE_STORE_OPTIONS);
+        set({ user: freshUser, token, isAuthenticated: true });
+      } catch (_fetchError) {
+        // Token might be invalid — but don't wipe it, let the user try again
       }
     } catch (_error) {
       // SecureStore read failed (transient iOS Keychain error) —
@@ -211,7 +255,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const user = await authApi.getCurrentUser();
 
       // Update local storage
-      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user));
+      await SecureStore.setItemAsync(USER_KEY, JSON.stringify(user), SECURE_STORE_OPTIONS);
 
       set({ user });
     } catch (error: any) {
@@ -229,7 +273,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (currentUser) {
       const updatedUser = { ...currentUser, ...updates };
       set({ user: updatedUser });
-      SecureStore.setItemAsync(USER_KEY, JSON.stringify(updatedUser));
+      SecureStore.setItemAsync(USER_KEY, JSON.stringify(updatedUser), SECURE_STORE_OPTIONS);
     }
   },
 }));

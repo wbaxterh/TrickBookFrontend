@@ -6,10 +6,17 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { router, Stack, useRootNavigationState, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, useColorScheme, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, AppState, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SoftAskSheet } from '@/components/notifications/SoftAskSheet';
 import { colors } from '@/constants/colors';
+import {
+  bootstrapNotifications,
+  handleColdStartTap,
+  registerThisDeviceToken,
+  syncLocalReminders,
+} from '@/lib/notifications';
 import { ThemeProvider } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
 import '../global.css';
@@ -25,15 +32,66 @@ const queryClient = new QueryClient({
 });
 
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, loadStoredAuth } = useAuthStore();
+  const { isAuthenticated, isLoading } = useAuthStore();
   const segments = useSegments();
   const navigationState = useRootNavigationState();
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
+  const [notificationsReady, setNotificationsReady] = useState(false);
+  const appState = useRef(AppState.currentState);
 
-  // Load stored auth on mount
+  // Bootstrap notifications once the user reaches an authenticated tab.
+  // Soft-ask is gated on `notificationsReady` so the sheet only appears once
+  // the user has actually landed inside the app.
   useEffect(() => {
-    loadStoredAuth().finally(() => setHasCheckedAuth(true));
-  }, [loadStoredAuth]);
+    if (!isAuthenticated) return;
+    const inTabs = segments[0] === '(tabs)';
+    if (!inTabs) return;
+    let cancelled = false;
+    (async () => {
+      await bootstrapNotifications();
+      await handleColdStartTap();
+      if (!cancelled) setNotificationsReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAuthenticated, segments]);
+
+  // Refresh the token on foreground (in case it rotated or the user reinstalled).
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const sub = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active' && notificationsReady) {
+        registerThisDeviceToken().catch(() => {});
+        // Re-sync the next 14d of reminders on each foreground so any
+        // server-side cadence changes flow to the device.
+        syncLocalReminders().catch(() => {});
+      }
+    });
+    return () => sub.remove();
+  }, [isAuthenticated, notificationsReady]);
+
+  // Load stored auth on mount (once only)
+  useEffect(() => {
+    useAuthStore
+      .getState()
+      .loadStoredAuth()
+      .finally(() => setHasCheckedAuth(true));
+  }, []);
+
+  // Re-validate auth when app returns to foreground (iOS kills JS context on memory pressure)
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (nextAppState) => {
+      if (appState.current.match(/inactive|background/) && nextAppState === 'active') {
+        const { isAuthenticated: authed } = useAuthStore.getState();
+        if (!authed) {
+          useAuthStore.getState().loadStoredAuth();
+        }
+      }
+      appState.current = nextAppState;
+    });
+    return () => sub.remove();
+  }, []);
 
   // Handle navigation based on auth state
   useEffect(() => {
@@ -71,7 +129,12 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <SoftAskSheet ready={notificationsReady && isAuthenticated} />
+    </>
+  );
 }
 
 export default function RootLayout() {

@@ -25,15 +25,18 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import ClusteredMapView from 'react-native-map-clustering';
+import MapView, { Marker, PROVIDER_GOOGLE, type Region } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SpotListCard as SpotListCardComponent } from '@/components/spots';
 import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 import { createSpotList, getSpotLists } from '@/lib/api/spotlists';
 import {
+  getMapPins,
   getSportTypes,
   getSpotCategories,
   getSpots,
+  type MapPin,
   type SportType,
   type Spot,
   type SpotCategory,
@@ -106,7 +109,9 @@ export default function SpotsScreen() {
     null,
   );
   const [_spotToAddToList, _setSpotToAddToList] = useState<Spot | null>(null);
+  const [mapPins, setMapPins] = useState<MapPin[]>([]);
   const mapRef = useRef<MapView>(null);
+  const mapPinsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // My Spots state
   const [myLists, setMyLists] = useState<SpotList[]>([]);
@@ -199,6 +204,35 @@ export default function SpotsScreen() {
   useEffect(() => {
     fetchSpots();
   }, [fetchSpots]);
+
+  // Fetch map pins for a given visible region (bounding box) with debouncing.
+  const fetchMapPinsForRegion = useCallback(
+    (region: Region) => {
+      if (mapPinsDebounceRef.current) {
+        clearTimeout(mapPinsDebounceRef.current);
+      }
+      mapPinsDebounceRef.current = setTimeout(async () => {
+        const bounds = {
+          minLat: region.latitude - region.latitudeDelta / 2,
+          maxLat: region.latitude + region.latitudeDelta / 2,
+          minLng: region.longitude - region.longitudeDelta / 2,
+          maxLng: region.longitude + region.longitudeDelta / 2,
+        };
+        const pins = await getMapPins(bounds, selectedSport, selectedCategory);
+        setMapPins(pins);
+      }, 350);
+    },
+    [selectedSport, selectedCategory],
+  );
+
+  // Refetch pins when filters change, using the current visible region if available.
+  useEffect(() => {
+    return () => {
+      if (mapPinsDebounceRef.current) {
+        clearTimeout(mapPinsDebounceRef.current);
+      }
+    };
+  }, []);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -406,15 +440,18 @@ export default function SpotsScreen() {
               <ActivityIndicator size="large" color={YELLOW} />
             </View>
           ) : viewMode === 'map' ? (
-            // Map View with all spots
+            // Map View with all spots (clustered, viewport-loaded)
             <View style={styles.mapContainer}>
-              <MapView
+              <ClusteredMapView
                 ref={mapRef}
                 style={styles.map}
                 provider={PROVIDER_GOOGLE}
                 customMapStyle={isDark ? darkMapStyle : []}
                 showsUserLocation
                 showsMyLocationButton={false}
+                radius={50}
+                clusterColor={YELLOW}
+                clusterTextColor={DARK}
                 initialRegion={
                   userLocation
                     ? {
@@ -423,52 +460,30 @@ export default function SpotsScreen() {
                         latitudeDelta: 0.3,
                         longitudeDelta: 0.3,
                       }
-                    : spots.length > 0
-                      ? {
-                          latitude: spots[0].latitude,
-                          longitude: spots[0].longitude,
-                          latitudeDelta: 2,
-                          longitudeDelta: 2,
-                        }
-                      : {
-                          latitude: 40.7128,
-                          longitude: -74.006,
-                          latitudeDelta: 2,
-                          longitudeDelta: 2,
-                        }
+                    : {
+                        latitude: 40.7128,
+                        longitude: -74.006,
+                        latitudeDelta: 2,
+                        longitudeDelta: 2,
+                      }
                 }
                 onPress={() => setSelectedSpot(null)}
-                onMarkerPress={(e) => {
-                  const markerId = e.nativeEvent.id;
-                  const spot = spots.find((s) => s._id === markerId);
-                  if (spot) {
-                    setSelectedSpot(spot);
-                    mapRef.current?.animateToRegion(
-                      {
-                        latitude: spot.latitude,
-                        longitude: spot.longitude,
-                        latitudeDelta: 0.05,
-                        longitudeDelta: 0.05,
-                      },
-                      300,
-                    );
-                  }
-                }}
+                onRegionChangeComplete={fetchMapPinsForRegion}
               >
-                {spots.map((spot) => (
+                {mapPins.map((pin) => (
                   <Marker
-                    key={spot._id}
-                    identifier={spot._id}
-                    coordinate={{ latitude: spot.latitude, longitude: spot.longitude }}
-                    tracksViewChanges={selectedSpot?._id === spot._id}
+                    key={pin._id}
+                    identifier={pin._id}
+                    coordinate={{ latitude: pin.latitude, longitude: pin.longitude }}
+                    tracksViewChanges={selectedSpot?._id === pin._id}
                     stopPropagation
                     onPress={(e) => {
                       e.stopPropagation();
-                      setSelectedSpot(spot);
+                      setSelectedSpot(pin as unknown as Spot);
                       mapRef.current?.animateToRegion(
                         {
-                          latitude: spot.latitude,
-                          longitude: spot.longitude,
+                          latitude: pin.latitude,
+                          longitude: pin.longitude,
                           latitudeDelta: 0.05,
                           longitudeDelta: 0.05,
                         },
@@ -483,9 +498,9 @@ export default function SpotsScreen() {
                           styles.marker,
                           {
                             backgroundColor: YELLOW,
-                            borderColor: selectedSpot?._id === spot._id ? DARK : '#B8A800',
-                            borderWidth: selectedSpot?._id === spot._id ? 3 : 2,
-                            transform: [{ scale: selectedSpot?._id === spot._id ? 1.2 : 1 }],
+                            borderColor: selectedSpot?._id === pin._id ? DARK : '#B8A800',
+                            borderWidth: selectedSpot?._id === pin._id ? 3 : 2,
+                            transform: [{ scale: selectedSpot?._id === pin._id ? 1.2 : 1 }],
                           },
                         ]}
                       >
@@ -495,7 +510,7 @@ export default function SpotsScreen() {
                     </View>
                   </Marker>
                 ))}
-              </MapView>
+              </ClusteredMapView>
 
               {/* Map Controls */}
               <View style={styles.mapControls}>

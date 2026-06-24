@@ -20,6 +20,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { RichContentCard } from '@/components/chat/RichContentCards';
 import {
   type Conversation,
   getConversation,
@@ -30,6 +31,7 @@ import {
   type SharedContent,
   sendMessage as sendMessageApi,
 } from '@/lib/api/messages';
+import { setCurrentConversationId } from '@/lib/notifications';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
 
@@ -226,12 +228,17 @@ export default function ChatScreen() {
     fetchData(true);
   }, [fetchData]);
 
-  // Mark as read when screen is focused
+  // Mark as read when screen is focused + tell the notification handler we're
+  // viewing this chat so it can suppress banners for incoming messages here.
   useFocusEffect(
     useCallback(() => {
       if (conversationId) {
         markAsRead(conversationId);
+        setCurrentConversationId(conversationId);
       }
+      return () => {
+        setCurrentConversationId(null);
+      };
     }, [conversationId]),
   );
 
@@ -446,6 +453,12 @@ export default function ChatScreen() {
                         {item.content}
                       </Text>
                     </View>
+                  </View>
+                )}
+                {/* Rich content card from bot messages */}
+                {item.richContent && (
+                  <View style={[styles.messageRow, { marginTop: -4 }]}>
+                    <RichContentCard richContent={item.richContent} />
                   </View>
                 )}
                 {showDate && (

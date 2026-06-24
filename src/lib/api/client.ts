@@ -8,6 +8,12 @@ import { API_CONFIG } from '@/constants/api';
 
 const TOKEN_KEY = 'auth_token';
 
+// Use AFTER_FIRST_UNLOCK so the token is readable on cold starts
+// (before the user unlocks the device for the current session)
+const SECURE_STORE_OPTIONS: SecureStore.SecureStoreOptions = {
+  keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
+};
+
 interface RequestOptions extends RequestInit {
   timeout?: number;
   skipAuth?: boolean;
@@ -31,7 +37,7 @@ class ApiClient {
    */
   async getToken(): Promise<string | null> {
     try {
-      return await SecureStore.getItemAsync(TOKEN_KEY);
+      return await SecureStore.getItemAsync(TOKEN_KEY, SECURE_STORE_OPTIONS);
     } catch {
       return null;
     }
@@ -41,14 +47,14 @@ class ApiClient {
    * Set the auth token
    */
   async setToken(token: string): Promise<void> {
-    await SecureStore.setItemAsync(TOKEN_KEY, token);
+    await SecureStore.setItemAsync(TOKEN_KEY, token, SECURE_STORE_OPTIONS);
   }
 
   /**
    * Clear the auth token
    */
   async clearToken(): Promise<void> {
-    await SecureStore.deleteItemAsync(TOKEN_KEY);
+    await SecureStore.deleteItemAsync(TOKEN_KEY, SECURE_STORE_OPTIONS);
   }
 
   /**
@@ -169,6 +175,17 @@ class ApiClient {
     return this.request<T>(endpoint, {
       ...options,
       method: 'PUT',
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  }
+
+  /**
+   * PATCH request
+   */
+  async patch<T>(endpoint: string, data?: any, options?: RequestOptions): Promise<T> {
+    return this.request<T>(endpoint, {
+      ...options,
+      method: 'PATCH',
       body: data ? JSON.stringify(data) : undefined,
     });
   }
