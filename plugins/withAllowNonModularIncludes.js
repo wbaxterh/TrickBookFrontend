@@ -18,9 +18,15 @@
  * Idempotent via a marker comment.
  */
 
-const { withDangerousMod } = require('@expo/config-plugins');
+// Per Expo's recommendation, import from `expo/config-plugins` (the sub-export
+// of the expo package itself) rather than the top-level `@expo/config-plugins`
+// package. The latter may not resolve correctly on EAS workers when it's not
+// listed in `dependencies` (only as a transitive dep).
+const { withDangerousMod } = require('expo/config-plugins');
 const fs = require('fs');
 const path = require('path');
+
+console.log('[withAllowNonModularIncludes] plugin file loaded');
 
 const MARKER = '# === TrickBook Podfile patch (modular headers + non-modular allowance) ===';
 
@@ -33,13 +39,18 @@ const POST_INSTALL_INJECTION = `
     end`;
 
 module.exports = function withTrickBookPodfilePatch(config) {
+  console.log('[withAllowNonModularIncludes] plugin function invoked');
   return withDangerousMod(config, [
     'ios',
     async (cfg) => {
+      console.log('[withAllowNonModularIncludes] running dangerous mod against Podfile');
       const podfile = path.join(cfg.modRequest.platformProjectRoot, 'Podfile');
       let src = fs.readFileSync(podfile, 'utf8');
 
-      if (src.includes(MARKER)) return cfg;
+      if (src.includes(MARKER)) {
+        console.log('[withAllowNonModularIncludes] marker already present, skipping');
+        return cfg;
+      }
 
       // 1) Add `use_modular_headers!` near the top of the target block. We
       //    insert it right after `use_frameworks!` if present, otherwise after
@@ -69,6 +80,7 @@ module.exports = function withTrickBookPodfilePatch(config) {
       }
 
       fs.writeFileSync(podfile, src);
+      console.log('[withAllowNonModularIncludes] Podfile patched successfully');
       return cfg;
     },
   ]);
