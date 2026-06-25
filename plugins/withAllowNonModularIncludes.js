@@ -45,42 +45,61 @@ module.exports = function withTrickBookPodfilePatch(config) {
     async (cfg) => {
       console.log('[withAllowNonModularIncludes] running dangerous mod against Podfile');
       const podfile = path.join(cfg.modRequest.platformProjectRoot, 'Podfile');
-      let src = fs.readFileSync(podfile, 'utf8');
+      const before = fs.readFileSync(podfile, 'utf8');
 
-      if (src.includes(MARKER)) {
+      console.log('[withAllowNonModularIncludes] === Podfile BEFORE (first 60 lines) ===');
+      console.log(before.split('\n').slice(0, 60).join('\n'));
+      console.log('[withAllowNonModularIncludes] === end Podfile snippet ===');
+
+      if (before.includes(MARKER)) {
         console.log('[withAllowNonModularIncludes] marker already present, skipping');
         return cfg;
       }
 
-      // 1) Add `use_modular_headers!` near the top of the target block. We
-      //    insert it right after `use_frameworks!` if present, otherwise after
-      //    the first `target 'TrickBook' do` line.
+      let src = before;
+      const initialLength = src.length;
+
+      // 1) Unconditionally inject `use_modular_headers!` immediately after the
+      //    target block opens. This is the most reliable insertion point —
+      //    `use_frameworks!` may or may not be present yet depending on plugin
+      //    order, but the target block always exists in a generated Podfile.
       if (!/^\s*use_modular_headers!/m.test(src)) {
-        if (/use_frameworks!.*$/m.test(src)) {
-          src = src.replace(/(use_frameworks!.*$)/m, '$1\n  use_modular_headers!');
-        } else if (/^(\s*target\s+['"][^'"]+['"]\s+do\s*$)/m.test(src)) {
-          src = src.replace(
-            /^(\s*target\s+['"][^'"]+['"]\s+do\s*$)/m,
-            '$1\n  use_modular_headers!',
-          );
+        const targetRegex = /^([ \t]*target\s+['"][^'"]+['"]\s+do[ \t]*$)/m;
+        if (targetRegex.test(src)) {
+          src = src.replace(targetRegex, "$1\n  use_modular_headers!");
+          console.log('[withAllowNonModularIncludes] injected use_modular_headers! after target line');
+        } else {
+          console.log('[withAllowNonModularIncludes] WARN: target line not found, use_modular_headers! NOT added');
         }
+      } else {
+        console.log('[withAllowNonModularIncludes] use_modular_headers! already present');
       }
 
       // 2) Append the build-setting tweak inside the existing post_install
-      //    block (Expo's template generates one). Falls back to a fresh block
-      //    if Expo ever stops emitting one.
+      //    block. Match the LAST `end` that closes the post_install block
+      //    (CocoaPods only allows one).
       if (/post_install\s+do\s+\|installer\|/.test(src)) {
+        const beforePostInstall = src;
         src = src.replace(
-          /(post_install\s+do\s+\|installer\|[\s\S]*?)\n(\s*)end(\s*\n)/,
+          /(post_install\s+do\s+\|installer\|[\s\S]*?)\n([ \t]*)end([ \t]*\n)/,
           (_m, body, indent, trailing) =>
             `${body}${POST_INSTALL_INJECTION}\n${indent}end${trailing}`,
         );
+        if (src === beforePostInstall) {
+          console.log('[withAllowNonModularIncludes] WARN: post_install regex did not match, falling back to append');
+          src += `\npost_install do |installer|${POST_INSTALL_INJECTION}\nend\n`;
+        } else {
+          console.log('[withAllowNonModularIncludes] injected build settings into existing post_install');
+        }
       } else {
+        console.log('[withAllowNonModularIncludes] no post_install found, appending fresh block');
         src += `\npost_install do |installer|${POST_INSTALL_INJECTION}\nend\n`;
       }
 
       fs.writeFileSync(podfile, src);
-      console.log('[withAllowNonModularIncludes] Podfile patched successfully');
+      console.log(
+        `[withAllowNonModularIncludes] Podfile patched — size ${initialLength} → ${src.length} bytes; use_modular_headers! ${/^\s*use_modular_headers!/m.test(src) ? 'PRESENT' : 'MISSING'}; marker ${src.includes(MARKER) ? 'PRESENT' : 'MISSING'}`,
+      );
       return cfg;
     },
   ]);
