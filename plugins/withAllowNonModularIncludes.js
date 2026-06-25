@@ -29,6 +29,7 @@ const path = require('path');
 console.log('[withAllowNonModularIncludes] plugin file loaded');
 
 const MARKER = '# === TrickBook Podfile patch (modular headers + non-modular allowance) ===';
+const PRE_INSTALL_MARKER = '# === TrickBook pre_install (maps as static_library) ===';
 
 const POST_INSTALL_INJECTION = `
     ${MARKER}
@@ -37,6 +38,23 @@ const POST_INSTALL_INJECTION = `
         bc.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
       end
     end`;
+
+// Force react-native-maps + react-native-google-maps to build as a static
+// library even when use_frameworks! is enabled. This is the canonical fix
+// documented by the react-native-maps maintainers for the RCTViewManager
+// "must be imported from module" error.
+const PRE_INSTALL_BLOCK = `
+${PRE_INSTALL_MARKER}
+pre_install do |installer|
+  installer.pod_targets.each do |pod|
+    if ['react-native-maps', 'react-native-google-maps'].include?(pod.name)
+      def pod.build_type
+        Pod::BuildType.static_library
+      end
+    end
+  end
+end
+`;
 
 module.exports = function withTrickBookPodfilePatch(config) {
   console.log('[withAllowNonModularIncludes] plugin function invoked');
@@ -96,9 +114,27 @@ module.exports = function withTrickBookPodfilePatch(config) {
         src += `\npost_install do |installer|${POST_INSTALL_INJECTION}\nend\n`;
       }
 
+      // 3) Add a pre_install block that forces react-native-maps and
+      //    react-native-google-maps to build as static_library. This is the
+      //    react-native-maps maintainers' documented workaround for the
+      //    "must be imported from module" error under use_frameworks!.
+      if (!src.includes(PRE_INSTALL_MARKER)) {
+        // Insert BEFORE the post_install block so order is conventional.
+        if (/post_install\s+do\s+\|installer\|/.test(src)) {
+          src = src.replace(
+            /(post_install\s+do\s+\|installer\|)/,
+            `${PRE_INSTALL_BLOCK}\n$1`,
+          );
+          console.log('[withAllowNonModularIncludes] injected pre_install before post_install');
+        } else {
+          src += `\n${PRE_INSTALL_BLOCK}\n`;
+          console.log('[withAllowNonModularIncludes] appended pre_install block at end');
+        }
+      }
+
       fs.writeFileSync(podfile, src);
       console.log(
-        `[withAllowNonModularIncludes] Podfile patched — size ${initialLength} → ${src.length} bytes; use_modular_headers! ${/^\s*use_modular_headers!/m.test(src) ? 'PRESENT' : 'MISSING'}; marker ${src.includes(MARKER) ? 'PRESENT' : 'MISSING'}`,
+        `[withAllowNonModularIncludes] Podfile patched — size ${initialLength} → ${src.length} bytes; use_modular_headers! ${/^\s*use_modular_headers!/m.test(src) ? 'PRESENT' : 'MISSING'}; post_install marker ${src.includes(MARKER) ? 'PRESENT' : 'MISSING'}; pre_install marker ${src.includes(PRE_INSTALL_MARKER) ? 'PRESENT' : 'MISSING'}`,
       );
       return cfg;
     },
