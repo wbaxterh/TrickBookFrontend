@@ -25,11 +25,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import ClusteredMapView from 'react-native-map-clustering';
 import MapView, { Marker, PROVIDER_GOOGLE, type Region } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SpotListCard as SpotListCardComponent } from '@/components/spots';
 import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
+import { useMapClusters } from '@/hooks/useMapClusters';
 import { createSpotList, getSpotLists } from '@/lib/api/spotlists';
 import {
   getMapPins,
@@ -110,6 +110,13 @@ export default function SpotsScreen() {
   );
   const [_spotToAddToList, _setSpotToAddToList] = useState<Spot | null>(null);
   const [mapPins, setMapPins] = useState<MapPin[]>([]);
+  // Current visible region, used to compute clusters for the viewport.
+  const [region, setRegion] = useState<Region>({
+    latitude: 40.7128,
+    longitude: -74.006,
+    latitudeDelta: 2,
+    longitudeDelta: 2,
+  });
   const mapRef = useRef<MapView>(null);
   const mapPinsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -154,6 +161,7 @@ export default function SpotsScreen() {
           longitude: location.coords.longitude,
         };
         setUserLocation(coords);
+        setRegion({ ...coords, latitudeDelta: 0.3, longitudeDelta: 0.3 });
         // Animate map to user location once obtained
         mapRef.current?.animateToRegion(
           {
@@ -224,6 +232,18 @@ export default function SpotsScreen() {
     },
     [selectedSport, selectedCategory],
   );
+
+  // Track the viewport region (for clustering) and refetch pins, in one handler.
+  const handleRegionChangeComplete = useCallback(
+    (r: Region) => {
+      setRegion(r);
+      fetchMapPinsForRegion(r);
+    },
+    [fetchMapPinsForRegion],
+  );
+
+  // Cluster the viewport pins in JS (supercluster) — keeps rendered marker count bounded.
+  const { clusters, getClusterExpansionRegion } = useMapClusters(mapPins, region);
 
   // Refetch pins when filters change, using the current visible region if available.
   useEffect(() => {
@@ -442,16 +462,13 @@ export default function SpotsScreen() {
           ) : viewMode === 'map' ? (
             // Map View with all spots (clustered, viewport-loaded)
             <View style={styles.mapContainer}>
-              <ClusteredMapView
+              <MapView
                 ref={mapRef}
                 style={styles.map}
                 provider={PROVIDER_GOOGLE}
                 customMapStyle={isDark ? darkMapStyle : []}
                 showsUserLocation
                 showsMyLocationButton={false}
-                radius={50}
-                clusterColor={YELLOW}
-                clusterTextColor={DARK}
                 initialRegion={
                   userLocation
                     ? {
@@ -468,49 +485,72 @@ export default function SpotsScreen() {
                       }
                 }
                 onPress={() => setSelectedSpot(null)}
-                onRegionChangeComplete={fetchMapPinsForRegion}
+                onRegionChangeComplete={handleRegionChangeComplete}
               >
-                {mapPins.map((pin) => (
-                  <Marker
-                    key={pin._id}
-                    identifier={pin._id}
-                    coordinate={{ latitude: pin.latitude, longitude: pin.longitude }}
-                    tracksViewChanges={selectedSpot?._id === pin._id}
-                    stopPropagation
-                    onPress={(e) => {
-                      e.stopPropagation();
-                      setSelectedSpot(pin as unknown as Spot);
-                      mapRef.current?.animateToRegion(
-                        {
-                          latitude: pin.latitude,
-                          longitude: pin.longitude,
-                          latitudeDelta: 0.05,
-                          longitudeDelta: 0.05,
-                        },
-                        300,
-                      );
-                    }}
-                    anchor={{ x: 0.5, y: 1 }}
-                  >
-                    <View style={styles.markerContainer}>
-                      <View
-                        style={[
-                          styles.marker,
-                          {
-                            backgroundColor: YELLOW,
-                            borderColor: selectedSpot?._id === pin._id ? DARK : '#B8A800',
-                            borderWidth: selectedSpot?._id === pin._id ? 3 : 2,
-                            transform: [{ scale: selectedSpot?._id === pin._id ? 1.2 : 1 }],
-                          },
-                        ]}
-                      >
-                        <Ionicons name="location" size={18} color={DARK} />
+                {clusters.map((item) =>
+                  item.type === 'cluster' ? (
+                    <Marker
+                      key={item.id}
+                      coordinate={{ latitude: item.latitude, longitude: item.longitude }}
+                      tracksViewChanges={false}
+                      onPress={() => {
+                        mapRef.current?.animateToRegion(
+                          getClusterExpansionRegion(
+                            item.clusterId as number,
+                            item.latitude,
+                            item.longitude,
+                          ),
+                          300,
+                        );
+                      }}
+                      anchor={{ x: 0.5, y: 0.5 }}
+                    >
+                      <View style={styles.clusterBubble}>
+                        <Text style={styles.clusterText}>{item.count}</Text>
                       </View>
-                      <View style={[styles.markerPoint, { borderTopColor: YELLOW }]} />
-                    </View>
-                  </Marker>
-                ))}
-              </ClusteredMapView>
+                    </Marker>
+                  ) : (
+                    <Marker
+                      key={item.id}
+                      identifier={item.pin?._id}
+                      coordinate={{ latitude: item.latitude, longitude: item.longitude }}
+                      tracksViewChanges={selectedSpot?._id === item.pin?._id}
+                      stopPropagation
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        setSelectedSpot(item.pin as unknown as Spot);
+                        mapRef.current?.animateToRegion(
+                          {
+                            latitude: item.latitude,
+                            longitude: item.longitude,
+                            latitudeDelta: 0.05,
+                            longitudeDelta: 0.05,
+                          },
+                          300,
+                        );
+                      }}
+                      anchor={{ x: 0.5, y: 1 }}
+                    >
+                      <View style={styles.markerContainer}>
+                        <View
+                          style={[
+                            styles.marker,
+                            {
+                              backgroundColor: YELLOW,
+                              borderColor: selectedSpot?._id === item.pin?._id ? DARK : '#B8A800',
+                              borderWidth: selectedSpot?._id === item.pin?._id ? 3 : 2,
+                              transform: [{ scale: selectedSpot?._id === item.pin?._id ? 1.2 : 1 }],
+                            },
+                          ]}
+                        >
+                          <Ionicons name="location" size={18} color={DARK} />
+                        </View>
+                        <View style={[styles.markerPoint, { borderTopColor: YELLOW }]} />
+                      </View>
+                    </Marker>
+                  ),
+                )}
+              </MapView>
 
               {/* Map Controls */}
               <View style={styles.mapControls}>
@@ -1267,6 +1307,22 @@ const styles = StyleSheet.create({
     borderLeftColor: 'transparent',
     borderRightColor: 'transparent',
     marginTop: -3,
+  },
+  clusterBubble: {
+    minWidth: 40,
+    height: 40,
+    paddingHorizontal: 8,
+    borderRadius: 20,
+    backgroundColor: YELLOW,
+    borderWidth: 2,
+    borderColor: DARK,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clusterText: {
+    color: DARK,
+    fontWeight: '700',
+    fontSize: 14,
   },
   mapSpotsContainer: {
     position: 'absolute',
