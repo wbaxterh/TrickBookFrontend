@@ -1,10 +1,8 @@
 /**
  * Expo push token acquisition + backend registration.
- *
- * Reads the EAS project id from the running config so getExpoPushTokenAsync
- * works in both dev and prod builds.
- *
- * Spec: docs/features/notifications.md §6.1, §7.1, §7.2
+ * Verbose by design — every step prints to Metro console so failures are diagnosable.
+ * Always calls requestPermissionsAsync so iOS native registerForRemoteNotifications is invoked
+ * even when permission was granted via iOS Settings (not via in-app prompt).
  */
 
 import Constants from 'expo-constants';
@@ -16,13 +14,19 @@ import { deletePushToken, registerPushToken } from '@/lib/api/notifications';
 import { ensureAndroidChannels } from './channels';
 
 const LAST_TOKEN_KEY = 'notifications.lastRegisteredToken';
+const TOKEN_TIMEOUT_MS = 15000;
+
+function log(...args: any[]) {
+  console.log('[notifications]', ...args);
+}
 
 function getProjectId(): string | undefined {
-  return (
+  const id =
     Constants.expoConfig?.extra?.eas?.projectId ||
     (Constants as any).easConfig?.projectId ||
-    undefined
-  );
+    undefined;
+  log('projectId resolved →', id || '(undefined)');
+  return id;
 }
 
 function getTimezone(): string {
@@ -41,8 +45,23 @@ function getLocale(): string {
   }
 }
 
+async function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
 export async function getExpoTokenForThisDevice(): Promise<string | null> {
-  if (!Device.isDevice) return null; // Simulators can't receive push.
+  log('getExpoTokenForThisDevice() start');
+  log('Device.isDevice →', Device.isDevice);
+  if (!Device.isDevice) {
+    log('SKIP: not a physical device, simulators cannot receive push');
+    return null;
+  }
+
   await ensureAndroidChannels();
 
   const projectId = getProjectId();
@@ -51,28 +70,66 @@ export async function getExpoTokenForThisDevice(): Promise<string | null> {
     return null;
   }
 
+  // Always request — even if iOS Settings shows granted, the app must invoke
+  // registerForRemoteNotifications (which expo-notifications does inside this call).
+  log('calling requestPermissionsAsync...');
+  const permRes = await Notifications.requestPermissionsAsync({
+    ios: { allowAlert: true, allowBadge: true, allowSound: true },
+  });
+  log(
+    'requestPermissionsAsync →',
+    JSON.stringify({
+      status: permRes.status,
+      granted: permRes.granted,
+      canAskAgain: permRes.canAskAgain,
+      ios: permRes.ios,
+    }),
+  );
+
+  if (permRes.status !== 'granted') {
+    log('SKIP: permission status not granted');
+    return null;
+  }
+
+  log('calling getExpoPushTokenAsync...');
   try {
-    const res = await Notifications.getExpoPushTokenAsync({ projectId });
+    const res = await withTimeout(
+      Notifications.getExpoPushTokenAsync({ projectId }),
+      TOKEN_TIMEOUT_MS,
+      'getExpoPushTokenAsync',
+    );
+    log('getExpoPushTokenAsync OK → token prefix:', (res.data || '').slice(0, 30) + '...');
     return res.data;
-  } catch (err) {
-    console.warn('[notifications] getExpoPushTokenAsync failed', err);
+  } catch (err: any) {
+    console.warn('[notifications] getExpoPushTokenAsync FAILED:', err?.message || err);
+    if (err?.message?.includes('timed out')) {
+      console.warn(
+        '[notifications] HINT: timeout usually = iOS refused APNs registration.\n' +
+          'Most common cause: aps-environment mismatch (production on Ad Hoc build needs sandbox).\n' +
+          'Plug device into Mac, open Console.app, filter "apsd", retry app launch.',
+      );
+    }
     return null;
   }
 }
 
-/**
- * Acquire the device's Expo token and POST it to the backend. Idempotent —
- * caches the last token locally so we skip the network when nothing changed.
- */
 export async function registerThisDeviceToken(): Promise<string | null> {
+  log('registerThisDeviceToken() start');
   const token = await getExpoTokenForThisDevice();
-  if (!token) return null;
+  if (!token) {
+    log('registerThisDeviceToken: no token → bail');
+    return null;
+  }
 
   const last = await SecureStore.getItemAsync(LAST_TOKEN_KEY).catch(() => null);
-  if (last === token) return token; // Already registered.
+  if (last === token) {
+    log('registerThisDeviceToken: token unchanged since last register, skipping POST');
+    return token;
+  }
 
+  log('POSTing token to backend...');
   try {
-    await registerPushToken({
+    const ok = await registerPushToken({
       token,
       platform: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web',
       transport: 'expo',
@@ -81,18 +138,15 @@ export async function registerThisDeviceToken(): Promise<string | null> {
       timezone: getTimezone(),
       locale: getLocale(),
     });
-    await SecureStore.setItemAsync(LAST_TOKEN_KEY, token).catch(() => {});
-    return token;
-  } catch (err) {
-    console.warn('[notifications] registerPushToken failed', err);
+    log('POST /push-tokens →', ok ? 'OK' : 'FAILED');
+    if (ok) await SecureStore.setItemAsync(LAST_TOKEN_KEY, token).catch(() => {});
+    return ok ? token : null;
+  } catch (err: any) {
+    console.warn('[notifications] registerPushToken POST failed:', err?.message || err);
     return null;
   }
 }
 
-/**
- * On logout — remove this device's token server-side so a future user doesn't
- * receive notifications meant for the prior account.
- */
 export async function unregisterThisDeviceToken() {
   const last = await SecureStore.getItemAsync(LAST_TOKEN_KEY).catch(() => null);
   if (!last) return;

@@ -31,27 +31,41 @@ export {
 
 import { ensureAndroidChannels } from './channels';
 import { installNotificationHandlers } from './handlers';
-import { getOsPermission } from './permissions';
 import { syncLocalReminders } from './scheduledLocal';
 import { registerThisDeviceToken } from './tokens';
 
 let _bootstrapped = false;
 
 export async function bootstrapNotifications() {
-  if (_bootstrapped) return;
+  if (_bootstrapped) {
+    console.log('[notifications] bootstrap: already done this session, skipping');
+    return;
+  }
   _bootstrapped = true;
 
-  installNotificationHandlers();
-  await ensureAndroidChannels();
+  console.log('[notifications] bootstrap: START');
+  try {
+    installNotificationHandlers();
+    console.log('[notifications] bootstrap: handlers installed');
 
-  // If the OS already granted permission (returning user, granted in Settings,
-  // or accepted the prompt on a previous launch), register the token + sync
-  // the next 14d of reminder local notifications.
-  const os = await getOsPermission();
-  if (os === 'granted' || os === 'provisional') {
-    await registerThisDeviceToken();
-    syncLocalReminders().catch(() => {});
+    await ensureAndroidChannels();
+    console.log('[notifications] bootstrap: channels ensured');
+
+    // Always attempt token registration — registerThisDeviceToken calls
+    // requestPermissionsAsync which correctly handles "already granted" AND
+    // triggers native registerForRemoteNotifications.
+    const token = await registerThisDeviceToken();
+    console.log('[notifications] bootstrap: registerThisDeviceToken →', token ? 'OK' : 'NO TOKEN');
+
+    if (token) {
+      syncLocalReminders().catch((e) =>
+        console.warn('[notifications] sync local reminders failed:', e),
+      );
+    }
+  } catch (err: any) {
+    console.warn('[notifications] bootstrap FAILED:', err?.message || err);
   }
+  console.log('[notifications] bootstrap: END');
 }
 
 export function _resetBootstrap() {

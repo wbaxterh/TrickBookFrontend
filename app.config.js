@@ -76,10 +76,13 @@ export default {
       config: {
         googleMapsApiKey: GOOGLE_MAPS_API_KEY,
       },
-      // Enable the APNs entitlement so the production build can register for
-      // remote notifications. Required for push to actually arrive on iOS.
+      // Enable the APNs entitlement so the build can register for remote
+      // notifications. Ad Hoc / development builds use APNs sandbox; TestFlight +
+      // App Store use production. EAS sets EAS_BUILD_PROFILE during build; default
+      // to production for safety (a sandbox entitlement on a store build is fatal).
       entitlements: {
-        'aps-environment': 'production',
+        'aps-environment':
+          process.env.EAS_BUILD_PROFILE === 'development' ? 'development' : 'production',
       },
       infoPlist: {
         NSCameraUsageDescription:
