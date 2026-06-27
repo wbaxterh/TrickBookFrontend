@@ -105,7 +105,7 @@ export default function NotificationsScreen() {
     setSavingListId(null);
   };
 
-  const togglePush = async (category: 'messages' | 'reminders', value: boolean) => {
+  const togglePush = async (category: 'messages' | 'reminders' | 'homies', value: boolean) => {
     if (!prefs) return;
     const next: NotificationPreferences = {
       ...prefs,
@@ -204,6 +204,15 @@ export default function NotificationsScreen() {
               hint="When a homie sends you a DM."
               value={prefs.messages.push}
               onChange={(v) => togglePush('messages', v)}
+              theme={theme}
+            />
+            <View style={[styles.divider, { backgroundColor: theme.border }]} />
+            <Row
+              icon="people"
+              label="Homie requests"
+              hint="When someone sends you a homie request."
+              value={prefs.homies?.push ?? true}
+              onChange={(v) => togglePush('homies', v)}
               theme={theme}
             />
             <View style={[styles.divider, { backgroundColor: theme.border }]} />

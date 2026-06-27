@@ -29,6 +29,7 @@ export interface QuietHours {
 export interface NotificationPreferences {
   messages: CategoryPreference;
   reminders: CategoryPreference;
+  homies: CategoryPreference;
   quietHours: QuietHours;
   osPermission: { ios: OsPermissionStatus; android: OsPermissionStatus; web: OsPermissionStatus };
   updatedAt?: string;

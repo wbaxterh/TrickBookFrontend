@@ -13,6 +13,7 @@ import { Platform } from 'react-native';
 export const CHANNELS = {
   messages: 'messages',
   reminders: 'reminders',
+  homies: 'homies',
 } as const;
 
 export async function ensureAndroidChannels() {
@@ -35,6 +36,17 @@ export async function ensureAndroidChannels() {
     importance: Notifications.AndroidImportance.DEFAULT,
     sound: 'default',
     enableVibrate: false,
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
+  });
+
+  await Notifications.setNotificationChannelAsync(CHANNELS.homies, {
+    name: 'Homie Requests',
+    description: 'Notifications when someone sends you a homie request.',
+    importance: Notifications.AndroidImportance.HIGH,
+    sound: 'default',
+    enableVibrate: true,
+    enableLights: true,
+    lightColor: '#FCF150',
     lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
   });
 }

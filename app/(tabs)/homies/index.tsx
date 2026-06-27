@@ -10,7 +10,7 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -33,9 +33,11 @@ import {
   type Homie,
   type HomieRequest,
   rejectHomieRequest,
+  searchDiscoverableUsers,
   sendHomieRequest,
 } from '@/lib/api/homies';
 import { getOrCreateConversation } from '@/lib/api/messages';
+import { apiClient } from '@/lib/api/client';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
 
@@ -61,29 +63,79 @@ export default function HomiesScreen() {
   const { theme, colors, isDark } = useThemeContext();
   const { user } = useAuthStore();
 
-  // Tab state
-  const [activeTab, setActiveTab] = useState<TabType>('homies');
+  // Tab state — honor a `?tab=` deep-link (e.g. from a homie-request notification tap)
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const initialTab: TabType =
+    params.tab === 'requests' || params.tab === 'find' ? (params.tab as TabType) : 'homies';
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [searchQuery, setSearchQuery] = useState('');
 
+  // If the screen is already mounted when the deep-link fires, switch tabs.
+  useEffect(() => {
+    if (params.tab === 'requests' || params.tab === 'find' || params.tab === 'homies') {
+      setActiveTab(params.tab as TabType);
+    }
+  }, [params.tab]);
+
   // Data state
+  const [companions, setCompanions] = useState<
+    Array<{ _id: string; name: string; bio?: string; imageUri?: string }>
+  >([]);
   const [homies, setHomies] = useState<Homie[]>([]);
   const [discoverableUsers, setDiscoverableUsers] = useState<Homie[]>([]);
   const [receivedRequests, setReceivedRequests] = useState<HomieRequest[]>([]);
   const [sentRequests, setSentRequests] = useState<string[]>([]);
 
+  // Find tab pagination state
+  const [findPage, setFindPage] = useState(1);
+  const [findHasMore, setFindHasMore] = useState(true);
+  const [findLoadingMore, setFindLoadingMore] = useState(false);
+
   // UI state
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Fetch discoverable users with pagination
+  const fetchDiscoverable = useCallback(async (query: string, page: number, append: boolean) => {
+    try {
+      if (page === 1) setLoading(true);
+      else setFindLoadingMore(true);
+
+      const data = await searchDiscoverableUsers(query, page, 20);
+      const users = data?.users || [];
+      setDiscoverableUsers((prev) => (append ? [...prev, ...users] : users));
+      setFindHasMore(data?.pagination?.hasMore ?? false);
+      setFindPage(page);
+    } catch (_error) {
+    } finally {
+      setLoading(false);
+      setFindLoadingMore(false);
+    }
+  }, []);
 
   // Fetch data based on active tab
   const fetchData = useCallback(async () => {
     try {
       if (activeTab === 'homies') {
-        const data = await getMyHomies();
+        const [data, bots] = await Promise.all([
+          getMyHomies(),
+          apiClient
+            .get<
+              Array<{
+                _id: string;
+                name: string;
+                bio?: string;
+                botCharacter?: string;
+                imageUri?: string;
+              }>
+            >('/bot-chat/bots')
+            .catch(() => []),
+        ]);
         setHomies(data);
+        setCompanions(Array.isArray(bots) ? bots : []);
       } else if (activeTab === 'find') {
-        const data = await getDiscoverableUsers();
-        setDiscoverableUsers(data);
+        await fetchDiscoverable(searchQuery, 1, false);
+        return; // loading state handled by fetchDiscoverable
       } else if (activeTab === 'requests') {
         const data = await getPendingRequests();
         setReceivedRequests(data.received || []);
@@ -93,18 +145,38 @@ export default function HomiesScreen() {
     } finally {
       setLoading(false);
     }
-  }, [activeTab]);
+  }, [activeTab, fetchDiscoverable, searchQuery]);
 
   useEffect(() => {
     setLoading(true);
     fetchData();
   }, [fetchData]);
 
+  // Debounced search for Find tab
+  useEffect(() => {
+    if (activeTab !== 'find') return;
+    const timeout = setTimeout(() => {
+      fetchDiscoverable(searchQuery, 1, false);
+    }, 300);
+    return () => clearTimeout(timeout);
+  }, [searchQuery, activeTab, fetchDiscoverable]);
+
+  // Load more for Find tab
+  const loadMoreDiscoverable = useCallback(() => {
+    if (!findLoadingMore && findHasMore) {
+      fetchDiscoverable(searchQuery, findPage + 1, true);
+    }
+  }, [findLoadingMore, findHasMore, searchQuery, findPage, fetchDiscoverable]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchData();
+    if (activeTab === 'find') {
+      await fetchDiscoverable(searchQuery, 1, false);
+    } else {
+      await fetchData();
+    }
     setRefreshing(false);
-  }, [fetchData]);
+  }, [fetchData, fetchDiscoverable, activeTab, searchQuery]);
 
   // Handle message button
   const handleMessage = async (homie: Homie) => {
@@ -161,11 +233,14 @@ export default function HomiesScreen() {
       h.email?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  const filteredDiscoverable = discoverableUsers.filter(
-    (u) =>
-      u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email?.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
+  // Client-side filter for discoverable users (fallback if backend doesn't support ?q=)
+  const filteredDiscoverable = searchQuery
+    ? discoverableUsers.filter(
+        (u) =>
+          u.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          u.bio?.toLowerCase().includes(searchQuery.toLowerCase()),
+      )
+    : discoverableUsers;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
@@ -223,7 +298,9 @@ export default function HomiesScreen() {
           <Ionicons name="search" size={20} color={theme.textSecondary} />
           <TextInput
             style={[styles.searchInput, { color: theme.text }]}
-            placeholder={activeTab === 'find' ? 'Search riders...' : 'Search homies...'}
+            placeholder={
+              activeTab === 'find' ? 'Search riders...' : 'Search homies & companions...'
+            }
             placeholderTextColor={theme.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -251,14 +328,75 @@ export default function HomiesScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={YELLOW} />
           }
           ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ListHeaderComponent={
+            companions.length > 0 ? (
+              <View style={styles.companionsSection}>
+                <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>
+                  COMPANIONS
+                </Text>
+                {companions
+                  .filter(
+                    (c) =>
+                      !searchQuery || c.name?.toLowerCase().includes(searchQuery.toLowerCase()),
+                  )
+                  .map((bot) => (
+                    <Pressable
+                      key={bot._id}
+                      style={[styles.card, { backgroundColor: theme.surface }]}
+                      onPress={() => router.push(`/(tabs)/homies/bot-chat/${bot._id}`)}
+                    >
+                      <View style={styles.avatarContainer}>
+                        {bot.imageUri ? (
+                          <Image source={{ uri: bot.imageUri }} style={styles.avatar} />
+                        ) : (
+                          <View
+                            style={[styles.avatarPlaceholder, { backgroundColor: `${YELLOW}30` }]}
+                          >
+                            <Text style={styles.avatarEmoji}>🤖</Text>
+                          </View>
+                        )}
+                        <View style={[styles.botIndicator, { borderColor: theme.surface }]}>
+                          <Ionicons name="hardware-chip-outline" size={8} color={DARK} />
+                        </View>
+                      </View>
+                      <View style={styles.cardInfo}>
+                        <Text style={[styles.cardName, { color: theme.text }]} numberOfLines={1}>
+                          {bot.name}
+                        </Text>
+                        {bot.bio ? (
+                          <Text
+                            style={[styles.cardBio, { color: theme.textSecondary }]}
+                            numberOfLines={1}
+                          >
+                            {bot.bio}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Pressable
+                        style={[styles.messageActionButton, { backgroundColor: YELLOW }]}
+                        onPress={() => router.push(`/(tabs)/homies/bot-chat/${bot._id}`)}
+                      >
+                        <Ionicons name="chatbubble" size={18} color={DARK} />
+                      </Pressable>
+                    </Pressable>
+                  ))}
+                <View style={[styles.sectionDivider, { borderBottomColor: theme.border }]} />
+                {filteredHomies.length > 0 && (
+                  <Text style={[styles.sectionLabel, { color: theme.textSecondary }]}>HOMIES</Text>
+                )}
+              </View>
+            ) : null
+          }
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="people-outline" size={48} color={theme.textSecondary} />
-              <Text style={[styles.emptyTitle, { color: theme.text }]}>No homies yet</Text>
-              <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                Find riders to add as homies
-              </Text>
-            </View>
+            companions.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="people-outline" size={48} color={theme.textSecondary} />
+                <Text style={[styles.emptyTitle, { color: theme.text }]}>No homies yet</Text>
+                <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+                  Find riders to add as homies
+                </Text>
+              </View>
+            ) : null
           }
           renderItem={({ item }) => (
             <HomieCard
@@ -275,18 +413,31 @@ export default function HomiesScreen() {
           keyExtractor={(item) => item._id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          onEndReached={loadMoreDiscoverable}
+          onEndReachedThreshold={0.5}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={YELLOW} />
           }
           ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ListFooterComponent={
+            findLoadingMore ? (
+              <View style={styles.footerLoader}>
+                <ActivityIndicator size="small" color={YELLOW} />
+              </View>
+            ) : null
+          }
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="search-outline" size={48} color={theme.textSecondary} />
-              <Text style={[styles.emptyTitle, { color: theme.text }]}>No riders found</Text>
-              <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                {searchQuery ? 'Try a different search' : 'No discoverable users available'}
-              </Text>
-            </View>
+            !loading ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="search-outline" size={48} color={theme.textSecondary} />
+                <Text style={[styles.emptyTitle, { color: theme.text }]}>No riders found</Text>
+                <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+                  {searchQuery
+                    ? `No one found for '${searchQuery}'. Try a different name.`
+                    : 'No discoverable users available'}
+                </Text>
+              </View>
+            ) : null
           }
           renderItem={({ item }) => (
             <DiscoverCard
@@ -419,9 +570,22 @@ function DiscoverCard({ user, theme, isPending, onPress, onSendRequest }: Discov
         <Text style={[styles.cardName, { color: theme.text }]} numberOfLines={1}>
           {user.name}
         </Text>
-        <Text style={[styles.cardUsername, { color: theme.textSecondary }]} numberOfLines={1}>
-          {user.email}
-        </Text>
+        {user.bio ? (
+          <Text style={[styles.cardBio, { color: theme.textSecondary }]} numberOfLines={1}>
+            {user.bio}
+          </Text>
+        ) : null}
+        {user.sports && user.sports.length > 0 && (
+          <View style={styles.sportBadges}>
+            {user.sports.slice(0, 3).map((sport) => (
+              <View key={sport} style={[styles.sportBadge, { backgroundColor: `${YELLOW}20` }]}>
+                <Text style={styles.sportBadgeText}>
+                  {SPORT_EMOJIS[sport] || '🏆'} {sport}
+                </Text>
+              </View>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* Add Button */}
@@ -430,11 +594,11 @@ function DiscoverCard({ user, theme, isPending, onPress, onSendRequest }: Discov
         onPress={onSendRequest}
         disabled={isPending}
       >
-        <Ionicons
-          name={isPending ? 'time' : 'person-add'}
-          size={18}
-          color={isPending ? theme.textSecondary : DARK}
-        />
+        {isPending ? (
+          <Text style={[styles.pendingText, { color: theme.textSecondary }]}>Pending</Text>
+        ) : (
+          <Ionicons name="person-add" size={18} color={DARK} />
+        )}
       </Pressable>
     </Pressable>
   );
@@ -634,9 +798,64 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   addButton: {
-    width: 44,
+    minWidth: 44,
     height: 44,
     borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 8,
+  },
+  pendingText: {
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  cardBio: {
+    fontSize: 13,
+    marginTop: 1,
+  },
+  sportBadges: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 4,
+  },
+  sportBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  sportBadgeText: {
+    fontSize: 11,
+    color: '#FCF150',
+    fontWeight: '500',
+  },
+  footerLoader: {
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  companionsSection: {
+    marginBottom: 4,
+    gap: 12,
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  sectionDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    marginVertical: 8,
+  },
+  botIndicator: {
+    position: 'absolute',
+    bottom: -1,
+    right: -1,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#FCF150',
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
   },
