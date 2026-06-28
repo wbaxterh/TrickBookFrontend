@@ -16,6 +16,10 @@ export default {
     icon: './assets/images/icon.png',
     userInterfaceStyle: 'automatic',
     scheme: 'trickbook',
+    // Disabled: react-native-maps (AIRGoogleMap) crashes under the New Architecture
+    // interop with custom marker child views ('insertReactSubview: object cannot be nil').
+    // Old arch is stable for our map. Requires a native rebuild on both platforms.
+    newArchEnabled: false,
     plugins: [
       'expo-secure-store',
       'expo-router',

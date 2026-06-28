@@ -118,6 +118,10 @@ export default function SpotsScreen() {
     longitudeDelta: 2,
   });
   const mapRef = useRef<MapView>(null);
+  // Gate marker rendering until the native map is ready. Inserting marker
+  // subviews during the map's init transaction is what triggers the
+  // AIRGoogleMap "insertReactSubview: object cannot be nil" crash on the new arch.
+  const [mapReady, setMapReady] = useState(false);
   const mapPinsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // My Spots state
@@ -485,9 +489,11 @@ export default function SpotsScreen() {
                       }
                 }
                 onPress={() => setSelectedSpot(null)}
+                onMapReady={() => setMapReady(true)}
                 onRegionChangeComplete={handleRegionChangeComplete}
               >
-                {clusters.map((item) =>
+                {mapReady &&
+                  clusters.map((item) =>
                   item.type === 'cluster' ? (
                     <Marker
                       key={item.id}
