@@ -38,6 +38,10 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   const [hasCheckedAuth, setHasCheckedAuth] = useState(false);
   const [notificationsReady, setNotificationsReady] = useState(false);
   const appState = useRef(AppState.currentState);
+  // Cold-start deep-link must be applied at most once per app session.
+  // getLastNotificationResponseAsync() keeps returning the same tapped
+  // notification, so calling it on every navigation re-pushes its URL.
+  const coldStartHandledRef = useRef(false);
 
   // Bootstrap notifications once the user reaches an authenticated tab.
   // Soft-ask is gated on `notificationsReady` so the sheet only appears once
@@ -49,7 +53,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     let cancelled = false;
     (async () => {
       await bootstrapNotifications();
-      await handleColdStartTap();
+      // Apply the cold-start deep-link only once — not on every navigation.
+      if (!coldStartHandledRef.current) {
+        coldStartHandledRef.current = true;
+        await handleColdStartTap();
+      }
       if (!cancelled) setNotificationsReady(true);
     })();
     return () => {

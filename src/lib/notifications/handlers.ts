@@ -83,6 +83,9 @@ export async function handleColdStartTap() {
       }
     }, 300); // wait for first render so router state exists
   }
+  // Clear the stored response so a later cold start doesn't re-apply this same
+  // deep-link when the app is opened without tapping a new notification.
+  Notifications.clearLastNotificationResponseAsync?.().catch(() => {});
 }
 
 export function uninstallNotificationHandlers() {
