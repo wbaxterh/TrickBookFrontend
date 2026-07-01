@@ -25,11 +25,12 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE, type Region } from 'react-native-maps';
+import MapView, { PROVIDER_GOOGLE, type Region } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SpotListCard as SpotListCardComponent } from '@/components/spots';
 import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 import { useMapClusters } from '@/hooks/useMapClusters';
+import { projectToScreen } from '@/lib/mapProjection';
 import { createSpotList, getSpotLists } from '@/lib/api/spotlists';
 import {
   getMapPins,
@@ -117,10 +118,18 @@ export default function SpotsScreen() {
     latitudeDelta: 2,
     longitudeDelta: 2,
   });
+  // Live region (updated continuously while panning) + viewport size, used to
+  // project our overlay markers onto the map. Kept separate from `region` (which
+  // only settles on region-change-complete and drives clustering) so markers
+  // track the map smoothly during a gesture without recomputing clusters.
+  const [projectionRegion, setProjectionRegion] = useState<Region>({
+    latitude: 40.7128,
+    longitude: -74.006,
+    latitudeDelta: 2,
+    longitudeDelta: 2,
+  });
+  const [mapLayout, setMapLayout] = useState({ width: 0, height: 0 });
   const mapRef = useRef<MapView>(null);
-  // Gate marker rendering until the native map is ready. Inserting marker
-  // subviews during the map's init transaction is what triggers the
-  // AIRGoogleMap "insertReactSubview: object cannot be nil" crash on the new arch.
   const [mapReady, setMapReady] = useState(false);
   const mapPinsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -166,6 +175,7 @@ export default function SpotsScreen() {
         };
         setUserLocation(coords);
         setRegion({ ...coords, latitudeDelta: 0.3, longitudeDelta: 0.3 });
+        setProjectionRegion({ ...coords, latitudeDelta: 0.3, longitudeDelta: 0.3 });
         // Animate map to user location once obtained
         mapRef.current?.animateToRegion(
           {
@@ -465,7 +475,10 @@ export default function SpotsScreen() {
             </View>
           ) : viewMode === 'map' ? (
             // Map View with all spots (clustered, viewport-loaded)
-            <View style={styles.mapContainer}>
+            <View
+              style={styles.mapContainer}
+              onLayout={(e) => setMapLayout(e.nativeEvent.layout)}
+            >
               <MapView
                 ref={mapRef}
                 style={styles.map}
@@ -490,43 +503,68 @@ export default function SpotsScreen() {
                 }
                 onPress={() => setSelectedSpot(null)}
                 onMapReady={() => setMapReady(true)}
+                onRegionChange={(r) => setProjectionRegion(r)}
                 onRegionChangeComplete={handleRegionChangeComplete}
-              >
-                {/* Plain pinColor markers — custom marker child views crash
-                    AIRGoogleMap under the New Architecture's view interop, so we
-                    can't use custom bubbles here. */}
-                {mapReady &&
-                  clusters.map((item) =>
-                    item.type === 'cluster' ? (
-                      <Marker
+              />
+
+              {/* Custom markers overlaid on top of the map. react-native-maps
+                  <Marker> crashes AIRGoogleMap under the New Architecture, so we
+                  project each coordinate to a screen point and render plain RN
+                  Views. box-none lets map pan/zoom pass through except on markers. */}
+              {mapReady && mapLayout.width > 0 && (
+                <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+                  {clusters.map((item) => {
+                    const pt = projectToScreen(
+                      item.latitude,
+                      item.longitude,
+                      projectionRegion,
+                      mapLayout,
+                    );
+                    if (!pt) return null;
+
+                    if (item.type === 'cluster') {
+                      return (
+                        <Pressable
+                          key={item.id}
+                          style={[
+                            styles.overlayMarker,
+                            {
+                              left: pt.x,
+                              top: pt.y,
+                              transform: [{ translateX: -20 }, { translateY: -20 }],
+                            },
+                          ]}
+                          onPress={() =>
+                            mapRef.current?.animateToRegion(
+                              getClusterExpansionRegion(
+                                item.clusterId as number,
+                                item.latitude,
+                                item.longitude,
+                              ),
+                              300,
+                            )
+                          }
+                        >
+                          <View style={styles.clusterBubble}>
+                            <Text style={styles.clusterText}>{item.count}</Text>
+                          </View>
+                        </Pressable>
+                      );
+                    }
+
+                    const selected = selectedSpot?._id === item.pin?._id;
+                    return (
+                      <Pressable
                         key={item.id}
-                        coordinate={{ latitude: item.latitude, longitude: item.longitude }}
-                        pinColor="#806D00"
-                        title={`${item.count} spots`}
-                        description="Tap to zoom in"
-                        tracksViewChanges={false}
+                        style={[
+                          styles.overlayMarker,
+                          {
+                            left: pt.x,
+                            top: pt.y,
+                            transform: [{ translateX: -20 }, { translateY: -47 }],
+                          },
+                        ]}
                         onPress={() => {
-                          mapRef.current?.animateToRegion(
-                            getClusterExpansionRegion(
-                              item.clusterId as number,
-                              item.latitude,
-                              item.longitude,
-                            ),
-                            300,
-                          );
-                        }}
-                      />
-                    ) : (
-                      <Marker
-                        key={item.id}
-                        identifier={item.pin?._id}
-                        coordinate={{ latitude: item.latitude, longitude: item.longitude }}
-                        pinColor={selectedSpot?._id === item.pin?._id ? '#FF6B00' : YELLOW}
-                        title={item.pin?.name}
-                        tracksViewChanges={false}
-                        stopPropagation
-                        onPress={(e) => {
-                          e.stopPropagation();
                           setSelectedSpot(item.pin as unknown as Spot);
                           mapRef.current?.animateToRegion(
                             {
@@ -538,10 +576,28 @@ export default function SpotsScreen() {
                             300,
                           );
                         }}
-                      />
-                    ),
-                  )}
-              </MapView>
+                      >
+                        <View style={styles.markerContainer}>
+                          <View
+                            style={[
+                              styles.marker,
+                              {
+                                backgroundColor: YELLOW,
+                                borderColor: selected ? DARK : '#B8A800',
+                                borderWidth: selected ? 3 : 2,
+                                transform: [{ scale: selected ? 1.2 : 1 }],
+                              },
+                            ]}
+                          >
+                            <Ionicons name="location" size={18} color={DARK} />
+                          </View>
+                          <View style={[styles.markerPoint, { borderTopColor: YELLOW }]} />
+                        </View>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
 
               {/* Map Controls */}
               <View style={styles.mapControls}>
@@ -1276,6 +1332,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 6,
+  },
+  overlayMarker: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   markerContainer: {
     alignItems: 'center',

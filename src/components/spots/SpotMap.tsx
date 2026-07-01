@@ -7,8 +7,9 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Linking, Platform, StyleSheet, TouchableOpacity, View } from 'react-native';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { PROVIDER_GOOGLE, type Region } from 'react-native-maps';
 import { colors, getThemeColors } from '@/constants/colors';
+import { projectToScreen } from '@/lib/mapProjection';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 interface SpotMapProps {
@@ -26,6 +27,16 @@ export function SpotMap({ latitude, longitude, spotName, height = 200 }: SpotMap
     null,
   );
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
+  // Overlay-marker projection state (react-native-maps <Marker> crashes on the
+  // new arch, so we render the pin as a View projected onto the map).
+  const [projectionRegion, setProjectionRegion] = useState<Region>({
+    latitude,
+    longitude,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+  });
+  const [mapLayout, setMapLayout] = useState({ width: 0, height: 0 });
+  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     requestLocationPermission();
@@ -131,8 +142,16 @@ export function SpotMap({ latitude, longitude, spotName, height = 200 }: SpotMap
     { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#17263c' }] },
   ];
 
+  const spotPoint =
+    mapReady && mapLayout.width > 0
+      ? projectToScreen(latitude, longitude, projectionRegion, mapLayout)
+      : null;
+
   return (
-    <View style={[styles.container, { height }]}>
+    <View
+      style={[styles.container, { height }]}
+      onLayout={(e) => setMapLayout(e.nativeEvent.layout)}
+    >
       <MapView
         ref={mapRef}
         style={styles.map}
@@ -146,16 +165,33 @@ export function SpotMap({ latitude, longitude, spotName, height = 200 }: SpotMap
         customMapStyle={isDark ? darkMapStyle : []}
         showsUserLocation={locationPermission}
         showsMyLocationButton={false}
-      >
-        {/* Plain pinColor marker — custom marker child views crash AIRGoogleMap
-            under the New Architecture's view interop. */}
-        <Marker
-          coordinate={{ latitude, longitude }}
-          title={spotName}
-          pinColor={colors.primary}
-          tracksViewChanges={false}
-        />
-      </MapView>
+        onMapReady={() => setMapReady(true)}
+        onRegionChange={(r) => setProjectionRegion(r)}
+      />
+
+      {/* Custom spot pin overlaid on the map (react-native-maps <Marker> crashes
+          AIRGoogleMap under the New Architecture). Non-interactive so map
+          gestures pass through. */}
+      {spotPoint && (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.overlayMarker,
+            {
+              left: spotPoint.x,
+              top: spotPoint.y,
+              transform: [{ translateX: -18 }, { translateY: -44 }],
+            },
+          ]}
+        >
+          <View style={styles.markerContainer}>
+            <View style={[styles.marker, { backgroundColor: colors.primary }]}>
+              <Ionicons name="location" size={20} color={colors.primaryText} />
+            </View>
+            <View style={[styles.markerPoint, { borderTopColor: colors.primary }]} />
+          </View>
+        </View>
+      )}
 
       {/* Map Controls */}
       <View style={styles.controls}>
@@ -202,6 +238,11 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  overlayMarker: {
+    position: 'absolute',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   markerContainer: {
     alignItems: 'center',
