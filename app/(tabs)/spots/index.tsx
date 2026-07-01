@@ -492,70 +492,55 @@ export default function SpotsScreen() {
                 onMapReady={() => setMapReady(true)}
                 onRegionChangeComplete={handleRegionChangeComplete}
               >
+                {/* Plain pinColor markers — custom marker child views crash
+                    AIRGoogleMap under the New Architecture's view interop, so we
+                    can't use custom bubbles here. */}
                 {mapReady &&
                   clusters.map((item) =>
-                  item.type === 'cluster' ? (
-                    <Marker
-                      key={item.id}
-                      coordinate={{ latitude: item.latitude, longitude: item.longitude }}
-                      tracksViewChanges={false}
-                      onPress={() => {
-                        mapRef.current?.animateToRegion(
-                          getClusterExpansionRegion(
-                            item.clusterId as number,
-                            item.latitude,
-                            item.longitude,
-                          ),
-                          300,
-                        );
-                      }}
-                      anchor={{ x: 0.5, y: 0.5 }}
-                    >
-                      <View style={styles.clusterBubble}>
-                        <Text style={styles.clusterText}>{item.count}</Text>
-                      </View>
-                    </Marker>
-                  ) : (
-                    <Marker
-                      key={item.id}
-                      identifier={item.pin?._id}
-                      coordinate={{ latitude: item.latitude, longitude: item.longitude }}
-                      tracksViewChanges={selectedSpot?._id === item.pin?._id}
-                      stopPropagation
-                      onPress={(e) => {
-                        e.stopPropagation();
-                        setSelectedSpot(item.pin as unknown as Spot);
-                        mapRef.current?.animateToRegion(
-                          {
-                            latitude: item.latitude,
-                            longitude: item.longitude,
-                            latitudeDelta: 0.05,
-                            longitudeDelta: 0.05,
-                          },
-                          300,
-                        );
-                      }}
-                      anchor={{ x: 0.5, y: 1 }}
-                    >
-                      <View style={styles.markerContainer}>
-                        <View
-                          style={[
-                            styles.marker,
+                    item.type === 'cluster' ? (
+                      <Marker
+                        key={item.id}
+                        coordinate={{ latitude: item.latitude, longitude: item.longitude }}
+                        pinColor="#806D00"
+                        title={`${item.count} spots`}
+                        description="Tap to zoom in"
+                        tracksViewChanges={false}
+                        onPress={() => {
+                          mapRef.current?.animateToRegion(
+                            getClusterExpansionRegion(
+                              item.clusterId as number,
+                              item.latitude,
+                              item.longitude,
+                            ),
+                            300,
+                          );
+                        }}
+                      />
+                    ) : (
+                      <Marker
+                        key={item.id}
+                        identifier={item.pin?._id}
+                        coordinate={{ latitude: item.latitude, longitude: item.longitude }}
+                        pinColor={selectedSpot?._id === item.pin?._id ? '#FF6B00' : YELLOW}
+                        title={item.pin?.name}
+                        tracksViewChanges={false}
+                        stopPropagation
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          setSelectedSpot(item.pin as unknown as Spot);
+                          mapRef.current?.animateToRegion(
                             {
-                              backgroundColor: YELLOW,
-                              borderColor: selectedSpot?._id === item.pin?._id ? DARK : '#B8A800',
-                              borderWidth: selectedSpot?._id === item.pin?._id ? 3 : 2,
-                              transform: [{ scale: selectedSpot?._id === item.pin?._id ? 1.2 : 1 }],
+                              latitude: item.latitude,
+                              longitude: item.longitude,
+                              latitudeDelta: 0.05,
+                              longitudeDelta: 0.05,
                             },
-                          ]}
-                        >
-                          <Ionicons name="location" size={18} color={DARK} />
-                        </View>
-                        <View style={[styles.markerPoint, { borderTopColor: YELLOW }]} />
-                      </View>
-                    </Marker>
-                  ),
-                )}
+                            300,
+                          );
+                        }}
+                      />
+                    ),
+                  )}
               </MapView>
 
               {/* Map Controls */}

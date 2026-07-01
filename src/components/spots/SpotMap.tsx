@@ -147,14 +147,14 @@ export function SpotMap({ latitude, longitude, spotName, height = 200 }: SpotMap
         showsUserLocation={locationPermission}
         showsMyLocationButton={false}
       >
-        <Marker coordinate={{ latitude, longitude }} title={spotName}>
-          <View style={styles.markerContainer}>
-            <View style={[styles.marker, { backgroundColor: colors.primary }]}>
-              <Ionicons name="location" size={20} color={colors.primaryText} />
-            </View>
-            <View style={[styles.markerPoint, { borderTopColor: colors.primary }]} />
-          </View>
-        </Marker>
+        {/* Plain pinColor marker — custom marker child views crash AIRGoogleMap
+            under the New Architecture's view interop. */}
+        <Marker
+          coordinate={{ latitude, longitude }}
+          title={spotName}
+          pinColor={colors.primary}
+          tracksViewChanges={false}
+        />
       </MapView>
 
       {/* Map Controls */}
