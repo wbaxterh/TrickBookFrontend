@@ -131,6 +131,7 @@ export default function SpotsScreen() {
   const [mapLayout, setMapLayout] = useState({ width: 0, height: 0 });
   const mapRef = useRef<MapView>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const mapPinsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // My Spots state
@@ -476,7 +477,7 @@ export default function SpotsScreen() {
           ) : viewMode === 'map' ? (
             // Map View with all spots (clustered, viewport-loaded)
             <View
-              style={styles.mapContainer}
+              style={[styles.mapContainer, isMapFullscreen && styles.mapContainerFullscreen]}
               onLayout={(e) => setMapLayout(e.nativeEvent.layout)}
             >
               <MapView
@@ -660,24 +661,12 @@ export default function SpotsScreen() {
                   <Ionicons name="remove" size={22} color={DARK} />
                 </Pressable>
 
-                {/* Fit all spots */}
+                {/* Toggle full-screen map */}
                 <Pressable
                   style={[styles.mapControlButton, { backgroundColor: YELLOW }]}
-                  onPress={() => {
-                    if (spots.length > 0) {
-                      const coordinates = spots.map((s) => ({
-                        latitude: s.latitude,
-                        longitude: s.longitude,
-                      }));
-                      mapRef.current?.fitToCoordinates(coordinates, {
-                        edgePadding: { top: 80, right: 80, bottom: 200, left: 80 },
-                        animated: true,
-                      });
-                      setSelectedSpot(null);
-                    }
-                  }}
+                  onPress={() => setIsMapFullscreen((v) => !v)}
                 >
-                  <Ionicons name="expand" size={18} color={DARK} />
+                  <Ionicons name={isMapFullscreen ? 'contract' : 'expand'} size={18} color={DARK} />
                 </Pressable>
               </View>
 
@@ -1295,6 +1284,17 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     borderRadius: 16,
     overflow: 'hidden',
+  },
+  mapContainerFullscreen: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    marginHorizontal: 0,
+    marginBottom: 0,
+    borderRadius: 0,
+    zIndex: 100,
   },
   map: {
     flex: 1,

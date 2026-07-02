@@ -161,6 +161,54 @@ export async function getSpots(params: GetSpotsParams = {}): Promise<SpotsRespon
   }
 }
 
+export interface MapPin {
+  _id: string;
+  name: string;
+  latitude: number;
+  longitude: number;
+  category?: string;
+  sportTypes?: string[];
+  rating?: number;
+  imageURL?: string | null;
+  city?: string;
+  state?: string;
+}
+
+export interface MapBounds {
+  minLat: number;
+  maxLat: number;
+  minLng: number;
+  maxLng: number;
+}
+
+/**
+ * Get lightweight map pins inside a bounding box, optionally filtered by sport/category.
+ */
+export async function getMapPins(
+  bounds: MapBounds,
+  sportType?: string,
+  category?: string,
+): Promise<MapPin[]> {
+  try {
+    const params = new URLSearchParams({
+      minLat: bounds.minLat.toString(),
+      maxLat: bounds.maxLat.toString(),
+      minLng: bounds.minLng.toString(),
+      maxLng: bounds.maxLng.toString(),
+    });
+    if (sportType && sportType !== 'all') params.append('sportType', sportType);
+    if (category && category !== 'all') params.append('category', category);
+
+    const response = await apiClient.get<MapPin[]>(
+      `${ENDPOINTS.spots.list}/map-pins?${params.toString()}`,
+      { skipAuth: true },
+    );
+    return response || [];
+  } catch (_error) {
+    return [];
+  }
+}
+
 /**
  * Search spots by query
  */
