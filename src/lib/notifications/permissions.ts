@@ -30,7 +30,6 @@ export async function requestOsPermission(): Promise<OsPermission> {
       allowAlert: true,
       allowBadge: true,
       allowSound: true,
-      allowAnnouncements: false,
     },
   });
   if (ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL) return 'provisional';

@@ -17,16 +17,26 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
+  type CouchCollection,
+  type CouchVideo,
   formatDuration,
   getCollection,
-  getTypeLabel,
-  type MediaCollection,
-  type MediaVideo,
 } from '@/lib/api/couch';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 const YELLOW = '#FCF150';
 const _DARK = '#1a1a1a';
+
+type MediaCollection = CouchCollection & { coverImage?: string };
+// Some backend responses include extra fields not yet in the CouchVideo contract
+type MediaVideo = CouchVideo & { avgRating?: number };
+
+/** Source label derived from the fields the backend actually persists. */
+function getTypeLabel(video: MediaVideo): string {
+  if (video.bunnyVideoId || video.hlsUrl) return 'Stream';
+  if (video.driveFileId) return 'Drive';
+  return 'Video';
+}
 
 export default function CollectionDetailScreen() {
   const { collectionId } = useLocalSearchParams<{ collectionId: string }>();
@@ -192,7 +202,7 @@ function VideoListItem({ video, theme, colors }: VideoListItemProps) {
         </Text>
         <View style={styles.videoMeta}>
           <Text style={[styles.videoMetaText, { color: theme.textSecondary }]}>
-            {getTypeLabel(video.type)}
+            {getTypeLabel(video)}
           </Text>
           {video.avgRating !== undefined && video.avgRating > 0 && (
             <View style={styles.ratingDisplay}>

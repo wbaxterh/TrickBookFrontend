@@ -30,7 +30,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SpotListCard as SpotListCardComponent } from '@/components/spots';
 import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 import { useMapClusters } from '@/hooks/useMapClusters';
-import { projectToScreen } from '@/lib/mapProjection';
 import { createSpotList, getSpotLists } from '@/lib/api/spotlists';
 import {
   getMapPins,
@@ -42,6 +41,7 @@ import {
   type Spot,
   type SpotCategory,
 } from '@/lib/api/spots';
+import { projectToScreen } from '@/lib/mapProjection';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
 import type { CreateSpotListInput, SpotList } from '@/types/spots';

@@ -1,11 +1,13 @@
 /**
  * Home Screen (Dashboard)
- * Personal dashboard matching HomeScreen.png design
+ * Action-oriented dashboard for quick access to core features
  *
  * Layout:
- * - Header: Avatar + "Yo, {name}!" (name in gold) + settings icon
+ * - Header: Avatar + "Yo, {name}!" + messages icon (badge) + settings icon
+ * - Primary Actions: 3 large cards (Add Trick, Trickipedia, Find a Spot)
+ * - Companion Widget: Kaori AI companion quick-launch
  * - Current Goals: Horizontal scroll of GoalCards
- * - Split row: Progress Stats | Quick Actions (2x2)
+ * - Feed CTA: Banner to browse the feed
  * - Homie Activity: Horizontal scroll
  */
 
@@ -22,12 +24,14 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ActivityCard, GoalCard, QuickActions, StatsCard } from '@/components/home';
-import { Avatar, Card, IconButton, SectionHeader } from '@/components/ui';
+import { ActionCard, ActivityCard, CompanionWidget, FeedCTA, GoalCard } from '@/components/home';
+import { Avatar, Card, CountBadge, IconButton, SectionHeader } from '@/components/ui';
 import { colors as brandColors } from '@/constants/colors';
+import { apiClient } from '@/lib/api/client';
 import { getMyHomies, type Homie } from '@/lib/api/homies';
+import { getUnreadCount } from '@/lib/api/messages';
 import { getUserTrickLists } from '@/lib/api/trickbook';
-import { type ActivityItem, getHomieActivity, getUserStats, type UserStats } from '@/lib/api/user';
+import { type ActivityItem, getHomieActivity } from '@/lib/api/user';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
 import type { TrickList, TrickListItem } from '@/types/trickbook';
@@ -58,32 +62,25 @@ function getStatusProgress(status: 'learning' | 'landed' | 'notStarted' | 'maste
   }
 }
 
-// Get relative time string
-function _getTimeAgo(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
+interface Bot {
+  _id: string;
+  name: string;
+  bio?: string;
+  imageUri?: string;
+  botCharacter?: string;
 }
 
 export default function HomeScreen() {
   const { theme, colors, isDark } = useThemeContext();
   const { user, token } = useAuthStore();
 
-  const [stats, setStats] = useState<UserStats | null>(null);
   const [trickLists, setTrickLists] = useState<TrickList[]>([]);
   const [homies, setHomies] = useState<Homie[]>([]);
   const [homieActivity, setHomieActivity] = useState<
     (ActivityItem & { userName?: string; userImage?: string })[]
   >([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [companion, setCompanion] = useState<Bot | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -92,22 +89,25 @@ export default function HomeScreen() {
     if (!user?.id || !token) return;
 
     try {
-      const [statsData, listsData, homiesData] = await Promise.all([
-        getUserStats(user.id).catch(() => null),
+      const [listsData, homiesData, unreadData, botsData] = await Promise.all([
         getUserTrickLists(user.id, token).catch(() => []),
         getMyHomies().catch(() => []),
+        getUnreadCount().catch(() => 0),
+        apiClient.get<Bot[]>('/bot-chat/bots').catch(() => []),
       ]);
 
-      if (statsData) setStats(statsData);
       setTrickLists(listsData);
       setHomies(homiesData);
+      setUnreadCount(unreadData);
+
+      const bots = Array.isArray(botsData) ? botsData : [];
+      setCompanion(bots[0] || null);
 
       // Fetch homie activity if we have homies
       if (homiesData.length > 0) {
         const homieIds = homiesData.map((h) => h._id);
         const activities = await getHomieActivity(homieIds, 10).catch(() => []);
 
-        // Enrich activities with user info
         const enrichedActivities = activities.map((activity) => {
           const homie = homiesData.find(
             (h) => h._id === activity.data?.userId || h._id === (activity as any).userId,
@@ -137,8 +137,7 @@ export default function HomeScreen() {
     setRefreshing(false);
   }, [fetchData]);
 
-  // Extract current goals from trick lists - sorted by most recent activity first
-  // Prioritize updatedAt (when trick was edited/status changed) over createdAt
+  // Extract current goals from trick lists
   const currentGoals = trickLists
     .flatMap((list: TrickList) =>
       (list.tricks || []).map((trick: TrickListItem) => ({
@@ -151,59 +150,15 @@ export default function HomeScreen() {
       })),
     )
     .sort((a, b) => {
-      // Tricks with timestamps come first, sorted newest to oldest
-      // Tricks without timestamps go to the end
       const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
       const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
       return timeB - timeA;
     })
     .slice(0, 5);
 
-  // Calculate stats
-  const totalLanded =
-    stats?.tricklistCount ||
-    trickLists.reduce(
-      (acc: number, list: TrickList) =>
-        acc +
-        (list.tricks || []).filter(
-          (t: TrickListItem) =>
-            t.status === 'Landed' || t.status === 'Mastered' || t.checked === 'Complete',
-        ).length,
-      0,
-    );
-
-  // Quick actions configuration
-  const quickActions = [
-    {
-      id: 'add-trick',
-      label: 'Add Trick',
-      icon: 'sparkles' as const,
-      onPress: () => router.push('/(tabs)/trickbook'),
-    },
-    {
-      id: 'feed',
-      label: 'The Feed',
-      icon: 'play' as const,
-      onPress: () => router.push('/(tabs)/media?tab=feed'),
-    },
-    {
-      id: 'trickipedia',
-      label: 'Open Trickipedia',
-      icon: 'book' as const,
-      onPress: () => router.push('/(tabs)/trickbook'),
-    },
-    {
-      id: 'find-spot',
-      label: 'Find Spot',
-      icon: 'location' as const,
-      onPress: () => router.push('/(tabs)/spots'),
-    },
-  ];
-
   // Get user display name and avatar
   const displayName = user?.name || 'Rider';
   const avatarEmoji = user?.riderProfile?.avatarIcon?.emoji || '🛹';
-  const _avatarBg = user?.riderProfile?.avatarIcon?.bg;
   const isPremium = user?.subscription?.plan === 'premium';
 
   if (loading) {
@@ -240,7 +195,7 @@ export default function HomeScreen() {
             onPress={() =>
               router.push({
                 pathname: '/(tabs)/profile/[userId]',
-                params: { userId: user?.id || user?._id, from: 'home' },
+                params: { userId: user?.id || user?._id || '', from: 'home' },
               })
             }
           >
@@ -260,10 +215,65 @@ export default function HomeScreen() {
             </Text>
           </Pressable>
 
-          <IconButton
-            icon="settings-outline"
-            variant="secondary"
-            onPress={() => router.push('/profile/settings')}
+          <View style={styles.headerRight}>
+            <View style={styles.iconWithBadge}>
+              <IconButton
+                icon="chatbubble-outline"
+                variant="secondary"
+                onPress={() => router.push('/(tabs)/homies/conversations')}
+              />
+              {unreadCount > 0 && (
+                <View style={styles.badgePosition}>
+                  <CountBadge count={unreadCount} />
+                </View>
+              )}
+            </View>
+            <IconButton
+              icon="settings-outline"
+              variant="secondary"
+              onPress={() => router.push('/profile/settings')}
+            />
+          </View>
+        </View>
+
+        {/* Primary Action Cards */}
+        <View style={styles.actionsRow}>
+          <ActionCard
+            icon="add-circle"
+            label="Add Trick"
+            sublabel="Track progress"
+            onPress={() => router.push('/(tabs)/trickbook')}
+          />
+          <ActionCard
+            icon="book"
+            label="Trickipedia"
+            sublabel="Learn new tricks"
+            onPress={() => router.push('/(tabs)/trickbook')}
+          />
+          <ActionCard
+            icon="location"
+            label="Find a Spot"
+            sublabel="Explore nearby"
+            onPress={() => router.push('/(tabs)/spots')}
+          />
+        </View>
+
+        {/* Companion Widget */}
+        <View style={styles.sectionPadded}>
+          <CompanionWidget
+            bot={companion}
+            onPress={() => companion && router.push(`/(tabs)/homies/bot-chat/${companion._id}`)}
+            onView3D={
+              // 3D stage only exists for Kaori so far
+              companion &&
+              (companion.botCharacter ?? companion.name).toLowerCase().includes('kaori')
+                ? () =>
+                    router.push({
+                      pathname: '/(tabs)/homies/companion-stage/[botId]',
+                      params: { botId: companion._id, name: companion.name },
+                    })
+                : undefined
+            }
           />
         </View>
 
@@ -318,19 +328,9 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Stats + Quick Actions Row */}
-        <View style={[styles.section, styles.splitRow]}>
-          {/* Progress Stats */}
-          <StatsCard
-            title="Progress Stats"
-            stats={[
-              { label: 'Total Landed', value: totalLanded },
-              { label: 'Homies', value: stats?.homiesCount || 0 },
-            ]}
-          />
-
-          {/* Quick Actions */}
-          <QuickActions title="Quick Actions" actions={quickActions} />
+        {/* Feed CTA */}
+        <View style={styles.sectionPadded}>
+          <FeedCTA onPress={() => router.push('/(tabs)/media?tab=feed')} />
         </View>
 
         {/* Homie Activity - Horizontal Scroll */}
@@ -352,7 +352,6 @@ export default function HomeScreen() {
               contentContainerStyle={styles.activityScroll}
             >
               {homieActivity.map((activity, index) => {
-                // Determine activity type and subject from the activity data
                 const activityType =
                   activity.type === 'post' ? 'added' : activity.type === 'spot' ? 'spot' : 'added';
                 const subject =
@@ -441,10 +440,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  iconWithBadge: {
+    position: 'relative',
+  },
+  badgePosition: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    zIndex: 1,
   },
   greeting: {
     fontSize: 24,
     fontWeight: '700',
+  },
+  actionsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: 20,
+    gap: 12,
+    marginBottom: 16,
   },
   section: {
     marginBottom: 20,
@@ -454,13 +474,9 @@ const styles = StyleSheet.create({
   },
   sectionPadded: {
     paddingHorizontal: 20,
+    marginBottom: 16,
   },
   goalsScroll: {
-    paddingHorizontal: 20,
-    gap: 12,
-  },
-  splitRow: {
-    flexDirection: 'row',
     paddingHorizontal: 20,
     gap: 12,
   },

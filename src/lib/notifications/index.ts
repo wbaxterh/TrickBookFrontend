@@ -19,6 +19,7 @@ export {
   clearSoftAskDeferred,
   getOsPermission,
   markSoftAskDeferred,
+  type OsPermission,
   requestOsPermission,
   shouldShowSoftAsk,
 } from './permissions';

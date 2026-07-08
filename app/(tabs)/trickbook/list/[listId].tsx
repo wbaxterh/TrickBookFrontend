@@ -38,6 +38,7 @@ import {
   editTrick,
   getTrickList,
   removeTrickFromList,
+  toggleTrickListVisibility,
   updateTrickList,
   updateTrickStatus,
 } from '@/lib/api/trickbook';
@@ -250,6 +251,19 @@ export default function TrickListDetailScreen() {
     setTrickLink('');
     setTrickNotes('');
     setSelectedTrick(null);
+  };
+
+  // Toggle public/private visibility
+  const handleToggleVisibility = async () => {
+    if (!list || !token || !listId) return;
+    const newValue = !list.isPublic;
+    const result = await toggleTrickListVisibility(listId, newValue, token);
+    if (result) {
+      setList((prev) => (prev ? { ...prev, isPublic: newValue } : prev));
+      Alert.alert(newValue ? 'List is now public' : 'List is now private');
+    } else {
+      Alert.alert('Error', 'Could not update visibility');
+    }
   };
 
   // Open share modal
@@ -879,6 +893,19 @@ export default function TrickListDetailScreen() {
           >
             <View style={[styles.actionSheet, { backgroundColor: theme.surface }]}>
               <Text style={[styles.actionSheetTitle, { color: theme.text }]}>{list.name}</Text>
+              <Pressable
+                style={[styles.actionSheetButton, { borderBottomColor: theme.border }]}
+                onPress={handleToggleVisibility}
+              >
+                <Ionicons
+                  name={list.isPublic ? 'globe-outline' : 'lock-closed-outline'}
+                  size={22}
+                  color={theme.text}
+                />
+                <Text style={[styles.actionSheetButtonText, { color: theme.text }]}>
+                  {list.isPublic ? 'Make Private' : 'Make Public'}
+                </Text>
+              </Pressable>
               <Pressable
                 style={[styles.actionSheetButton, { borderBottomColor: theme.border }]}
                 onPress={handleOpenShare}

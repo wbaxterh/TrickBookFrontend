@@ -361,15 +361,15 @@ function FeedView({ theme, colors, onSwitchTab }: FeedViewProps) {
     async (pageNum: number = 1, refresh: boolean = false) => {
       try {
         const response = user
-          ? await getFeed({ page: pageNum, limit: 10 })
-          : await getTrending({ page: pageNum, limit: 10 });
+          ? await getFeed({ page: pageNum, limit: 20 })
+          : await getTrending({ page: pageNum, limit: 20 });
 
         if (refresh || pageNum === 1) {
           setPosts(response.posts);
         } else {
           setPosts((prev) => [...prev, ...response.posts]);
         }
-        setHasMore(response.pagination.hasMore ?? response.posts.length === 10);
+        setHasMore(response.pagination.hasMore ?? response.posts.length === 20);
         setPage(pageNum);
       } catch (_error) {
       } finally {
@@ -649,30 +649,53 @@ interface FeedVideoItemProps {
 // Separate video player component that only renders when we have a URL
 function FeedVideoPlayer({
   videoUrl,
+  fallbackUrls,
   isActive,
   isMuted,
   onMutedChange,
 }: {
   videoUrl: string;
+  fallbackUrls?: string[];
   isActive: boolean;
   isMuted: boolean;
   onMutedChange: (muted: boolean) => void;
 }) {
-  const player = useVideoPlayer(videoUrl, (p) => {
+  const [currentUrl, setCurrentUrl] = useState(videoUrl);
+  const triedUrls = useRef(new Set<string>());
+
+  // Reset when videoUrl prop changes (new post)
+  useEffect(() => {
+    setCurrentUrl(videoUrl);
+    triedUrls.current.clear();
+  }, [videoUrl]);
+
+  const player = useVideoPlayer(currentUrl, (p) => {
     p.loop = true;
     p.muted = isMuted;
   });
 
-  // Listen for player events
+  // Listen for player events — try fallback URLs on error
   useEffect(() => {
     if (!player) return;
 
-    const statusSub = player.addListener('statusChange', (_status) => {});
+    const statusSub = player.addListener('statusChange', ({ status }) => {
+      if (status === 'error') {
+        console.error('Video playback error for URL:', currentUrl);
+        triedUrls.current.add(currentUrl);
+
+        // Try next fallback URL
+        const nextUrl = fallbackUrls?.find((u) => !triedUrls.current.has(u));
+        if (nextUrl) {
+          console.log('Trying fallback URL:', nextUrl);
+          setCurrentUrl(nextUrl);
+        }
+      }
+    });
 
     return () => {
       statusSub.remove();
     };
-  }, [player]);
+  }, [player, currentUrl, fallbackUrls]);
 
   // Handle play/pause based on visibility
   useEffect(() => {
@@ -729,38 +752,42 @@ const FeedVideoItem = memo(function FeedVideoItem({
   const hasLove = post.userReactions?.includes('love');
   const hasRespect = post.userReactions?.includes('respect');
 
-  // Determine video URL - prefer signed URLs from backend
+  // Determine video URL - prefer HLS so playback adapts to whatever
+  // resolutions Bunny actually transcoded (the hardcoded play_720p.mp4
+  // fallback returns 404 for source videos uploaded below 720p).
   const videoUrl = useMemo(() => {
     if (post.mediaType !== 'video') return null;
 
-    // Prefer signed MP4 URL from backend (for mobile compatibility)
-    if (post.signedMp4Url) {
-      return post.signedMp4Url;
-    }
-
-    // Fall back to signed HLS URL
+    // Prefer signed HLS URL — adaptive, works for any source resolution
     if (post.signedHlsUrl) {
       return post.signedHlsUrl;
     }
 
-    // Last resort: try unsigned URL (won't work if token auth is enabled)
+    // Fall back to unsigned HLS
     if (post.hlsUrl) {
       return post.hlsUrl;
     }
 
-    return null;
-  }, [post.mediaType, post.signedMp4Url, post.signedHlsUrl, post.hlsUrl]);
-
-  // Debug logging
-  useEffect(() => {
-    if (isActive) {
+    // Last resort: signed 720p MP4 (only valid if source >= 720p)
+    if (post.signedMp4Url) {
+      return post.signedMp4Url;
     }
-  }, [isActive]);
+
+    return null;
+  }, [post.mediaType, post.signedHlsUrl, post.hlsUrl, post.signedMp4Url]);
 
   // Toggle mute
   const handleMuteToggle = () => {
     setIsMuted(!isMuted);
   };
+
+  // Build fallback URL list (all available URLs except the primary one)
+  const fallbackUrls = useMemo(() => {
+    const urls = [post.signedHlsUrl, post.hlsUrl, post.signedMp4Url].filter(
+      (u): u is string => !!u && u !== videoUrl,
+    );
+    return urls;
+  }, [post.signedHlsUrl, post.hlsUrl, post.signedMp4Url, videoUrl]);
 
   const isVideo = post.mediaType === 'video' && videoUrl;
 
@@ -770,6 +797,7 @@ const FeedVideoItem = memo(function FeedVideoItem({
       {isVideo && videoUrl ? (
         <FeedVideoPlayer
           videoUrl={videoUrl}
+          fallbackUrls={fallbackUrls}
           isActive={isActive}
           isMuted={isMuted}
           onMutedChange={setIsMuted}

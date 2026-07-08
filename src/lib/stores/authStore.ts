@@ -10,6 +10,8 @@ import { apiClient } from '@/lib/api/client';
 
 export interface User {
   id: string;
+  /** MongoDB document id — some API responses return `_id` instead of `id` */
+  _id?: string;
   name: string;
   email: string;
   imageUri?: string | null;
@@ -35,10 +37,16 @@ export interface User {
     favoriteCourse?: string;
     otherHobbies?: string;
     avatarType?: 'icon' | 'upload';
-    avatarIcon?: { id: string; emoji: string; bg: string };
+    avatarIcon?: { id: string; emoji: string; bg: string } | null;
     stance?: string;
     homeSpot?: string;
     bio?: string;
+  };
+  stats?: {
+    spots: number;
+    followers: number;
+    following: number;
+    tricks: number;
   };
   role?: string;
   network?: boolean;

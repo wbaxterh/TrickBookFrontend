@@ -84,10 +84,14 @@ module.exports = function withTrickBookPodfilePatch(config) {
       if (!/^\s*use_modular_headers!/m.test(src)) {
         const targetRegex = /^([ \t]*target\s+['"][^'"]+['"]\s+do[ \t]*$)/m;
         if (targetRegex.test(src)) {
-          src = src.replace(targetRegex, "$1\n  use_modular_headers!");
-          console.log('[withAllowNonModularIncludes] injected use_modular_headers! after target line');
+          src = src.replace(targetRegex, '$1\n  use_modular_headers!');
+          console.log(
+            '[withAllowNonModularIncludes] injected use_modular_headers! after target line',
+          );
         } else {
-          console.log('[withAllowNonModularIncludes] WARN: target line not found, use_modular_headers! NOT added');
+          console.log(
+            '[withAllowNonModularIncludes] WARN: target line not found, use_modular_headers! NOT added',
+          );
         }
       } else {
         console.log('[withAllowNonModularIncludes] use_modular_headers! already present');
@@ -104,10 +108,14 @@ module.exports = function withTrickBookPodfilePatch(config) {
             `${body}${POST_INSTALL_INJECTION}\n${indent}end${trailing}`,
         );
         if (src === beforePostInstall) {
-          console.log('[withAllowNonModularIncludes] WARN: post_install regex did not match, falling back to append');
+          console.log(
+            '[withAllowNonModularIncludes] WARN: post_install regex did not match, falling back to append',
+          );
           src += `\npost_install do |installer|${POST_INSTALL_INJECTION}\nend\n`;
         } else {
-          console.log('[withAllowNonModularIncludes] injected build settings into existing post_install');
+          console.log(
+            '[withAllowNonModularIncludes] injected build settings into existing post_install',
+          );
         }
       } else {
         console.log('[withAllowNonModularIncludes] no post_install found, appending fresh block');
@@ -121,10 +129,7 @@ module.exports = function withTrickBookPodfilePatch(config) {
       if (!src.includes(PRE_INSTALL_MARKER)) {
         // Insert BEFORE the post_install block so order is conventional.
         if (/post_install\s+do\s+\|installer\|/.test(src)) {
-          src = src.replace(
-            /(post_install\s+do\s+\|installer\|)/,
-            `${PRE_INSTALL_BLOCK}\n$1`,
-          );
+          src = src.replace(/(post_install\s+do\s+\|installer\|)/, `${PRE_INSTALL_BLOCK}\n$1`);
           console.log('[withAllowNonModularIncludes] injected pre_install before post_install');
         } else {
           src += `\n${PRE_INSTALL_BLOCK}\n`;

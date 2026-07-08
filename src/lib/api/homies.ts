@@ -10,8 +10,9 @@ import { apiClient } from './client';
 export interface Homie {
   _id: string;
   name: string;
-  email: string;
+  email?: string;
   username?: string;
+  bio?: string;
   imageUri?: string | null;
   sports?: string[];
   network?: boolean;
@@ -71,6 +72,52 @@ export async function getDiscoverableUsers(): Promise<Homie[]> {
     return response;
   } catch (_error) {
     return [];
+  }
+}
+
+/**
+ * Search discoverable users with pagination
+ */
+export interface PaginatedUsersResponse {
+  users: Homie[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+    hasMore: boolean;
+  };
+}
+
+export async function searchDiscoverableUsers(
+  query: string = '',
+  page: number = 1,
+  limit: number = 20,
+): Promise<PaginatedUsersResponse> {
+  try {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    if (query) params.append('q', query);
+    const response = await apiClient.get<PaginatedUsersResponse | Homie[]>(
+      `${ENDPOINTS.homies.discoverable}?${params}`,
+    );
+
+    // Handle both old flat array and new paginated response formats
+    if (Array.isArray(response)) {
+      return {
+        users: response,
+        pagination: {
+          page: 1,
+          limit: response.length,
+          total: response.length,
+          pages: 1,
+          hasMore: false,
+        },
+      };
+    }
+
+    return response;
+  } catch (_error) {
+    return { users: [], pagination: { page: 1, limit: 20, total: 0, pages: 0, hasMore: false } };
   }
 }
 

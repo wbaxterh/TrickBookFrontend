@@ -11,7 +11,7 @@ import {
   Dimensions,
   FlatList,
   Image,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -52,6 +52,33 @@ export default function CommentsBottomSheet({ visible, post, onClose }: Comments
   const [hasMore, setHasMore] = useState(true);
   const inputRef = useRef<TextInput>(null);
   const slideAnim = useRef(new Animated.Value(SHEET_HEIGHT)).current;
+  const keyboardAnim = useRef(new Animated.Value(0)).current;
+
+  // Track keyboard to shift sheet above it
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSub = Keyboard.addListener(showEvent, (e) => {
+      Animated.timing(keyboardAnim, {
+        toValue: e.endCoordinates.height,
+        duration: e.duration || 250,
+        useNativeDriver: false,
+      }).start();
+    });
+    const hideSub = Keyboard.addListener(hideEvent, (e) => {
+      Animated.timing(keyboardAnim, {
+        toValue: 0,
+        duration: (e && e.duration) || 250,
+        useNativeDriver: false,
+      }).start();
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Fetch comments when modal opens
   useEffect(() => {
@@ -202,6 +229,7 @@ export default function CommentsBottomSheet({ visible, post, onClose }: Comments
           styles.sheet,
           {
             transform: [{ translateY: slideAnim }],
+            bottom: keyboardAnim,
             paddingBottom: insets.bottom,
           },
         ]}
@@ -250,43 +278,38 @@ export default function CommentsBottomSheet({ visible, post, onClose }: Comments
         />
 
         {/* Input */}
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={0}
-        >
-          <View style={styles.inputContainer}>
-            {user ? (
-              <>
-                <TextInput
-                  ref={inputRef}
-                  style={styles.input}
-                  placeholder="Add a comment..."
-                  placeholderTextColor="rgba(255,255,255,0.4)"
-                  value={newComment}
-                  onChangeText={setNewComment}
-                  multiline
-                  maxLength={500}
-                />
-                <Pressable
-                  style={[
-                    styles.sendButton,
-                    (!newComment.trim() || submitting) && styles.sendButtonDisabled,
-                  ]}
-                  onPress={handleSubmit}
-                  disabled={!newComment.trim() || submitting}
-                >
-                  {submitting ? (
-                    <ActivityIndicator size="small" color="#000" />
-                  ) : (
-                    <Ionicons name="send" size={20} color="#000" />
-                  )}
-                </Pressable>
-              </>
-            ) : (
-              <Text style={styles.loginPrompt}>Sign in to comment</Text>
-            )}
-          </View>
-        </KeyboardAvoidingView>
+        <View style={styles.inputContainer}>
+          {user ? (
+            <>
+              <TextInput
+                ref={inputRef}
+                style={styles.input}
+                placeholder="Add a comment..."
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                value={newComment}
+                onChangeText={setNewComment}
+                multiline
+                maxLength={500}
+              />
+              <Pressable
+                style={[
+                  styles.sendButton,
+                  (!newComment.trim() || submitting) && styles.sendButtonDisabled,
+                ]}
+                onPress={handleSubmit}
+                disabled={!newComment.trim() || submitting}
+              >
+                {submitting ? (
+                  <ActivityIndicator size="small" color="#000" />
+                ) : (
+                  <Ionicons name="send" size={20} color="#000" />
+                )}
+              </Pressable>
+            </>
+          ) : (
+            <Text style={styles.loginPrompt}>Sign in to comment</Text>
+          )}
+        </View>
       </Animated.View>
     </Modal>
   );

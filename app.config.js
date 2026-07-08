@@ -41,6 +41,17 @@ export default {
           color: '#FCF150',
         },
       ],
+      // Mic + speech recognition for talking to Kaori on the 3D stage
+      [
+        'expo-speech-recognition',
+        {
+          microphonePermission:
+            'Allow $(PRODUCT_NAME) to access the microphone so you can talk to Kaori.',
+          speechRecognitionPermission:
+            'Allow $(PRODUCT_NAME) to use speech recognition to turn your voice into text.',
+          androidSpeechServicePackages: ['com.google.android.googlequicksearchbox'],
+        },
+      ],
       // Add `use_frameworks! :linkage => :static` to the iOS Podfile. Required
       // because @react-native-google-signin/google-signin transitively pulls in
       // AppCheckCore (Swift), whose Obj-C deps (GoogleUtilities, RecaptchaInterop)

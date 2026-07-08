@@ -25,9 +25,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { apiClient } from '@/lib/api/client';
 import {
   acceptHomieRequest,
-  getDiscoverableUsers,
   getMyHomies,
   getPendingRequests,
   type Homie,
@@ -37,7 +37,6 @@ import {
   sendHomieRequest,
 } from '@/lib/api/homies';
 import { getOrCreateConversation } from '@/lib/api/messages';
-import { apiClient } from '@/lib/api/client';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
 
