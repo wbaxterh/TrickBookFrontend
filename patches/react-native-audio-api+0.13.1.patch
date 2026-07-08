@@ -1,0 +1,16 @@
+diff --git a/node_modules/react-native-audio-api/ios/audioapi/ios/system/AudioSessionManager.mm b/node_modules/react-native-audio-api/ios/audioapi/ios/system/AudioSessionManager.mm
+index d115837..691a8e7 100644
+--- a/node_modules/react-native-audio-api/ios/audioapi/ios/system/AudioSessionManager.mm
++++ b/node_modules/react-native-audio-api/ios/audioapi/ios/system/AudioSessionManager.mm
+@@ -513,7 +513,10 @@ - (AVAudioSessionCategoryOptions)optionsFromArray:(NSArray *)optionsArray
+     }
+ 
+     if ([option isEqualToString:@"allowBluetoothHFP"]) {
+-      options |= AVAudioSessionCategoryOptionAllowBluetoothHFP;
++      // AVAudioSessionCategoryOptionAllowBluetoothHFP is the iOS 26 SDK
++      // rename of AllowBluetooth (same bit value); the old name compiles
++      // on every SDK including the Xcode 16.x EAS build images.
++      options |= AVAudioSessionCategoryOptionAllowBluetooth;
+       continue;
+     }
+ 

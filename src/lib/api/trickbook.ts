@@ -317,7 +317,7 @@ export async function getTrickList(
         notes: t.notes,
         createdAt: t.createdAt,
       })),
-      isPublic: false,
+      isPublic: tricks[0]?.isPublic || false,
     } as TrickList;
   } catch (_error) {
     return null;
@@ -370,5 +370,28 @@ export async function editTrick(
     return response.ok;
   } catch (_error) {
     return false;
+  }
+}
+
+// Toggle tricklist public/private visibility
+export async function toggleTrickListVisibility(
+  listId: string,
+  isPublic: boolean,
+  token: string,
+): Promise<TrickList | null> {
+  try {
+    const response = await fetch(`${API_BASE}/listings/${listId}/visibility`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-auth-token': token,
+      },
+      body: JSON.stringify({ isPublic }),
+    });
+
+    if (!response.ok) throw new Error('Failed to update visibility');
+    return response.json();
+  } catch (_error) {
+    return null;
   }
 }

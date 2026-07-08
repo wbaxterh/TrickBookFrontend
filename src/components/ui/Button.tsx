@@ -106,18 +106,18 @@ export function Button({
   return (
     <Pressable
       disabled={isDisabled}
-      style={({ pressed }) => [
+      style={(state) => [
         styles.button,
         {
           height: sizeStyles.height,
           paddingHorizontal: size === 'icon' ? 0 : sizeStyles.paddingH,
           width: size === 'icon' ? sizeStyles.width : fullWidth ? '100%' : undefined,
-          backgroundColor: pressed ? variantStyles.bgPressed : variantStyles.bg,
+          backgroundColor: state.pressed ? variantStyles.bgPressed : variantStyles.bg,
           borderColor: variantStyles.border,
           borderWidth: variant === 'outline' ? 1 : 0,
           opacity: isDisabled ? 0.5 : 1,
         },
-        style,
+        typeof style === 'function' ? style(state) : style,
       ]}
       {...props}
     >
@@ -205,19 +205,19 @@ export function IconButton({
 
   return (
     <Pressable
-      style={({ pressed }) => [
+      style={(state) => [
         styles.iconButton,
         {
           width: sizeStyles.dimension,
           height: sizeStyles.dimension,
           borderRadius: sizeStyles.dimension / 2,
-          backgroundColor: pressed
+          backgroundColor: state.pressed
             ? variant === 'ghost'
               ? theme.surface
               : `${variantStyles.bg}CC`
             : variantStyles.bg,
         },
-        style,
+        typeof style === 'function' ? style(state) : style,
       ]}
       {...props}
     >

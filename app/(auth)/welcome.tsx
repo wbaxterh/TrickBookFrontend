@@ -5,11 +5,6 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import {
-  GoogleSignin,
-  isErrorWithCode,
-  statusCodes,
-} from '@react-native-google-signin/google-signin';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -30,11 +25,19 @@ import { getUserCount } from '@/lib/api/user';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
 
-// Configure Google Sign-In with the web client ID (used for ID token audience)
-GoogleSignin.configure({
-  iosClientId: '624774098704-r7eqvb0jc4i3or885fk3k1u3l5uqlqmd.apps.googleusercontent.com',
-  webClientId: '624774098704-j2q01j9g7pj41f8poqbvkvho9f7v3mco.apps.googleusercontent.com',
-});
+// Conditionally load native Google Sign-In (unavailable in Expo Go)
+let GoogleSigninModule: any = null;
+try {
+  const mod = require('@react-native-google-signin/google-signin');
+  GoogleSigninModule = mod.GoogleSignin;
+  GoogleSigninModule.configure({
+    iosClientId: '624774098704-r7eqvb0jc4i3or885fk3k1u3l5uqlqmd.apps.googleusercontent.com',
+    webClientId: '624774098704-j2q01j9g7pj41f8poqbvkvho9f7v3mco.apps.googleusercontent.com',
+  });
+} catch {
+  // Native module not available (Expo Go) -- Google Sign-In button will be hidden
+}
+const googleSignInAvailable = GoogleSigninModule != null;
 
 // Format number with K/M suffix
 function formatCount(count: number): string {
@@ -56,10 +59,11 @@ export default function WelcomeScreen() {
 
   // Trigger native Google sign-in
   const onGoogleSignIn = async () => {
+    if (!GoogleSigninModule) return;
     setIsGoogleLoading(true);
     try {
-      await GoogleSignin.hasPlayServices();
-      const response = await GoogleSignin.signIn();
+      await GoogleSigninModule.hasPlayServices();
+      const response = await GoogleSigninModule.signIn();
 
       if (response.type === 'success' && response.data.idToken) {
         // Send ID token to backend for verification
@@ -71,16 +75,12 @@ export default function WelcomeScreen() {
         Alert.alert('Error', 'Google sign-in failed. Please try again.');
       }
     } catch (error: any) {
-      if (isErrorWithCode(error)) {
-        if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-          // User cancelled — do nothing
-        } else if (error.code === statusCodes.IN_PROGRESS) {
-          // Sign-in already in progress
-        } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
-          Alert.alert('Error', 'Google Play Services is not available on this device.');
-        } else {
-          Alert.alert('Error', error.message || 'Failed to sign in with Google');
-        }
+      if (error.code === 'SIGN_IN_CANCELLED') {
+        // User cancelled — do nothing
+      } else if (error.code === 'IN_PROGRESS') {
+        // Sign-in already in progress
+      } else if (error.code === 'PLAY_SERVICES_NOT_AVAILABLE') {
+        Alert.alert('Error', 'Google Play Services is not available on this device.');
       } else {
         Alert.alert('Error', error.message || 'Failed to sign in with Google');
       }
@@ -165,30 +165,32 @@ export default function WelcomeScreen() {
             Get Started
           </Button>
 
-          {/* Google Sign-In Button */}
-          <Pressable
-            style={[
-              styles.ssoButton,
-              {
-                backgroundColor: colors.surface,
-                borderColor: theme.border,
-                opacity: isGoogleLoading ? 0.6 : 1,
-              },
-            ]}
-            onPress={onGoogleSignIn}
-            disabled={isGoogleLoading}
-          >
-            {isGoogleLoading ? (
-              <ActivityIndicator size="small" color={theme.text} />
-            ) : (
-              <>
-                <Ionicons name="logo-google" size={20} color={theme.text} />
-                <Text style={[styles.ssoButtonText, { color: theme.text }]}>
-                  Continue with Google
-                </Text>
-              </>
-            )}
-          </Pressable>
+          {/* Google Sign-In Button - hidden when native module unavailable (Expo Go) */}
+          {googleSignInAvailable && (
+            <Pressable
+              style={[
+                styles.ssoButton,
+                {
+                  backgroundColor: theme.surface,
+                  borderColor: theme.border,
+                  opacity: isGoogleLoading ? 0.6 : 1,
+                },
+              ]}
+              onPress={onGoogleSignIn}
+              disabled={isGoogleLoading}
+            >
+              {isGoogleLoading ? (
+                <ActivityIndicator size="small" color={theme.text} />
+              ) : (
+                <>
+                  <Ionicons name="logo-google" size={20} color={theme.text} />
+                  <Text style={[styles.ssoButtonText, { color: theme.text }]}>
+                    Continue with Google
+                  </Text>
+                </>
+              )}
+            </Pressable>
+          )}
 
           {/* Apple Sign-In Button - iOS only */}
           {Platform.OS === 'ios' && (

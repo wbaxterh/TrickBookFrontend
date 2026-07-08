@@ -22,6 +22,18 @@ export interface SharedContent {
   preview?: SharedContentPreview;
 }
 
+export type RichContentType =
+  | 'spot_card'
+  | 'spots_list'
+  | 'tricklist_card'
+  | 'trick_card'
+  | 'spot_draft_confirmation';
+
+export interface RichContent {
+  type: RichContentType;
+  data: any;
+}
+
 export interface Message {
   _id: string;
   conversationId: string;
@@ -29,6 +41,7 @@ export interface Message {
   content: string | null;
   type?: 'text' | 'shared';
   sharedContent?: SharedContent | null;
+  richContent?: RichContent;
   status: 'sent' | 'read';
   readAt?: string;
   createdAt: string;

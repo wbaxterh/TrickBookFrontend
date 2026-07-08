@@ -423,7 +423,7 @@ export default function SpotDetailScreen() {
           preview={{
             title: spot.name,
             subtitle: fullAddress,
-            thumbnailUrl: spot.imageURL,
+            thumbnailUrl: spot.imageURL ?? undefined,
           }}
           onSuccess={(conversationId) => {
             router.push(`/(tabs)/homies/chat/${conversationId}`);

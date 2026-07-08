@@ -54,7 +54,7 @@ export interface User {
     favoriteCourse?: string;
     otherHobbies?: string;
     avatarType?: 'icon' | 'upload';
-    avatarIcon?: { id: string; emoji: string; bg: string };
+    avatarIcon?: { id: string; emoji: string; bg: string } | null;
     stance?: string;
     homeSpot?: string;
     bio?: string;

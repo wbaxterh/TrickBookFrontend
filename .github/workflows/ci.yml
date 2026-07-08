@@ -26,3 +26,6 @@ jobs:
 
       - name: Typecheck
         run: npx tsc --noEmit
+
+      - name: Production readiness checks
+        run: bash scripts/check-prod-ready.sh

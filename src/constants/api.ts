@@ -7,13 +7,16 @@
 const isDevelopment = __DEV__;
 
 // Use your computer's local IP for physical devices (localhost only works on simulators)
-const DEV_API_HOST = '192.168.5.131';
+const DEV_API_HOST = '192.168.1.242';
 
 export const API_CONFIG = {
   // Base URLs
   baseUrl: isDevelopment ? `http://${DEV_API_HOST}:9000/api` : 'https://api.thetrickbook.com/api',
 
   socketUrl: isDevelopment ? `http://${DEV_API_HOST}:9000` : 'https://api.thetrickbook.com',
+
+  // Kith voice sidecar — streams Kaori's TTS audio + emotion events (3D stage)
+  kithWsUrl: isDevelopment ? `ws://${DEV_API_HOST}:3040/ws` : 'wss://api.thetrickbook.com/kith/ws',
 
   // Bunny.net CDN for video streaming
   bunnyCdnHostname: 'vz-9b8a66dd-b7b.b-cdn.net',
