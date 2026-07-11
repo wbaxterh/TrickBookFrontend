@@ -327,6 +327,29 @@ export default function PostDetailScreen() {
             </View>
           )}
 
+          {/* Spot chip */}
+          {post.spot && (
+            <View style={styles.spotSection}>
+              <Pressable
+                style={[styles.spotChip, { backgroundColor: theme.surface }]}
+                onPress={() => router.push(`/(tabs)/spots/${post.spot?._id}`)}
+              >
+                <Ionicons name="location" size={16} color={colors.primary} />
+                <Text style={[styles.spotChipText, { color: theme.text }]} numberOfLines={1}>
+                  {post.spot.name}
+                </Text>
+                {(post.spot.city || post.spot.state) && (
+                  <Text
+                    style={[styles.spotChipMeta, { color: theme.textSecondary }]}
+                    numberOfLines={1}
+                  >
+                    {[post.spot.city, post.spot.state].filter(Boolean).join(', ')}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          )}
+
           {/* Comments Section */}
           <View style={[styles.commentsSection, { borderTopColor: theme.border }]}>
             <Text style={[styles.commentsSectionTitle, { color: theme.text }]}>
@@ -564,6 +587,31 @@ const styles = StyleSheet.create({
   caption: {
     fontSize: 15,
     lineHeight: 22,
+  },
+  spotSection: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  spotChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: `${YELLOW}60`,
+  },
+  spotChipText: {
+    fontSize: 14,
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  spotChipMeta: {
+    fontSize: 13,
+    flexShrink: 1,
   },
   commentsSection: {
     paddingHorizontal: 20,

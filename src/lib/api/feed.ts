@@ -52,6 +52,16 @@ export interface FeedPost {
   status: 'processing' | 'published' | 'removed';
   userReactions?: ('love' | 'respect')[];
   saved?: boolean;
+  // Linked spot (backend enriches the post with this when spotId is set)
+  spotId?: string;
+  spot?: {
+    _id: string;
+    name: string;
+    city?: string;
+    state?: string;
+    imageURL?: string | null;
+    category?: string;
+  };
   createdAt: string;
   updatedAt: string;
 }
@@ -240,6 +250,7 @@ export interface CreatePostData {
   duration?: number;
   aspectRatio?: string;
   visibility?: 'public' | 'homies' | 'private';
+  spotId?: string;
 }
 
 /**

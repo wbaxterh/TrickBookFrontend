@@ -5,6 +5,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { Image as ExpoImage } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -25,13 +26,16 @@ import { ShareToHomieModal } from '@/components/share';
 import { AddToSpotListModal, SpotMap, SpotReviewsList } from '@/components/spots';
 import {
   deleteSpot,
+  deleteSpotPhoto,
   getSpotById,
   isSpotSaved,
+  reportSpotPhoto,
   type Spot,
   type SpotPhoto,
   saveSpot,
   unsaveSpot,
   updateSpot,
+  uploadSpotPhoto,
 } from '@/lib/api/spots';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
@@ -71,9 +75,14 @@ export default function SpotDetailScreen() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Photo upload state (Google-Maps-style "add a photo" for any logged-in user)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
   // Is the current user the author/owner of this spot?
   const currentUserId = user?.id || user?._id;
   const isOwner = !!currentUserId && !!spot?.userId && spot.userId === currentUserId;
+  const isAdmin = user?.role === 'admin';
+  const isLoggedIn = !!currentUserId;
 
   // Combined photo gallery: user photos first, then Google photos, else header image
   const galleryPhotos = useMemo<SpotPhoto[]>(() => {
@@ -197,6 +206,168 @@ export default function SpotDetailScreen() {
     );
   }, [spotId]);
 
+  // Upload one or more picked photos to this spot, then refetch to refresh gallery.
+  const uploadPickedPhotos = useCallback(
+    async (assets: { uri: string; mimeType: string }[]) => {
+      if (!spotId || assets.length === 0) return;
+      setUploadingPhoto(true);
+      let failed = 0;
+      for (const asset of assets) {
+        const uploaded = await uploadSpotPhoto(spotId, asset.uri, asset.mimeType);
+        if (!uploaded) failed++;
+      }
+      // Refetch the spot so the new photos show up in the gallery.
+      const refreshed = await getSpotById(spotId);
+      if (refreshed) setSpot(refreshed);
+      setUploadingPhoto(false);
+      if (failed > 0) {
+        Alert.alert(
+          'Some photos failed',
+          `${failed} photo${failed > 1 ? 's' : ''} couldn't be uploaded. Please try again.`,
+        );
+      }
+    },
+    [spotId],
+  );
+
+  // Pick photos from the library and upload them.
+  const handleAddPhotoFromGallery = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow access to your photo library.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      await uploadPickedPhotos(
+        result.assets.map((asset) => ({
+          uri: asset.uri,
+          mimeType: asset.mimeType || 'image/jpeg',
+        })),
+      );
+    }
+  }, [uploadPickedPhotos]);
+
+  // Capture a photo with the camera and upload it.
+  const handleAddPhotoFromCamera = useCallback(async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow access to your camera.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      await uploadPickedPhotos([{ uri: asset.uri, mimeType: asset.mimeType || 'image/jpeg' }]);
+    }
+  }, [uploadPickedPhotos]);
+
+  // "Add Photo" affordance — any logged-in user. Offers Gallery or Camera.
+  const handleAddPhoto = useCallback(() => {
+    if (!isLoggedIn) {
+      Alert.alert('Sign In Required', 'Please sign in to add a photo to this spot.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign In', onPress: () => router.push('/(auth)/login') },
+      ]);
+      return;
+    }
+    if (uploadingPhoto) return;
+    Alert.alert('Add Photo', 'Add a photo to this spot', [
+      { text: 'Choose from Gallery', onPress: handleAddPhotoFromGallery },
+      { text: 'Take Photo', onPress: handleAddPhotoFromCamera },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [isLoggedIn, uploadingPhoto, handleAddPhotoFromGallery, handleAddPhotoFromCamera]);
+
+  // Report a user photo, then thank the reporter.
+  const handleReportPhoto = useCallback(
+    (photoKey: string) => {
+      if (!spotId) return;
+      Alert.alert('Report Photo', 'Report this photo as inappropriate or incorrect?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Report',
+          style: 'destructive',
+          onPress: async () => {
+            const ok = await reportSpotPhoto(spotId, photoKey);
+            if (ok) {
+              // A report may have crossed the auto-hide threshold — refresh so a
+              // now-hidden photo disappears.
+              const refreshed = await getSpotById(spotId);
+              if (refreshed) setSpot(refreshed);
+            }
+            Alert.alert(
+              ok ? 'Thanks' : 'Error',
+              ok ? "Thanks — we'll review this." : 'Failed to report photo. Please try again.',
+            );
+          },
+        },
+      ]);
+    },
+    [spotId],
+  );
+
+  // Delete a user photo (uploader/owner or admin), then refetch.
+  const handleDeletePhoto = useCallback(
+    (photoKey: string) => {
+      if (!spotId) return;
+      Alert.alert('Delete Photo', 'Delete this photo? This cannot be undone.', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const ok = await deleteSpotPhoto(spotId, photoKey);
+            if (ok) {
+              const refreshed = await getSpotById(spotId);
+              if (refreshed) setSpot(refreshed);
+            } else {
+              Alert.alert('Error', 'Failed to delete photo. Please try again.');
+            }
+          },
+        },
+      ]);
+    },
+    [spotId],
+  );
+
+  // Long-press / "..." on a user photo opens the report/delete menu.
+  const handlePhotoActions = useCallback(
+    (photo: SpotPhoto) => {
+      // Google photos have no key and are neither reportable nor deletable.
+      if (!photo.key) return;
+      const photoKey = photo.key;
+      const isOwnPhoto = !!currentUserId && photo.userId === currentUserId;
+      const canDelete = isAdmin || isOwnPhoto;
+      const buttons: {
+        text: string;
+        style?: 'default' | 'cancel' | 'destructive';
+        onPress?: () => void;
+      }[] = [];
+      // You can't report your own photo — you delete it instead.
+      if (!isOwnPhoto) {
+        buttons.push({ text: 'Report photo', onPress: () => handleReportPhoto(photoKey) });
+      }
+      if (canDelete) {
+        buttons.push({
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => handleDeletePhoto(photoKey),
+        });
+      }
+      buttons.push({ text: 'Cancel', style: 'cancel' });
+      Alert.alert('Photo', undefined, buttons);
+    },
+    [isAdmin, currentUserId, handleReportPhoto, handleDeletePhoto],
+  );
+
   // Parse tags into features array
   const getFeatures = (): string[] => {
     if (!spot?.tags) return [];
@@ -311,6 +482,17 @@ export default function SpotDetailScreen() {
 
           {/* Action buttons */}
           <View style={styles.headerActions}>
+            <Pressable
+              style={styles.actionButton}
+              onPress={handleAddPhoto}
+              disabled={uploadingPhoto}
+            >
+              {uploadingPhoto ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="camera-outline" size={22} color="#FFFFFF" />
+              )}
+            </Pressable>
             <Pressable style={styles.actionButton} onPress={() => setIsFavorite(!isFavorite)}>
               <Ionicons
                 name={isFavorite ? 'heart' : 'heart-outline'}
@@ -332,25 +514,63 @@ export default function SpotDetailScreen() {
           </View>
         </View>
 
-        {/* Photo Gallery (user + Google photos) */}
-        {galleryPhotos.length > 1 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.gallery}
-            contentContainerStyle={styles.galleryContent}
-          >
-            {galleryPhotos.map((photo, index) => (
-              <ExpoImage
+        {/* Photo Gallery (user + Google photos) + "Add Photo" tile */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.gallery}
+          contentContainerStyle={styles.galleryContent}
+        >
+          {/* Skip index 0 — it's already shown as the large header image. */}
+          {galleryPhotos.slice(1).map((photo, index) => {
+            // Only user photos (which carry a `key`) can be reported/deleted.
+            const isUserPhoto = !!photo.key;
+            return (
+              <Pressable
                 key={photo.key ?? photo.url ?? `photo-${index}`}
-                source={{ uri: photo.url }}
-                style={styles.galleryThumb}
-                contentFit="cover"
-                transition={200}
-              />
-            ))}
-          </ScrollView>
-        )}
+                onLongPress={isUserPhoto ? () => handlePhotoActions(photo) : undefined}
+                delayLongPress={300}
+              >
+                <ExpoImage
+                  source={{ uri: photo.url }}
+                  style={styles.galleryThumb}
+                  contentFit="cover"
+                  transition={200}
+                />
+                {isUserPhoto && (
+                  <Pressable
+                    style={styles.galleryMoreButton}
+                    onPress={() => handlePhotoActions(photo)}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="ellipsis-horizontal" size={16} color="#FFFFFF" />
+                  </Pressable>
+                )}
+              </Pressable>
+            );
+          })}
+
+          {/* Add Photo tile — available to any logged-in user */}
+          <Pressable
+            style={[
+              styles.galleryAddTile,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+            onPress={handleAddPhoto}
+            disabled={uploadingPhoto}
+          >
+            {uploadingPhoto ? (
+              <ActivityIndicator size="small" color={YELLOW} />
+            ) : (
+              <>
+                <Ionicons name="camera" size={22} color={YELLOW} />
+                <Text style={[styles.galleryAddText, { color: theme.textSecondary }]}>
+                  Add Photo
+                </Text>
+              </>
+            )}
+          </Pressable>
+        </ScrollView>
 
         {/* Content */}
         <View style={styles.content}>
@@ -844,6 +1064,31 @@ const styles = StyleSheet.create({
     width: 110,
     height: 80,
     borderRadius: 12,
+  },
+  galleryMoreButton: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  galleryAddTile: {
+    width: 110,
+    height: 80,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  galleryAddText: {
+    fontSize: 12,
+    fontWeight: '600',
   },
 
   // Content

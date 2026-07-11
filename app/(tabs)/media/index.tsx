@@ -893,6 +893,19 @@ const FeedVideoItem = memo(function FeedVideoItem({
           </Text>
         )}
 
+        {/* Spot chip */}
+        {post.spot && (
+          <Pressable
+            style={styles.spotChip}
+            onPress={() => router.push(`/(tabs)/spots/${post.spot?._id}`)}
+          >
+            <Ionicons name="location" size={14} color={YELLOW} />
+            <Text style={styles.spotChipText} numberOfLines={1}>
+              {post.spot.name}
+            </Text>
+          </Pressable>
+        )}
+
         {/* Tags */}
         {post.sportTypes && post.sportTypes.length > 0 && (
           <View style={styles.videoTags}>
@@ -1378,5 +1391,25 @@ const styles = StyleSheet.create({
   videoTime: {
     color: 'rgba(255,255,255,0.7)',
     fontSize: 12,
+  },
+  spotChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    maxWidth: '100%',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderWidth: 1,
+    borderColor: `${YELLOW}80`,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+    marginBottom: 8,
+  },
+  spotChipText: {
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '600',
+    flexShrink: 1,
   },
 });

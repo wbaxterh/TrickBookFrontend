@@ -13,8 +13,10 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  FlatList,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -25,7 +27,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { type CreatePostData, createPost } from '@/lib/api/feed';
-import { getSportTypes, type SportType } from '@/lib/api/spots';
+import { getSportTypes, type SportType, type Spot, searchSpots } from '@/lib/api/spots';
 import {
   createVideoEntry,
   uploadImageToS3,
@@ -60,6 +62,13 @@ export default function UploadScreen() {
   const [tricks, setTricks] = useState<string[]>([]);
   const [trickInput, setTrickInput] = useState('');
   const [visibility, setVisibility] = useState<'public' | 'homies' | 'private'>('public');
+
+  // Spot tagging state
+  const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
+  const [spotModalVisible, setSpotModalVisible] = useState(false);
+  const [spotQuery, setSpotQuery] = useState('');
+  const [spotResults, setSpotResults] = useState<Spot[]>([]);
+  const [spotSearching, setSpotSearching] = useState(false);
 
   // Upload state
   const [uploadStep, setUploadStep] = useState<UploadStep>('idle');
@@ -143,6 +152,45 @@ export default function UploadScreen() {
 
   const handleRemoveTrick = (trick: string) => {
     setTricks(tricks.filter((t) => t !== trick));
+  };
+
+  // Debounced spot search while the picker modal is open
+  useEffect(() => {
+    if (!spotModalVisible) return;
+    const query = spotQuery.trim();
+    if (query.length < 2) {
+      setSpotResults([]);
+      setSpotSearching(false);
+      return;
+    }
+    let cancelled = false;
+    setSpotSearching(true);
+    const handle = setTimeout(async () => {
+      const response = await searchSpots(query);
+      if (!cancelled) {
+        setSpotResults(response.spots);
+        setSpotSearching(false);
+      }
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [spotQuery, spotModalVisible]);
+
+  const openSpotModal = () => {
+    setSpotQuery('');
+    setSpotResults([]);
+    setSpotModalVisible(true);
+  };
+
+  const handleSelectSpot = (spot: Spot) => {
+    setSelectedSpot(spot);
+    setSpotModalVisible(false);
+  };
+
+  const handleRemoveSpot = () => {
+    setSelectedSpot(null);
   };
 
   const handleSubmit = async () => {
@@ -297,6 +345,7 @@ export default function UploadScreen() {
       visibility,
       duration: processedVideo.duration,
       aspectRatio,
+      spotId: selectedSpot?._id,
     };
 
     const post = await createPost(postData);
@@ -344,6 +393,7 @@ export default function UploadScreen() {
       sportTypes: selectedSports,
       tricks,
       visibility,
+      spotId: selectedSpot?._id,
     };
 
     const post = await createPost(postData);
@@ -527,6 +577,46 @@ export default function UploadScreen() {
             )}
           </View>
 
+          {/* Tag a Spot */}
+          <View style={styles.section}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Tag a Spot</Text>
+            {selectedSpot ? (
+              <View style={[styles.spotChip, { backgroundColor: theme.surface }]}>
+                <Ionicons name="location" size={18} color={YELLOW} />
+                <View style={styles.spotChipInfo}>
+                  <Text style={[styles.spotChipName, { color: theme.text }]} numberOfLines={1}>
+                    {selectedSpot.name}
+                  </Text>
+                  {(selectedSpot.city || selectedSpot.state) && (
+                    <Text
+                      style={[styles.spotChipMeta, { color: theme.textSecondary }]}
+                      numberOfLines={1}
+                    >
+                      {[selectedSpot.city, selectedSpot.state].filter(Boolean).join(', ')}
+                    </Text>
+                  )}
+                </View>
+                {!isUploading && (
+                  <Pressable onPress={handleRemoveSpot} hitSlop={8}>
+                    <Ionicons name="close-circle" size={22} color={theme.textSecondary} />
+                  </Pressable>
+                )}
+              </View>
+            ) : (
+              <Pressable
+                style={[styles.tagSpotButton, { backgroundColor: theme.surface }]}
+                onPress={openSpotModal}
+                disabled={isUploading}
+              >
+                <Ionicons name="location-outline" size={20} color={colors.primary} />
+                <Text style={[styles.tagSpotButtonText, { color: theme.text }]}>
+                  Tag a spot (optional)
+                </Text>
+                <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+              </Pressable>
+            )}
+          </View>
+
           {/* Visibility */}
           <View style={styles.section}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>Who can see this?</Text>
@@ -625,6 +715,90 @@ export default function UploadScreen() {
           <View style={{ height: 40 }} />
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* Spot Picker Modal */}
+      <Modal
+        visible={spotModalVisible}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setSpotModalVisible(false)}
+      >
+        <SafeAreaView
+          style={[styles.modalContainer, { backgroundColor: theme.background }]}
+          edges={['top']}
+        >
+          <View style={styles.modalHeader}>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>Tag a Spot</Text>
+            <Pressable
+              style={[styles.headerButton, { backgroundColor: theme.surface }]}
+              onPress={() => setSpotModalVisible(false)}
+            >
+              <Ionicons name="close" size={24} color={theme.text} />
+            </Pressable>
+          </View>
+
+          <View style={styles.modalSearchRow}>
+            <Ionicons name="search" size={20} color={theme.textSecondary} />
+            <TextInput
+              style={[styles.modalSearchInput, { color: theme.text }]}
+              placeholder="Search spots by name..."
+              placeholderTextColor={theme.textSecondary}
+              value={spotQuery}
+              onChangeText={setSpotQuery}
+              autoFocus
+              returnKeyType="search"
+            />
+            {spotQuery.length > 0 && (
+              <Pressable onPress={() => setSpotQuery('')} hitSlop={8}>
+                <Ionicons name="close-circle" size={20} color={theme.textSecondary} />
+              </Pressable>
+            )}
+          </View>
+
+          {spotSearching ? (
+            <View style={styles.modalEmpty}>
+              <ActivityIndicator size="small" color={YELLOW} />
+            </View>
+          ) : (
+            <FlatList
+              data={spotResults}
+              keyExtractor={(item) => item._id}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.modalListContent}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={[styles.spotResultRow, { borderBottomColor: theme.border }]}
+                  onPress={() => handleSelectSpot(item)}
+                >
+                  <Ionicons name="location" size={20} color={colors.primary} />
+                  <View style={styles.spotResultInfo}>
+                    <Text style={[styles.spotResultName, { color: theme.text }]} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    {(item.city || item.state) && (
+                      <Text
+                        style={[styles.spotResultMeta, { color: theme.textSecondary }]}
+                        numberOfLines={1}
+                      >
+                        {[item.city, item.state].filter(Boolean).join(', ')}
+                      </Text>
+                    )}
+                  </View>
+                </Pressable>
+              )}
+              ListEmptyComponent={
+                <View style={styles.modalEmpty}>
+                  <Text style={[styles.modalEmptyText, { color: theme.textSecondary }]}>
+                    {spotQuery.trim().length < 2
+                      ? 'Type at least 2 characters to search.'
+                      : 'No spots found.'}
+                  </Text>
+                </View>
+              }
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -884,5 +1058,98 @@ const styles = StyleSheet.create({
     color: DARK,
     fontSize: 16,
     fontWeight: '600',
+  },
+  tagSpotButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  tagSpotButtonText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  spotChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: `${YELLOW}60`,
+  },
+  spotChipInfo: {
+    flex: 1,
+  },
+  spotChipName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  spotChipMeta: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  modalSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.08)',
+  },
+  modalSearchInput: {
+    flex: 1,
+    fontSize: 15,
+  },
+  modalListContent: {
+    paddingHorizontal: 16,
+  },
+  spotResultRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  spotResultInfo: {
+    flex: 1,
+  },
+  spotResultName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  spotResultMeta: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  modalEmpty: {
+    paddingTop: 40,
+    alignItems: 'center',
+  },
+  modalEmptyText: {
+    fontSize: 14,
+    textAlign: 'center',
+    paddingHorizontal: 40,
   },
 });
