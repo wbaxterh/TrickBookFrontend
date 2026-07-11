@@ -3,7 +3,8 @@
  * Functions for fetching and managing spots
  */
 
-import { ENDPOINTS } from '@/constants/api';
+import { FileSystemUploadType, uploadAsync } from 'expo-file-system/legacy';
+import { API_CONFIG, ENDPOINTS } from '@/constants/api';
 import { apiClient } from './client';
 
 // Types
@@ -28,7 +29,7 @@ export interface Spot {
   state?: string;
   isPublic?: boolean;
   sportTypes?: string[];
-  category?: 'park' | 'street' | 'indoor' | 'diy' | 'other';
+  category?: 'park' | 'street' | 'indoor' | 'diy' | 'resort' | 'other';
   approvalStatus?: 'pending' | 'approved' | 'rejected' | 'private';
   userId?: string;
   createdAt?: string;
@@ -281,6 +282,18 @@ export async function updateSpot(id: string, updates: Partial<Spot>): Promise<Sp
 }
 
 /**
+ * Delete a spot (owner only). Returns true on success.
+ */
+export async function deleteSpot(id: string): Promise<boolean> {
+  try {
+    await apiClient.delete(ENDPOINTS.spots.detail(id));
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+/**
  * Get user's own spots
  */
 export async function getMySpots(
@@ -309,6 +322,98 @@ export async function getMySpots(
         hasMore: false,
       },
     };
+  }
+}
+
+/**
+ * Get the current user's saved spots (the "Saved" half of My Spots).
+ */
+export async function getSavedSpots(
+  params: { page?: number; limit?: number } = {},
+): Promise<SpotsResponse> {
+  try {
+    const queryParams = new URLSearchParams();
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.limit) queryParams.append('limit', params.limit.toString());
+    const queryString = queryParams.toString();
+    const endpoint = queryString
+      ? `${ENDPOINTS.spots.list}/saved?${queryString}`
+      : `${ENDPOINTS.spots.list}/saved`;
+    return await apiClient.get<SpotsResponse>(endpoint);
+  } catch (_error) {
+    return {
+      spots: [],
+      pagination: { page: 1, limit: 50, totalCount: 0, totalPages: 0, hasMore: false },
+    };
+  }
+}
+
+/**
+ * One-tap save: add a spot to the user's "Saved Spots". Returns true on success.
+ */
+export async function saveSpot(id: string): Promise<boolean> {
+  try {
+    await apiClient.post(`${ENDPOINTS.spots.detail(id)}/save`);
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+/**
+ * Remove a spot from the user's "Saved Spots". Returns true on success.
+ */
+export async function unsaveSpot(id: string): Promise<boolean> {
+  try {
+    await apiClient.delete(`${ENDPOINTS.spots.detail(id)}/save`);
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+/**
+ * Whether the current user has saved this spot (checks the default Saved bucket).
+ */
+export async function isSpotSaved(id: string): Promise<boolean> {
+  try {
+    const lists = await apiClient.get<{ isDefaultSaved?: boolean }[]>(
+      `${ENDPOINTS.spots.detail(id)}/lists`,
+    );
+    return Array.isArray(lists) && lists.some((l) => l.isDefaultSaved === true);
+  } catch (_error) {
+    return false;
+  }
+}
+
+/**
+ * Upload one user photo to a spot (multipart). Uses expo-file-system for
+ * reliable uploads on physical iOS devices. Returns the created photo or null.
+ */
+export async function uploadSpotPhoto(
+  spotId: string,
+  fileUri: string,
+  mimeType: string = 'image/jpeg',
+): Promise<SpotPhoto | null> {
+  try {
+    const token = await apiClient.getToken();
+    const result = await uploadAsync(
+      `${API_CONFIG.baseUrl}${ENDPOINTS.spots.detail(spotId)}/photos`,
+      fileUri,
+      {
+        httpMethod: 'POST',
+        uploadType: FileSystemUploadType.MULTIPART,
+        fieldName: 'photo',
+        mimeType,
+        headers: token ? { 'x-auth-token': token } : {},
+      },
+    );
+    if (result.status !== 200 && result.status !== 201) {
+      return null;
+    }
+    return JSON.parse(result.body) as SpotPhoto;
+  } catch (_error) {
+    return null;
   }
 }
 

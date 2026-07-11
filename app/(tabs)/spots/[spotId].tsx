@@ -4,38 +4,86 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import { Image as ExpoImage } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
-  Image,
+  Alert,
   Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ShareToHomieModal } from '@/components/share';
-import { SpotMap, SpotReviewsList } from '@/components/spots';
-import { getSpotById, type Spot } from '@/lib/api/spots';
+import { AddToSpotListModal, SpotMap, SpotReviewsList } from '@/components/spots';
+import {
+  deleteSpot,
+  getSpotById,
+  isSpotSaved,
+  type Spot,
+  type SpotPhoto,
+  saveSpot,
+  unsaveSpot,
+  updateSpot,
+} from '@/lib/api/spots';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { useAuthStore } from '@/lib/stores/authStore';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SPOT_CATEGORIES: { id: Spot['category']; label: string }[] = [
+  { id: 'park', label: 'Park' },
+  { id: 'street', label: 'Street' },
+  { id: 'indoor', label: 'Indoor' },
+  { id: 'diy', label: 'DIY' },
+  { id: 'resort', label: 'Resort' },
+  { id: 'other', label: 'Other' },
+];
+
 const YELLOW = '#FCF150';
 const DARK = '#1a1a1a';
 
 export default function SpotDetailScreen() {
   const { spotId } = useLocalSearchParams<{ spotId: string }>();
-  const { theme, colors, isDark } = useThemeContext();
+  const { theme, isDark } = useThemeContext();
+  const { user } = useAuthStore();
   const [isFavorite, setIsFavorite] = useState(false);
   const [spot, setSpot] = useState<Spot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [shareModalVisible, setShareModalVisible] = useState(false);
+
+  // Save state ("My Spots" saved bucket)
+  const [isSaved, setIsSaved] = useState(false);
+  const [savePending, setSavePending] = useState(false);
+  const [listModalVisible, setListModalVisible] = useState(false);
+
+  // Owner edit/delete state
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editCategory, setEditCategory] = useState<Spot['category']>('other');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Is the current user the author/owner of this spot?
+  const currentUserId = user?.id || user?._id;
+  const isOwner = !!currentUserId && !!spot?.userId && spot.userId === currentUserId;
+
+  // Combined photo gallery: user photos first, then Google photos, else header image
+  const galleryPhotos = useMemo<SpotPhoto[]>(() => {
+    if (!spot) return [];
+    const photos: SpotPhoto[] = [...(spot.userPhotos ?? []), ...(spot.googlePhotos ?? [])];
+    if (photos.length === 0 && spot.imageURL) {
+      photos.push({ url: spot.imageURL });
+    }
+    return photos;
+  }, [spot]);
 
   // Fetch spot data from backend
   const loadSpot = useCallback(async () => {
@@ -60,6 +108,94 @@ export default function SpotDetailScreen() {
   useEffect(() => {
     loadSpot();
   }, [loadSpot]);
+
+  // Load the current saved state for this spot
+  useEffect(() => {
+    if (!spotId) return;
+    let cancelled = false;
+    isSpotSaved(spotId).then((saved) => {
+      if (!cancelled) setIsSaved(saved);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [spotId]);
+
+  // One-tap save toggle
+  const handleToggleSave = useCallback(async () => {
+    if (!spotId || savePending) return;
+    setSavePending(true);
+    const next = !isSaved;
+    // Optimistic update
+    setIsSaved(next);
+    const ok = next ? await saveSpot(spotId) : await unsaveSpot(spotId);
+    if (ok) {
+      if (next) Alert.alert('Saved', 'Saved to My Spots');
+    } else {
+      // Revert on failure
+      setIsSaved(!next);
+      Alert.alert('Error', next ? 'Failed to save spot' : 'Failed to remove spot');
+    }
+    setSavePending(false);
+  }, [spotId, isSaved, savePending]);
+
+  // Long-press opens the named-list picker
+  const handleOpenListPicker = useCallback(() => {
+    setListModalVisible(true);
+  }, []);
+
+  // Open the inline edit modal, prefilled from the loaded spot
+  const handleOpenEdit = useCallback(() => {
+    if (!spot) return;
+    setEditName(spot.name ?? '');
+    setEditDescription(spot.description ?? '');
+    setEditCategory(spot.category ?? 'other');
+    setEditModalVisible(true);
+  }, [spot]);
+
+  // Save inline edits
+  const handleSaveEdit = useCallback(async () => {
+    if (!spotId || !editName.trim() || savingEdit) return;
+    setSavingEdit(true);
+    const updated = await updateSpot(spotId, {
+      name: editName.trim(),
+      description: editDescription.trim(),
+      category: editCategory,
+    });
+    setSavingEdit(false);
+    if (updated) {
+      setSpot(updated);
+      setEditModalVisible(false);
+    } else {
+      Alert.alert('Error', 'Failed to update spot');
+    }
+  }, [spotId, editName, editDescription, editCategory, savingEdit]);
+
+  // Delete this spot (owner only), with confirmation
+  const handleDelete = useCallback(() => {
+    if (!spotId) return;
+    Alert.alert(
+      'Delete Spot',
+      'Are you sure you want to delete this spot? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            const ok = await deleteSpot(spotId);
+            setDeleting(false);
+            if (ok) {
+              router.back();
+            } else {
+              Alert.alert('Error', 'Failed to delete spot');
+            }
+          },
+        },
+      ],
+    );
+  }, [spotId]);
 
   // Parse tags into features array
   const getFeatures = (): string[] => {
@@ -152,8 +288,13 @@ export default function SpotDetailScreen() {
       >
         {/* Header Image */}
         <View style={styles.imageContainer}>
-          {spot.imageURL ? (
-            <Image source={{ uri: spot.imageURL }} style={styles.headerImage} resizeMode="cover" />
+          {galleryPhotos.length > 0 ? (
+            <ExpoImage
+              source={{ uri: galleryPhotos[0].url }}
+              style={styles.headerImage}
+              contentFit="cover"
+              transition={200}
+            />
           ) : (
             <View style={[styles.imagePlaceholder, { backgroundColor: theme.surface }]}>
               <Ionicons name={getCategoryIcon(category)} size={64} color={theme.textSecondary} />
@@ -191,8 +332,55 @@ export default function SpotDetailScreen() {
           </View>
         </View>
 
+        {/* Photo Gallery (user + Google photos) */}
+        {galleryPhotos.length > 1 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.gallery}
+            contentContainerStyle={styles.galleryContent}
+          >
+            {galleryPhotos.map((photo, index) => (
+              <ExpoImage
+                key={photo.key ?? photo.url ?? `photo-${index}`}
+                source={{ uri: photo.url }}
+                style={styles.galleryThumb}
+                contentFit="cover"
+                transition={200}
+              />
+            ))}
+          </ScrollView>
+        )}
+
         {/* Content */}
         <View style={styles.content}>
+          {/* Owner Actions */}
+          {isOwner && (
+            <View style={styles.ownerActions}>
+              <Pressable
+                style={[styles.ownerButton, { backgroundColor: theme.surface }]}
+                onPress={handleOpenEdit}
+              >
+                <Ionicons name="create-outline" size={18} color={theme.text} />
+                <Text style={[styles.ownerButtonText, { color: theme.text }]}>Edit</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.ownerButton, { backgroundColor: theme.surface }]}
+                onPress={handleDelete}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator size="small" color="#FF6B6B" />
+                ) : (
+                  <>
+                    <Ionicons name="trash-outline" size={18} color="#FF6B6B" />
+                    <Text style={[styles.ownerButtonText, { color: '#FF6B6B' }]}>Delete</Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
+          )}
+
           {/* Title & Rating Row */}
           <View style={styles.titleRow}>
             <View style={styles.titleContainer}>
@@ -404,12 +592,21 @@ export default function SpotDetailScreen() {
         </Pressable>
 
         <Pressable
-          style={[styles.addButton, { borderColor: theme.border }]}
-          onPress={() => {
-            // TODO: Add to spotlist
-          }}
+          style={[
+            styles.addButton,
+            { borderColor: isSaved ? YELLOW : theme.border },
+            isSaved && { backgroundColor: `${YELLOW}20` },
+          ]}
+          onPress={handleToggleSave}
+          onLongPress={handleOpenListPicker}
+          delayLongPress={300}
+          disabled={savePending}
         >
-          <Ionicons name="bookmark-outline" size={22} color={theme.text} />
+          <Ionicons
+            name={isSaved ? 'bookmark' : 'bookmark-outline'}
+            size={22}
+            color={isSaved ? YELLOW : theme.text}
+          />
         </Pressable>
       </View>
 
@@ -430,6 +627,108 @@ export default function SpotDetailScreen() {
           }}
         />
       )}
+
+      {/* Add to Spot List Modal (long-press on save) */}
+      {spot && (
+        <AddToSpotListModal
+          visible={listModalVisible}
+          spotId={spot._id}
+          spotName={spot.name}
+          onClose={() => setListModalVisible(false)}
+          onSuccess={() => {
+            // A saved-to-a-list spot also lives in "My Spots"; reflect saved state.
+            setIsSaved(true);
+          }}
+        />
+      )}
+
+      {/* Inline Edit Modal (owner only) */}
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <Pressable style={styles.editOverlay} onPress={() => setEditModalVisible(false)}>
+          <Pressable
+            style={[styles.editSheet, { backgroundColor: theme.surface }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.editHeader}>
+              <Text style={[styles.editTitle, { color: theme.text }]}>Edit Spot</Text>
+              <Pressable onPress={() => setEditModalVisible(false)}>
+                <Ionicons name="close" size={24} color={theme.text} />
+              </Pressable>
+            </View>
+
+            <Text style={[styles.editLabel, { color: theme.textSecondary }]}>Name</Text>
+            <TextInput
+              style={[
+                styles.editInput,
+                { backgroundColor: theme.background, color: theme.text, borderColor: theme.border },
+              ]}
+              value={editName}
+              onChangeText={setEditName}
+              placeholder="Spot name"
+              placeholderTextColor={theme.textSecondary}
+            />
+
+            <Text style={[styles.editLabel, { color: theme.textSecondary }]}>Description</Text>
+            <TextInput
+              style={[
+                styles.editInput,
+                styles.editTextarea,
+                { backgroundColor: theme.background, color: theme.text, borderColor: theme.border },
+              ]}
+              value={editDescription}
+              onChangeText={setEditDescription}
+              placeholder="Describe this spot..."
+              placeholderTextColor={theme.textSecondary}
+              multiline
+            />
+
+            <Text style={[styles.editLabel, { color: theme.textSecondary }]}>Category</Text>
+            <View style={styles.editCategoryRow}>
+              {SPOT_CATEGORIES.map((cat) => {
+                const selected = editCategory === cat.id;
+                return (
+                  <Pressable
+                    key={cat.id}
+                    style={[
+                      styles.editCategoryChip,
+                      { backgroundColor: theme.background, borderColor: theme.border },
+                      selected && { backgroundColor: YELLOW, borderColor: YELLOW },
+                    ]}
+                    onPress={() => setEditCategory(cat.id)}
+                  >
+                    <Text
+                      style={[styles.editCategoryText, { color: selected ? DARK : theme.text }]}
+                    >
+                      {cat.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Pressable
+              style={[
+                styles.editSaveButton,
+                { backgroundColor: YELLOW },
+                (!editName.trim() || savingEdit) && styles.editSaveButtonDisabled,
+              ]}
+              onPress={handleSaveEdit}
+              disabled={!editName.trim() || savingEdit}
+            >
+              {savingEdit ? (
+                <ActivityIndicator size="small" color={DARK} />
+              ) : (
+                <Text style={styles.editSaveButtonText}>Save Changes</Text>
+              )}
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -533,10 +832,115 @@ const styles = StyleSheet.create({
     color: DARK,
   },
 
+  // Photo Gallery
+  gallery: {
+    marginTop: 12,
+  },
+  galleryContent: {
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  galleryThumb: {
+    width: 110,
+    height: 80,
+    borderRadius: 12,
+  },
+
   // Content
   content: {
     paddingHorizontal: 20,
     paddingTop: 20,
+  },
+
+  // Owner Actions
+  ownerActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  ownerButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 44,
+    borderRadius: 12,
+  },
+  ownerButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+
+  // Edit Modal
+  editOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  editSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 40,
+  },
+  editHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+  },
+  editTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  editLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  editInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+  },
+  editTextarea: {
+    minHeight: 90,
+    textAlignVertical: 'top',
+  },
+  editCategoryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  editCategoryChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  editCategoryText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  editSaveButton: {
+    height: 52,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 24,
+  },
+  editSaveButtonDisabled: {
+    opacity: 0.5,
+  },
+  editSaveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: DARK,
   },
 
   // Title Row

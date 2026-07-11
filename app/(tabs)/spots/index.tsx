@@ -6,12 +6,11 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Dimensions,
   FlatList,
   Image,
   KeyboardAvoidingView,
@@ -26,13 +25,15 @@ import {
   View,
 } from 'react-native';
 import MapView, { PROVIDER_GOOGLE, type Region } from 'react-native-maps';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { SpotListCard as SpotListCardComponent } from '@/components/spots';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AddToSpotListModal, SpotListCard as SpotListCardComponent } from '@/components/spots';
 import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 import { useMapClusters } from '@/hooks/useMapClusters';
 import { createSpotList, getSpotLists } from '@/lib/api/spotlists';
 import {
   getMapPins,
+  getMySpots,
+  getSavedSpots,
   getSportTypes,
   getSpotCategories,
   getSpots,
@@ -40,13 +41,13 @@ import {
   type SportType,
   type Spot,
   type SpotCategory,
+  saveSpot,
+  unsaveSpot,
 } from '@/lib/api/spots';
 import { projectToScreen } from '@/lib/mapProjection';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
 import type { CreateSpotListInput, SpotList } from '@/types/spots';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 /**
  * Theme colors - see /src/constants/colors.ts for full policy
@@ -74,6 +75,11 @@ const SPORT_ICONS: Record<string, string> = {
 
 type ViewMode = 'map' | 'list';
 type TabType = 'allSpots' | 'mySpots';
+// My Spots sub-view: the flat authored+saved list vs. the named collections.
+type MySpotsView = 'spots' | 'collections';
+// A spot in the flat "My Spots" list, tagged with how the user relates to it.
+type MySpotBadge = 'Mine' | 'Saved';
+type MySpot = Spot & { mineOrSaved: MySpotBadge };
 
 // Dark mode map styling
 const darkMapStyle = [
@@ -87,8 +93,9 @@ const darkMapStyle = [
 ];
 
 export default function SpotsScreen() {
-  const { theme, colors, isDark } = useThemeContext();
+  const { theme, isDark } = useThemeContext();
   const { user, token } = useAuthStore();
+  const insets = useSafeAreaInsets();
 
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('allSpots');
@@ -109,7 +116,11 @@ export default function SpotsScreen() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(
     null,
   );
-  const [_spotToAddToList, _setSpotToAddToList] = useState<Spot | null>(null);
+  // Saved-spot state: track which spot ids the user has saved so the bookmark
+  // control renders filled/outline. Seeded via isSpotSaved when a spot is selected.
+  const [savedSpotIds, setSavedSpotIds] = useState<Set<string>>(new Set());
+  // Spot whose named-list picker (AddToSpotListModal) is open, if any.
+  const [spotForListModal, setSpotForListModal] = useState<Spot | null>(null);
   const [mapPins, setMapPins] = useState<MapPin[]>([]);
   // Current visible region, used to compute clusters for the viewport.
   const [region, setRegion] = useState<Region>({
@@ -135,6 +146,13 @@ export default function SpotsScreen() {
   const mapPinsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // My Spots state
+  // Sub-view within the My Spots tab: the flat authored+saved list ('spots')
+  // is primary; collections (named lists) live behind a toggle.
+  const [mySpotsView, setMySpotsView] = useState<MySpotsView>('spots');
+  // Flat list = spots the user created (badge "Mine") + saved (badge "Saved").
+  const [mySpots, setMySpots] = useState<MySpot[]>([]);
+  const [mySpotsLoading, setMySpotsLoading] = useState(false);
+  const [mySpotsRefreshing, setMySpotsRefreshing] = useState(false);
   const [myLists, setMyLists] = useState<SpotList[]>([]);
   const [listsLoading, setListsLoading] = useState(false);
   const [listsRefreshing, setListsRefreshing] = useState(false);
@@ -158,10 +176,39 @@ export default function SpotsScreen() {
     }
   };
 
-  const handleAddToList = (spot: Spot) => {
-    // Navigate to add-to-list screen or show modal
-    // For now, navigate to spot detail where they can add to list
-    router.push(`/(tabs)/spots/${spot._id}`);
+  // One-tap save/unsave toggle for the selected-spot map card. Optimistically
+  // flips the saved state, then reconciles on the server response.
+  const handleToggleSave = async (spot: Spot) => {
+    const currentlySaved = savedSpotIds.has(spot._id);
+    // Optimistic update
+    setSavedSpotIds((prev) => {
+      const next = new Set(prev);
+      if (currentlySaved) {
+        next.delete(spot._id);
+      } else {
+        next.add(spot._id);
+      }
+      return next;
+    });
+    const ok = currentlySaved ? await unsaveSpot(spot._id) : await saveSpot(spot._id);
+    if (!ok) {
+      // Revert on failure
+      setSavedSpotIds((prev) => {
+        const next = new Set(prev);
+        if (currentlySaved) {
+          next.add(spot._id);
+        } else {
+          next.delete(spot._id);
+        }
+        return next;
+      });
+      Alert.alert('Error', currentlySaved ? 'Failed to remove spot' : 'Failed to save spot');
+    }
+  };
+
+  // Long-press on the save control opens the named-list picker for that spot.
+  const handleOpenListPicker = (spot: Spot) => {
+    setSpotForListModal(spot);
   };
 
   // Get user location on mount and center map
@@ -275,6 +322,63 @@ export default function SpotsScreen() {
     setRefreshing(false);
   }, [fetchSpots]);
 
+  // Load the full set of saved spot ids up front so every bookmark control
+  // (map preview cards, the selected-spot card, My Spots) renders filled/outline
+  // correctly. This replaces per-spot isSpotSaved checks — those only seeded the
+  // selected spot and, because they depended on savedSpotIds, re-added an id
+  // right after the user optimistically unsaved it (the bookmark bounced back).
+  const loadSavedSpotIds = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await getSavedSpots({ limit: 500 });
+      setSavedSpotIds(new Set(res.spots.map((s) => s._id)));
+    } catch (_error) {
+      // Keep whatever we already know on failure.
+    }
+  }, [token]);
+
+  useEffect(() => {
+    loadSavedSpotIds();
+  }, [loadSavedSpotIds]);
+
+  // Fetch the flat "My Spots" list: spots the user created (badge "Mine") plus
+  // spots they saved (badge "Saved"), merged and de-duped by _id. If a spot is
+  // both authored and saved, it shows "Mine".
+  const fetchMySpots = useCallback(async () => {
+    if (!user?.id && !user?._id) return;
+    setMySpotsLoading(true);
+    try {
+      const [mine, saved] = await Promise.all([
+        getMySpots({ limit: 100 }),
+        getSavedSpots({ limit: 100 }),
+      ]);
+      const byId = new Map<string, MySpot>();
+      // Saved first so authored ("Mine") overwrites on conflict.
+      for (const spot of saved.spots) {
+        byId.set(spot._id, { ...spot, mineOrSaved: 'Saved' });
+      }
+      for (const spot of mine.spots) {
+        byId.set(spot._id, { ...spot, mineOrSaved: 'Mine' });
+      }
+      setMySpots(Array.from(byId.values()));
+      // Keep the bookmark state in sync with what the server considers saved.
+      setSavedSpotIds((prev) => {
+        const next = new Set(prev);
+        for (const spot of saved.spots) next.add(spot._id);
+        return next;
+      });
+    } catch (_error) {
+    } finally {
+      setMySpotsLoading(false);
+    }
+  }, [user?.id, user?._id]);
+
+  const onMySpotsRefresh = useCallback(async () => {
+    setMySpotsRefreshing(true);
+    await fetchMySpots();
+    setMySpotsRefreshing(false);
+  }, [fetchMySpots]);
+
   // Fetch user's spot lists
   const fetchMyLists = useCallback(async () => {
     if (!user?.id && !user?._id) return;
@@ -294,12 +398,30 @@ export default function SpotsScreen() {
     setListsRefreshing(false);
   }, [fetchMyLists]);
 
-  // Fetch lists when switching to My Spots tab
+  // Fetch My Spots content when switching to the tab / sub-view.
   useEffect(() => {
-    if (activeTab === 'mySpots') {
+    if (activeTab !== 'mySpots') return;
+    if (mySpotsView === 'spots') {
+      fetchMySpots();
+    } else {
       fetchMyLists();
     }
-  }, [activeTab, fetchMyLists]);
+  }, [activeTab, mySpotsView, fetchMySpots, fetchMyLists]);
+
+  // Refresh My Spots content whenever the screen regains focus (e.g. after
+  // creating/saving a spot elsewhere), matching the previous refresh-on-focus.
+  useFocusEffect(
+    useCallback(() => {
+      // Reconcile saved-bookmark state with the server on every focus.
+      loadSavedSpotIds();
+      if (activeTab !== 'mySpots') return;
+      if (mySpotsView === 'spots') {
+        fetchMySpots();
+      } else {
+        fetchMyLists();
+      }
+    }, [activeTab, mySpotsView, fetchMySpots, fetchMyLists, loadSavedSpotIds]),
+  );
 
   // Handle create spot list
   const handleCreateList = async () => {
@@ -328,146 +450,154 @@ export default function SpotsScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Spots</Text>
-        <View style={styles.headerActions}>
-          {activeTab === 'allSpots' && (
-            <Pressable style={styles.filterButton} onPress={() => setFilterModalVisible(true)}>
-              <Ionicons name="options-outline" size={18} color={isDark ? YELLOW : DARK} />
-              <Text style={[styles.filterText, { color: isDark ? YELLOW : DARK }]}>Filter</Text>
+      {/* Header — hidden in fullscreen map for an immersive view. */}
+      {!isMapFullscreen && (
+        <View style={styles.header}>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Spots</Text>
+          <View style={styles.headerActions}>
+            {activeTab === 'allSpots' && (
+              <Pressable style={styles.filterButton} onPress={() => setFilterModalVisible(true)}>
+                <Ionicons name="options-outline" size={18} color={isDark ? YELLOW : DARK} />
+                <Text style={[styles.filterText, { color: isDark ? YELLOW : DARK }]}>Filter</Text>
+              </Pressable>
+            )}
+            <Pressable
+              style={[styles.addButton, { backgroundColor: YELLOW }]}
+              onPress={() =>
+                activeTab === 'allSpots'
+                  ? router.push('/(tabs)/spots/add')
+                  : setCreateModalVisible(true)
+              }
+            >
+              <Ionicons name="add" size={22} color={DARK} />
             </Pressable>
-          )}
+          </View>
+        </View>
+      )}
+
+      {/* Tab Toggle — hidden in fullscreen map. */}
+      {!isMapFullscreen && (
+        <View style={[styles.tabContainer, { backgroundColor: theme.surface }]}>
           <Pressable
-            style={[styles.addButton, { backgroundColor: YELLOW }]}
-            onPress={() =>
-              activeTab === 'allSpots'
-                ? router.push('/(tabs)/spots/add')
-                : setCreateModalVisible(true)
-            }
+            style={[styles.tab, activeTab === 'allSpots' && { backgroundColor: YELLOW }]}
+            onPress={() => setActiveTab('allSpots')}
           >
-            <Ionicons name="add" size={22} color={DARK} />
+            <Text
+              style={[
+                styles.tabText,
+                { color: activeTab === 'allSpots' ? DARK : theme.textSecondary },
+              ]}
+            >
+              All Spots
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.tab, activeTab === 'mySpots' && { backgroundColor: YELLOW }]}
+            onPress={() => setActiveTab('mySpots')}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                { color: activeTab === 'mySpots' ? DARK : theme.textSecondary },
+              ]}
+            >
+              My Spots
+            </Text>
           </Pressable>
         </View>
-      </View>
-
-      {/* Tab Toggle */}
-      <View style={[styles.tabContainer, { backgroundColor: theme.surface }]}>
-        <Pressable
-          style={[styles.tab, activeTab === 'allSpots' && { backgroundColor: YELLOW }]}
-          onPress={() => setActiveTab('allSpots')}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              { color: activeTab === 'allSpots' ? DARK : theme.textSecondary },
-            ]}
-          >
-            All Spots
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[styles.tab, activeTab === 'mySpots' && { backgroundColor: YELLOW }]}
-          onPress={() => setActiveTab('mySpots')}
-        >
-          <Text
-            style={[
-              styles.tabText,
-              { color: activeTab === 'mySpots' ? DARK : theme.textSecondary },
-            ]}
-          >
-            My Spots
-          </Text>
-        </Pressable>
-      </View>
+      )}
 
       {activeTab === 'allSpots' ? (
         <>
-          {/* Search Bar */}
-          <View style={styles.searchContainer}>
-            <View style={[styles.searchBar, { backgroundColor: theme.surface }]}>
-              <Ionicons name="search" size={20} color={theme.textSecondary} />
-              <TextInput
-                style={[styles.searchInput, { color: theme.text }]}
-                placeholder="Search spots..."
-                placeholderTextColor={theme.textSecondary}
-                value={searchQuery}
-                onChangeText={setSearchQuery}
-              />
-              {searchQuery.length > 0 && (
-                <Pressable onPress={() => setSearchQuery('')}>
-                  <Ionicons name="close-circle" size={20} color={theme.textSecondary} />
-                </Pressable>
-              )}
-            </View>
-          </View>
-
-          {/* View Toggle & Categories */}
-          <View style={styles.filtersRow}>
-            {/* View Toggle */}
-            <View style={[styles.viewToggle, { backgroundColor: theme.surface }]}>
-              <Pressable
-                style={[
-                  styles.viewToggleButton,
-                  viewMode === 'map' && styles.viewToggleActive,
-                  viewMode === 'map' && { backgroundColor: YELLOW },
-                ]}
-                onPress={() => setViewMode('map')}
-              >
-                <Ionicons
-                  name="map"
-                  size={18}
-                  color={viewMode === 'map' ? DARK : theme.textSecondary}
+          {/* Search Bar — hidden in fullscreen map. */}
+          {!isMapFullscreen && (
+            <View style={styles.searchContainer}>
+              <View style={[styles.searchBar, { backgroundColor: theme.surface }]}>
+                <Ionicons name="search" size={20} color={theme.textSecondary} />
+                <TextInput
+                  style={[styles.searchInput, { color: theme.text }]}
+                  placeholder="Search spots..."
+                  placeholderTextColor={theme.textSecondary}
+                  value={searchQuery}
+                  onChangeText={setSearchQuery}
                 />
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.viewToggleButton,
-                  viewMode === 'list' && styles.viewToggleActive,
-                  viewMode === 'list' && { backgroundColor: YELLOW },
-                ]}
-                onPress={() => setViewMode('list')}
-              >
-                <Ionicons
-                  name="list"
-                  size={18}
-                  color={viewMode === 'list' ? DARK : theme.textSecondary}
-                />
-              </Pressable>
+                {searchQuery.length > 0 && (
+                  <Pressable onPress={() => setSearchQuery('')}>
+                    <Ionicons name="close-circle" size={20} color={theme.textSecondary} />
+                  </Pressable>
+                )}
+              </View>
             </View>
+          )}
 
-            {/* Category Pills */}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoriesScroll}
-            >
-              {spotCategories.map((cat) => (
+          {/* View Toggle & Categories — hidden in fullscreen map. */}
+          {!isMapFullscreen && (
+            <View style={styles.filtersRow}>
+              {/* View Toggle */}
+              <View style={[styles.viewToggle, { backgroundColor: theme.surface }]}>
                 <Pressable
-                  key={cat.id}
                   style={[
-                    styles.categoryPill,
-                    { backgroundColor: selectedCategory === cat.id ? YELLOW : theme.surface },
+                    styles.viewToggleButton,
+                    viewMode === 'map' && styles.viewToggleActive,
+                    viewMode === 'map' && { backgroundColor: YELLOW },
                   ]}
-                  onPress={() => setSelectedCategory(cat.id)}
+                  onPress={() => setViewMode('map')}
                 >
                   <Ionicons
-                    name={cat.icon as any}
-                    size={16}
-                    color={selectedCategory === cat.id ? DARK : theme.textSecondary}
+                    name="map"
+                    size={18}
+                    color={viewMode === 'map' ? DARK : theme.textSecondary}
                   />
-                  <Text
-                    style={[
-                      styles.categoryText,
-                      { color: selectedCategory === cat.id ? DARK : theme.text },
-                    ]}
-                  >
-                    {cat.name}
-                  </Text>
                 </Pressable>
-              ))}
-            </ScrollView>
-          </View>
+                <Pressable
+                  style={[
+                    styles.viewToggleButton,
+                    viewMode === 'list' && styles.viewToggleActive,
+                    viewMode === 'list' && { backgroundColor: YELLOW },
+                  ]}
+                  onPress={() => setViewMode('list')}
+                >
+                  <Ionicons
+                    name="list"
+                    size={18}
+                    color={viewMode === 'list' ? DARK : theme.textSecondary}
+                  />
+                </Pressable>
+              </View>
+
+              {/* Category Pills */}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.categoriesScroll}
+              >
+                {spotCategories.map((cat) => (
+                  <Pressable
+                    key={cat.id}
+                    style={[
+                      styles.categoryPill,
+                      { backgroundColor: selectedCategory === cat.id ? YELLOW : theme.surface },
+                    ]}
+                    onPress={() => setSelectedCategory(cat.id)}
+                  >
+                    <Ionicons
+                      name={cat.icon as any}
+                      size={16}
+                      color={selectedCategory === cat.id ? DARK : theme.textSecondary}
+                    />
+                    <Text
+                      style={[
+                        styles.categoryText,
+                        { color: selectedCategory === cat.id ? DARK : theme.text },
+                      ]}
+                    >
+                      {cat.name}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
           {/* Content */}
           {loading && !refreshing ? (
@@ -600,8 +730,17 @@ export default function SpotsScreen() {
                 </View>
               )}
 
-              {/* Map Controls */}
-              <View style={styles.mapControls}>
+              {/* Map Controls — nudged below the status bar when fullscreen so
+                  the top control clears the notch/safe area. */}
+              <View style={[styles.mapControls, isMapFullscreen && { top: insets.top + 12 }]}>
+                {/* Filter — reachable in fullscreen since the header is hidden. */}
+                <Pressable
+                  style={[styles.mapControlButton, { backgroundColor: YELLOW }]}
+                  onPress={() => setFilterModalVisible(true)}
+                >
+                  <Ionicons name="options-outline" size={20} color={DARK} />
+                </Pressable>
+
                 {/* Center on user button */}
                 <Pressable
                   style={[styles.mapControlButton, { backgroundColor: YELLOW }]}
@@ -670,14 +809,22 @@ export default function SpotsScreen() {
                 </Pressable>
               </View>
 
-              {/* Selected spot card or spots preview */}
-              <View style={styles.mapSpotsContainer}>
+              {/* Selected spot card or spots preview — lifted above the bottom
+                  safe area when fullscreen (no tab bar padding then). */}
+              <View
+                style={[
+                  styles.mapSpotsContainer,
+                  isMapFullscreen && { paddingBottom: insets.bottom + 16 },
+                ]}
+              >
                 {selectedSpot ? (
                   <SpotMapCard
                     spot={selectedSpot}
                     theme={theme}
+                    saved={savedSpotIds.has(selectedSpot._id)}
                     onPress={() => router.push(`/(tabs)/spots/${selectedSpot._id}`)}
-                    onAddToList={() => handleAddToList(selectedSpot)}
+                    onToggleSave={() => handleToggleSave(selectedSpot)}
+                    onOpenListPicker={() => handleOpenListPicker(selectedSpot)}
                   />
                 ) : spots.length > 0 ? (
                   <ScrollView
@@ -690,6 +837,7 @@ export default function SpotsScreen() {
                         key={spot._id}
                         spot={spot}
                         theme={theme}
+                        saved={savedSpotIds.has(spot._id)}
                         onPress={() => {
                           setSelectedSpot(spot);
                           mapRef.current?.animateToRegion(
@@ -702,7 +850,8 @@ export default function SpotsScreen() {
                             500,
                           );
                         }}
-                        onAddToList={() => handleAddToList(spot)}
+                        onToggleSave={() => handleToggleSave(spot)}
+                        onOpenListPicker={() => handleOpenListPicker(spot)}
                       />
                     ))}
                   </ScrollView>
@@ -871,7 +1020,102 @@ export default function SpotsScreen() {
       ) : (
         // My Spots Tab
         <>
-          {listsLoading && !listsRefreshing ? (
+          {/* Sub-view toggle: flat Spots (authored + saved) vs. Collections. */}
+          <View style={styles.mySpotsSwitch}>
+            <Pressable
+              style={[
+                styles.mySpotsSwitchButton,
+                mySpotsView === 'spots' && { backgroundColor: `${YELLOW}25` },
+              ]}
+              onPress={() => setMySpotsView('spots')}
+            >
+              <Ionicons
+                name="location"
+                size={16}
+                color={mySpotsView === 'spots' ? (isDark ? YELLOW : DARK) : theme.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.mySpotsSwitchText,
+                  {
+                    color: mySpotsView === 'spots' ? (isDark ? YELLOW : DARK) : theme.textSecondary,
+                  },
+                ]}
+              >
+                Spots
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.mySpotsSwitchButton,
+                mySpotsView === 'collections' && { backgroundColor: `${YELLOW}25` },
+              ]}
+              onPress={() => setMySpotsView('collections')}
+            >
+              <Ionicons
+                name="albums-outline"
+                size={16}
+                color={
+                  mySpotsView === 'collections' ? (isDark ? YELLOW : DARK) : theme.textSecondary
+                }
+              />
+              <Text
+                style={[
+                  styles.mySpotsSwitchText,
+                  {
+                    color:
+                      mySpotsView === 'collections'
+                        ? isDark
+                          ? YELLOW
+                          : DARK
+                        : theme.textSecondary,
+                  },
+                ]}
+              >
+                Collections
+              </Text>
+            </Pressable>
+          </View>
+
+          {mySpotsView === 'spots' ? (
+            mySpotsLoading && !mySpotsRefreshing ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={YELLOW} />
+              </View>
+            ) : (
+              <FlatList
+                data={mySpots}
+                keyExtractor={(item) => item._id}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={mySpotsRefreshing}
+                    onRefresh={onMySpotsRefresh}
+                    tintColor={YELLOW}
+                  />
+                }
+                ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
+                ListEmptyComponent={
+                  <View style={styles.emptyContainer}>
+                    <Ionicons name="location-outline" size={48} color={theme.textSecondary} />
+                    <Text style={[styles.emptyTitle, { color: theme.text }]}>No spots yet</Text>
+                    <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+                      You haven't added or saved any spots yet
+                    </Text>
+                  </View>
+                }
+                renderItem={({ item }) => (
+                  <SpotListCard
+                    spot={item}
+                    theme={theme}
+                    badge={item.mineOrSaved}
+                    onPress={() => router.push(`/(tabs)/spots/${item._id}`)}
+                  />
+                )}
+              />
+            )
+          ) : listsLoading && !listsRefreshing ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={YELLOW} />
             </View>
@@ -1006,6 +1250,27 @@ export default function SpotsScreen() {
           </Modal>
         </>
       )}
+
+      {/* Named-list picker (opened via long-press on a save/bookmark control).
+          Mounted once at screen level and controlled by spotForListModal. */}
+      <AddToSpotListModal
+        visible={spotForListModal !== null}
+        spotId={spotForListModal?._id ?? ''}
+        spotName={spotForListModal?.name ?? ''}
+        onClose={() => setSpotForListModal(null)}
+        onSuccess={() => {
+          // The picker may have added the spot to the default Saved bucket.
+          if (spotForListModal) {
+            const id = spotForListModal._id;
+            setSavedSpotIds((prev) => {
+              if (prev.has(id)) return prev;
+              const next = new Set(prev);
+              next.add(id);
+              return next;
+            });
+          }
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -1014,11 +1279,22 @@ export default function SpotsScreen() {
 interface SpotMapCardProps {
   spot: Spot;
   theme: any;
+  saved?: boolean;
   onPress: () => void;
-  onAddToList?: () => void;
+  /** Tap the bookmark: one-tap save/unsave. */
+  onToggleSave?: () => void;
+  /** Long-press the bookmark: open the named-list picker. */
+  onOpenListPicker?: () => void;
 }
 
-function SpotMapCard({ spot, theme, onPress, onAddToList }: SpotMapCardProps) {
+function SpotMapCard({
+  spot,
+  theme,
+  saved,
+  onPress,
+  onToggleSave,
+  onOpenListPicker,
+}: SpotMapCardProps) {
   const address = [spot.city, spot.state].filter(Boolean).join(', ');
 
   return (
@@ -1053,13 +1329,27 @@ function SpotMapCard({ spot, theme, onPress, onAddToList }: SpotMapCardProps) {
           </View>
           <View style={styles.mapCardActions}>
             <Pressable
-              style={[styles.addToListButton, { borderColor: theme.border }]}
+              style={[
+                styles.addToListButton,
+                { borderColor: saved ? YELLOW : theme.border },
+                saved && { backgroundColor: `${YELLOW}25` },
+              ]}
               onPress={(e) => {
                 e.stopPropagation();
-                onAddToList?.();
+                onToggleSave?.();
               }}
+              onLongPress={(e) => {
+                e.stopPropagation();
+                onOpenListPicker?.();
+              }}
+              delayLongPress={300}
+              hitSlop={6}
             >
-              <Ionicons name="bookmark-outline" size={16} color={theme.text} />
+              <Ionicons
+                name={saved ? 'bookmark' : 'bookmark-outline'}
+                size={16}
+                color={saved ? YELLOW : theme.text}
+              />
             </Pressable>
             <Pressable style={[styles.viewButton, { backgroundColor: YELLOW }]} onPress={onPress}>
               <Text style={styles.viewButtonText}>View</Text>
@@ -1076,27 +1366,37 @@ function SpotMapCard({ spot, theme, onPress, onAddToList }: SpotMapCardProps) {
 interface SpotListCardProps {
   spot: Spot;
   theme: any;
+  /** Optional "Mine"/"Saved" badge shown on the image (My Spots flat list). */
+  badge?: MySpotBadge;
   onPress: () => void;
 }
 
-function SpotListCard({ spot, theme, onPress }: SpotListCardProps) {
+function SpotListCard({ spot, theme, badge, onPress }: SpotListCardProps) {
   const address = [spot.city, spot.state].filter(Boolean).join(', ') || 'Unknown location';
 
   return (
     <Pressable style={[styles.listCard, { backgroundColor: theme.surface }]} onPress={onPress}>
       {/* Image */}
-      {spot.imageURL ? (
-        <Image source={{ uri: spot.imageURL }} style={styles.listCardImage} />
-      ) : (
-        <View
-          style={[
-            styles.listCardImagePlaceholder,
-            { backgroundColor: theme.surfaceElevated || theme.border },
-          ]}
-        >
-          <Ionicons name="image-outline" size={32} color={theme.textSecondary} />
-        </View>
-      )}
+      <View>
+        {spot.imageURL ? (
+          <Image source={{ uri: spot.imageURL }} style={styles.listCardImage} />
+        ) : (
+          <View
+            style={[
+              styles.listCardImagePlaceholder,
+              { backgroundColor: theme.surfaceElevated || theme.border },
+            ]}
+          >
+            <Ionicons name="image-outline" size={32} color={theme.textSecondary} />
+          </View>
+        )}
+        {badge && (
+          <View style={styles.cardBadge}>
+            <Ionicons name={badge === 'Mine' ? 'create' : 'bookmark'} size={10} color={DARK} />
+            <Text style={styles.cardBadgeText}>{badge}</Text>
+          </View>
+        )}
+      </View>
 
       {/* Content */}
       <View style={styles.listCardContent}>
@@ -1642,6 +1942,45 @@ const styles = StyleSheet.create({
   applyFilterButtonText: {
     fontSize: 16,
     fontWeight: '600',
+    color: DARK,
+  },
+
+  // My Spots sub-view switch (Spots | Collections)
+  mySpotsSwitch: {
+    flexDirection: 'row',
+    marginHorizontal: 20,
+    marginBottom: 16,
+    gap: 8,
+  },
+  mySpotsSwitchButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  mySpotsSwitchText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+
+  // Mine / Saved badge on spot card image
+  cardBadge: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: YELLOW,
+  },
+  cardBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
     color: DARK,
   },
 
