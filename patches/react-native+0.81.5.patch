@@ -1,0 +1,40 @@
+diff --git a/node_modules/react-native/React/Fabric/RCTSurfaceTouchHandler.mm b/node_modules/react-native/React/Fabric/RCTSurfaceTouchHandler.mm
+index a793251..db132bb 100644
+--- a/node_modules/react-native/React/Fabric/RCTSurfaceTouchHandler.mm
++++ b/node_modules/react-native/React/Fabric/RCTSurfaceTouchHandler.mm
+@@ -203,7 +203,10 @@ - (void)_updateTouches:(NSSet<UITouch *> *)touches
+ {
+   for (UITouch *touch in touches) {
+     auto iterator = _activeTouches.find(touch);
+-    RCTAssert(iterator != _activeTouches.end(), @"Inconsistency between local and UIKit touch registries");
++    // patched (facebook/react-native#53303): the fatal RCTAssert is removed so a
++    // touch that UIKit delivers after its responder view was unmounted mid-gesture
++    // is skipped by the guard below instead of hard-crashing the app. Common on the
++    // map's projected-overlay markers on iOS 26 + New Architecture.
+     if (iterator == _activeTouches.end()) {
+       continue;
+     }
+@@ -216,7 +219,10 @@ - (void)_unregisterTouches:(NSSet<UITouch *> *)touches
+ {
+   for (UITouch *touch in touches) {
+     auto iterator = _activeTouches.find(touch);
+-    RCTAssert(iterator != _activeTouches.end(), @"Inconsistency between local and UIKit touch registries");
++    // patched (facebook/react-native#53303): the fatal RCTAssert is removed so a
++    // touch that UIKit delivers after its responder view was unmounted mid-gesture
++    // is skipped by the guard below instead of hard-crashing the app. Common on the
++    // map's projected-overlay markers on iOS 26 + New Architecture.
+     if (iterator == _activeTouches.end()) {
+       continue;
+     }
+@@ -233,7 +239,10 @@ - (void)_unregisterTouches:(NSSet<UITouch *> *)touches
+ 
+   for (UITouch *touch in touches) {
+     auto iterator = _activeTouches.find(touch);
+-    RCTAssert(iterator != _activeTouches.end(), @"Inconsistency between local and UIKit touch registries");
++    // patched (facebook/react-native#53303): the fatal RCTAssert is removed so a
++    // touch that UIKit delivers after its responder view was unmounted mid-gesture
++    // is skipped by the guard below instead of hard-crashing the app. Common on the
++    // map's projected-overlay markers on iOS 26 + New Architecture.
+     if (iterator == _activeTouches.end()) {
+       continue;
+     }

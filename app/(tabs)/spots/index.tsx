@@ -44,7 +44,7 @@ import {
   saveSpot,
   unsaveSpot,
 } from '@/lib/api/spots';
-import { projectToScreen } from '@/lib/mapProjection';
+import { projectToScreenXY } from '@/lib/mapProjection';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
 import type { CreateSpotListInput, SpotList } from '@/types/spots';
@@ -645,36 +645,46 @@ export default function SpotsScreen() {
               {mapReady && mapLayout.width > 0 && (
                 <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
                   {clusters.map((item) => {
-                    const pt = projectToScreen(
+                    const pt = projectToScreenXY(
                       item.latitude,
                       item.longitude,
                       projectionRegion,
                       mapLayout,
                     );
                     if (!pt) return null;
+                    // NEVER unmount an off-screen marker while panning — that
+                    // desyncs Fabric's touch registry and hard-crashes on the New
+                    // Architecture (RN #53303). Keep it mounted but hidden and
+                    // non-interactive instead.
+                    const hidden = !pt.onScreen;
 
                     if (item.type === 'cluster') {
                       return (
                         <Pressable
                           key={item.id}
+                          pointerEvents={hidden ? 'none' : 'auto'}
                           style={[
                             styles.overlayMarker,
                             {
                               left: pt.x,
                               top: pt.y,
+                              opacity: hidden ? 0 : 1,
                               transform: [{ translateX: -20 }, { translateY: -20 }],
                             },
                           ]}
-                          onPress={() =>
-                            mapRef.current?.animateToRegion(
-                              getClusterExpansionRegion(
-                                item.clusterId as number,
-                                item.latitude,
-                                item.longitude,
-                              ),
-                              300,
-                            )
-                          }
+                          onPress={() => {
+                            // Defer the camera animation past this touch's end so
+                            // re-projection/re-clustering can't move or unmount the
+                            // pressed marker while UIKit is still finalizing it.
+                            const target = getClusterExpansionRegion(
+                              item.clusterId as number,
+                              item.latitude,
+                              item.longitude,
+                            );
+                            requestAnimationFrame(() =>
+                              mapRef.current?.animateToRegion(target, 300),
+                            );
+                          }}
                         >
                           <View style={styles.clusterBubble}>
                             <Text style={styles.clusterText}>{item.count}</Text>
@@ -684,28 +694,35 @@ export default function SpotsScreen() {
                     }
 
                     const selected = selectedSpot?._id === item.pin?._id;
+                    const pin = item.pin;
                     return (
                       <Pressable
                         key={item.id}
+                        pointerEvents={hidden ? 'none' : 'auto'}
                         style={[
                           styles.overlayMarker,
                           {
                             left: pt.x,
                             top: pt.y,
+                            opacity: hidden ? 0 : 1,
                             transform: [{ translateX: -20 }, { translateY: -47 }],
                           },
                         ]}
                         onPress={() => {
-                          setSelectedSpot(item.pin as unknown as Spot);
-                          mapRef.current?.animateToRegion(
-                            {
-                              latitude: item.latitude,
-                              longitude: item.longitude,
-                              latitudeDelta: 0.05,
-                              longitudeDelta: 0.05,
-                            },
-                            300,
-                          );
+                          const lat = item.latitude;
+                          const lng = item.longitude;
+                          requestAnimationFrame(() => {
+                            setSelectedSpot(pin as unknown as Spot);
+                            mapRef.current?.animateToRegion(
+                              {
+                                latitude: lat,
+                                longitude: lng,
+                                latitudeDelta: 0.05,
+                                longitudeDelta: 0.05,
+                              },
+                              300,
+                            );
+                          });
                         }}
                       >
                         <View style={styles.markerContainer}>

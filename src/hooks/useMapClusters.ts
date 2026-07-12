@@ -63,7 +63,11 @@ export function useMapClusters(pins: MapPin[], region: Region | null) {
       if (props.cluster) {
         return {
           type: 'cluster' as const,
-          id: `cluster-${props.cluster_id}`,
+          // Position-derived key (NOT cluster_id — supercluster reassigns
+          // cluster_id across bbox/zoom queries, so a cluster at the same place
+          // would get a new React key and remount its Pressable, which can
+          // desync the Fabric touch registry mid-gesture).
+          id: `cluster-${Math.round(latitude * 1e4)}-${Math.round(longitude * 1e4)}`,
           latitude,
           longitude,
           count: props.point_count as number,
