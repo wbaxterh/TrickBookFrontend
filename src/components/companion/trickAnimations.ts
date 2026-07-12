@@ -18,6 +18,7 @@ import type { VRM } from '@pixiv/three-vrm';
 import {
   applyRiderPose,
   clamp01,
+  DOWNHILL_LOOK,
   easeInOut,
   hipDropFor,
   jumpArc,
@@ -37,7 +38,7 @@ import {
   windUpDemoPose,
 } from './riderFundamentals';
 
-export type TrickId = 'frontside-360';
+export type TrickId = 'frontside-360' | 'frontside-360-stylish';
 
 export type DemoAction = 'none' | 'full' | 'setup' | 'pop' | 'land';
 
@@ -73,21 +74,90 @@ function frontside360PoseAt(t: number): RiderPose {
   if (land > 0.5) crouch = lerp(0.72, 0.35, easeInOut((land - 0.5) * 2));
   if (settle > 0) crouch = lerp(0.35, STANCE_CROUCH, easeInOut(settle));
 
-  // Coil: wind away during setup, whip through at pop, neutral by landing
+  // Coil: wind away during setup, whip through at pop. Through the air the
+  // SHOULDERS lead the rotation (chest twists more than the hips — that's the
+  // coil ratio in applyTorsoAndHead) and the hips catch up as she comes
+  // around — "shoulders move first to spot the landing, then the hips follow".
   let coil = -0.7 * easeInOut(setup);
-  if (pop > 0) coil = lerp(-0.7, 0.35, easeInOut(pop));
-  if (air > 0) coil = lerp(0.35, 0.1, air);
-  if (land > 0) coil = lerp(0.1, 0, land);
+  if (pop > 0) coil = lerp(-0.7, 0.5, easeInOut(pop));
+  if (air > 0) coil = lerp(0.5, 0.05, easeInOut(air));
+  if (land > 0) coil = lerp(0.05, 0, land);
 
   const tuck = air > 0 && land === 0 ? Math.sin(Math.PI * air) : 0;
   const balance = land > 0 ? Math.sin(Math.PI * clamp01(land + settle * 0.4)) * (1 - settle) : 0;
 
-  // Head: lead the spin through the air, spot the landing from ~270°
+  // Head: lead the spin HARD and tilt over the leading shoulder through the air,
+  // spot the landing from ~270°, then settle looking downhill (not at camera).
   const spotting = spin > 0.72;
-  const headLead = air > 0 && !spotting ? 0.45 : 0;
-  const headSpot = spotting && land < 1 ? 0.3 : 0;
+  let headLead = 0;
+  let headSpot = 0;
+  let headRoll = 0;
+  if (air > 0 && !spotting) {
+    headLead = 0.65; // head cranks around ahead of the body
+    headRoll = 0.28 * Math.sin(Math.PI * air); // tip the head over the shoulder mid-air
+  }
+  if (spotting && land < 1) {
+    headLead = 0.5; // still turned toward where she's landing
+    headSpot = 0.32; // chin down to spot the snow
+    headRoll = 0.15;
+  }
+  if (settle > 0) {
+    // End looking downhill / forward, not straight at the camera.
+    headLead = lerp(headLead, DOWNHILL_LOOK, easeInOut(settle));
+    headSpot = lerp(headSpot, 0, easeInOut(settle));
+    headRoll = lerp(headRoll, 0, easeInOut(settle));
+  }
 
-  return { spin, height, crouch, coil, tuck, balance, headLead, headSpot };
+  return {
+    spin,
+    height,
+    crouch,
+    coil,
+    tuck,
+    balance,
+    headLead,
+    headSpot,
+    headRoll,
+    backLegLift: 0,
+    frontLegLift: 0,
+    boardTilt: 0,
+  };
+}
+
+/**
+ * A more STYLISH frontside 360: she lifts her back leg as she spins so the
+ * board angles (tail up), then ~3/4 through she pushes the back leg down and
+ * lifts the front leg (board angles the other way) to set up a tail-first
+ * landing, slapping the board down tail-then-nose. Head/shoulder work is
+ * inherited from the base FS360. (First pass — tune the leg/board amounts and
+ * the tilt axis/sign on-device.)
+ */
+function frontside360StylishPoseAt(t: number): RiderPose {
+  const base = frontside360PoseAt(t);
+  const air = phase(t, FS360_POP_END, FS360_AIR_END);
+  const land = phase(t, FS360_AIR_END, FS360_LAND_END);
+  const settle = phase(t, FS360_LAND_END, FS360_SETTLE_END);
+  const airborne = air > 0 && land === 0;
+
+  // First ~3/4 of the spin vs the last quarter, measured off the spin progress.
+  const early = clamp01(base.spin / 0.72);
+  const late = clamp01((base.spin - 0.72) / 0.28);
+
+  let backLegLift = airborne ? 0.9 * easeInOut(early) * (1 - easeInOut(late)) : 0;
+  let frontLegLift = airborne ? 0.7 * easeInOut(late) : 0;
+  // Tail-up while the back leg is lifted, swinging nose-up in the last quarter.
+  let boardTilt = airborne ? 0.5 * easeInOut(early) * (1 - late) - 0.4 * easeInOut(late) : 0;
+
+  if (land > 0) {
+    // Slap it down tail-first: board pitches tail-down and levels out.
+    const slap = Math.sin(Math.PI * clamp01(land * 1.6));
+    boardTilt = lerp(-0.4, 0, easeInOut(land)) + 0.35 * slap;
+    frontLegLift = 0.4 * (1 - easeInOut(clamp01(land * 2)));
+    backLegLift = 0;
+  }
+  if (settle > 0) boardTilt = lerp(boardTilt, 0, easeInOut(settle));
+
+  return { ...base, backLegLift, frontLegLift, boardTilt };
 }
 
 export const TRICKS: Record<TrickId, TrickTimeline> = {
@@ -95,6 +165,11 @@ export const TRICKS: Record<TrickId, TrickTimeline> = {
     duration: FS360_SETTLE_END,
     totalSpin: Math.PI * 2,
     poseAt: frontside360PoseAt,
+  },
+  'frontside-360-stylish': {
+    duration: FS360_SETTLE_END,
+    totalSpin: Math.PI * 2,
+    poseAt: frontside360StylishPoseAt,
   },
 };
 
@@ -117,6 +192,8 @@ export interface TrickDemoState {
   /** Board height — follows the jump but NOT the crouch hip-drop. */
   boardY: number;
   boardOpacity: number;
+  /** Board angle around its long axis (tail up/down) for stylish variants. */
+  boardTilt: number;
 }
 
 export const createTrickDemoState = (): TrickDemoState => ({
@@ -131,6 +208,7 @@ export const createTrickDemoState = (): TrickDemoState => ({
   rootY: 0,
   boardY: 0,
   boardOpacity: 0,
+  boardTilt: 0,
 });
 
 /** True while the demo system should own the body. */
@@ -182,9 +260,11 @@ export function startAction(state: TrickDemoState, action: Exclude<DemoAction, '
  * the stance has fully blended out (caller resumes idle animation).
  */
 export function driveDemo(vrm: VRM, state: TrickDemoState, dt: number): boolean {
-  // Smooth the on-board weight toward the session target
+  // Smooth the on-board weight toward the session target. Blend OUT a little
+  // faster so the stance return and the board fade finish together crisply
+  // (no lingering ghost board after she's already standing).
   const target = state.session ? 1 : 0;
-  state.stance += (target - state.stance) * Math.min(1, 2.5 * dt);
+  state.stance += (target - state.stance) * Math.min(1, (state.session ? 2.5 : 3.5) * dt);
   state.idleT += dt;
 
   if (state.action !== 'none') {
@@ -196,13 +276,15 @@ export function driveDemo(vrm: VRM, state: TrickDemoState, dt: number): boolean 
     }
   } else if (state.session) {
     // Keep performing while she explains: after a short breather in
-    // stance, run the full trick again — sentence cues can still fire
-    // early or mix in phase demos during the gap.
+    // stance, run the full trick again — alternating the clean and the
+    // stylish FS360 so both get shown. Sentence cues can still fire early
+    // or mix in phase demos during the gap.
     state.gapT += dt;
     if (state.gapT > LOOP_GAP_SECONDS) {
       state.action = 'full';
       state.actionT = 0;
       state.gapT = 0;
+      state.trick = state.trick === 'frontside-360' ? 'frontside-360-stylish' : 'frontside-360';
     }
   }
 
@@ -220,6 +302,7 @@ export function driveDemo(vrm: VRM, state: TrickDemoState, dt: number): boolean 
   state.rootY = pose.height - hipDropFor(effectiveCrouch);
   state.boardY = pose.height;
   state.boardOpacity = stanceEase;
+  state.boardTilt = pose.boardTilt * stanceEase;
 
   if (!state.session && state.stance < 0.005 && state.action === 'none') {
     state.stance = 0;
@@ -227,6 +310,7 @@ export function driveDemo(vrm: VRM, state: TrickDemoState, dt: number): boolean 
     state.rootY = 0;
     state.boardY = 0;
     state.boardOpacity = 0;
+    state.boardTilt = 0;
     if (humanoid) resetRiderBones(humanoid);
     return false;
   }

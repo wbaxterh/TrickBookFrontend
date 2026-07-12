@@ -612,11 +612,15 @@ function TrickBoard({ demo }: { demo: React.MutableRefObject<TrickDemoState> }) 
   useFrame(() => {
     const group = groupRef.current;
     if (!group) return;
-    const { boardOpacity, rootYaw, boardY } = demo.current;
-    group.visible = boardOpacity > 0.01;
+    const { boardOpacity, rootYaw, boardY, boardTilt } = demo.current;
+    // Cut off a bit higher than 0 so the board doesn't linger as a faint ghost
+    // after she's already stood back up (stance return + board vanish together).
+    group.visible = boardOpacity > 0.05;
     if (!group.visible) return;
     group.position.y = boardY + 0.045;
     group.rotation.y = rootYaw;
+    // Tail up / nose down tilt for stylish trick variants (0 the rest of the time).
+    group.rotation.z = boardTilt;
     if (deckRef.current) deckRef.current.opacity = boardOpacity;
     if (baseRef.current) baseRef.current.opacity = boardOpacity;
   });

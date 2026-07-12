@@ -74,6 +74,15 @@ export interface RiderPose {
   /** Head: lead the spin (yaw) and spot the landing (pitch down). */
   headLead: number;
   headSpot: number;
+  /** Head tilt/roll toward the leading shoulder (radians) — "head over the shoulder". */
+  headRoll: number;
+  /** Asymmetric leg raise for stylish variants (0 → 1). Regular stance:
+   *  front = left leg (lead foot), back = right leg. Lifting a leg bends its
+   *  knee up so the corresponding end of the board can angle up. */
+  backLegLift: number;
+  frontLegLift: number;
+  /** Board angle around its long axis (radians; + = tail up / nose down). */
+  boardTilt: number;
 }
 
 export const REST_POSE: RiderPose = {
@@ -85,35 +94,54 @@ export const REST_POSE: RiderPose = {
   balance: 0,
   headLead: 0,
   headSpot: 0,
+  headRoll: 0,
+  backLegLift: 0,
+  frontLegLift: 0,
+  boardTilt: 0,
 };
 
-/** Relaxed on-board bounce while she talks between moves. */
+/** Slight head turn to look "downhill" (toward the direction of travel) rather
+ *  than straight at the camera while riding. */
+export const DOWNHILL_LOOK = 0.32;
+
+/** Relaxed on-board bounce while she talks between moves — gaze downhill. */
 export function stanceIdlePose(idleT: number): RiderPose {
   return {
     ...REST_POSE,
     crouch: STANCE_CROUCH + Math.sin(idleT * 1.6) * 0.035,
     coil: Math.sin(idleT * 0.7) * 0.05,
+    headLead: DOWNHILL_LOOK,
   };
 }
 
 // --- Bone appliers ---
 
-function applyLegs(humanoid: Humanoid, crouch: number, stanceWeight: number) {
+function applyLegs(
+  humanoid: Humanoid,
+  crouch: number,
+  stanceWeight: number,
+  backLegLift = 0,
+  frontLegLift = 0,
+) {
   const spread = STANCE_SPREAD * stanceWeight;
   for (const side of ['left', 'right'] as const) {
+    // Regular stance: left leg leads (front), right leg is back.
+    const lift = side === 'left' ? frontLegLift : backLegLift;
     const upper = humanoid.getNormalizedBoneNode(`${side}UpperLeg`);
     const lower = humanoid.getNormalizedBoneNode(`${side}LowerLeg`);
     const foot = humanoid.getNormalizedBoneNode(`${side}Foot`);
     if (upper) {
-      // Thigh pitches forward (knee travels toward the toe side)
-      upper.rotation.x = -crouch * THIGH_FLEX;
+      // Thigh pitches forward (knee travels toward the toe side); a leg lift
+      // raises the thigh a little so the knee comes up.
+      upper.rotation.x = -crouch * THIGH_FLEX - lift * 0.5;
       // Splay OUTWARD: her left leg sits on +X (she faces the camera)
       upper.rotation.z = side === 'left' ? spread : -spread;
     }
-    // Shin folds back under the thigh — the human knee hinge
-    if (lower) lower.rotation.x = crouch * SHIN_FLEX;
-    // Keep the sole flat on the board
-    if (foot) foot.rotation.x = -crouch * (SHIN_FLEX - THIGH_FLEX);
+    // Shin folds back under the thigh — the human knee hinge; a lift folds it
+    // more so that foot lifts off the board.
+    if (lower) lower.rotation.x = crouch * SHIN_FLEX + lift * 1.3;
+    // Keep the sole flat on the board (relaxed when the foot is lifted)
+    if (foot) foot.rotation.x = -crouch * (SHIN_FLEX - THIGH_FLEX) + lift * 0.4;
   }
 }
 
@@ -139,7 +167,8 @@ function applyTorsoAndHead(humanoid: Humanoid, pose: RiderPose) {
   if (neck) {
     neck.rotation.y = pose.coil * 0.4 + pose.headLead;
     neck.rotation.x = pose.headSpot - pose.tuck * 0.15;
-    neck.rotation.z = 0;
+    // Tilt the head over the leading shoulder while spinning/spotting.
+    neck.rotation.z = pose.headRoll;
   }
 }
 
@@ -167,17 +196,30 @@ function applyArms(humanoid: Humanoid, pose: RiderPose) {
 
 /** Apply a full rider pose to the skeleton (legs scaled by stance weight). */
 export function applyRiderPose(humanoid: Humanoid, pose: RiderPose, stanceWeight: number) {
-  applyLegs(humanoid, pose.crouch * stanceWeight, stanceWeight);
+  applyLegs(
+    humanoid,
+    pose.crouch * stanceWeight,
+    stanceWeight,
+    pose.backLegLift * stanceWeight,
+    pose.frontLegLift * stanceWeight,
+  );
   applyTorsoAndHead(humanoid, pose);
   applyArms(humanoid, pose);
 }
 
-/** Zero out the bones the idle system never touches (legs, arm Y). */
+/** Zero out the bones the idle system never touches (legs, arm Y, neck roll/pitch). */
 export function resetRiderBones(humanoid: Humanoid) {
   applyLegs(humanoid, 0, 0);
   for (const side of ['left', 'right'] as const) {
     const upper = humanoid.getNormalizedBoneNode(`${side}UpperArm`);
     if (upper) upper.rotation.y = 0;
+  }
+  // The idle system re-drives neck yaw each frame but not roll/pitch — clear
+  // any leftover head-over-shoulder tilt / spot from a trick.
+  const neck = humanoid.getNormalizedBoneNode('neck');
+  if (neck) {
+    neck.rotation.x = 0;
+    neck.rotation.z = 0;
   }
 }
 

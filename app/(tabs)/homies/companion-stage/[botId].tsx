@@ -93,19 +93,27 @@ export default function CompanionStageScreen() {
   const demoState = useRef(createTrickDemoState());
   const replySentences = useRef<string[] | null>(null);
 
-  const { voiceState, voiceReady, getSessionId, bargeIn, reassertPlayback, setMode, beginReply } =
-    useKithVoice({
-      onAssistantSentence: (index) => {
-        const sentences = replySentences.current;
-        if (!sentences) return;
-        const action = actionForSentence(sentences[index] ?? '');
-        if (action) startAction(demoState.current, action);
-      },
-      onReplyDone: () => {
-        demoState.current.session = false;
-        replySentences.current = null;
-      },
-    });
+  const {
+    voiceState,
+    voiceReady,
+    getSessionId,
+    bargeIn,
+    stop,
+    reassertPlayback,
+    setMode,
+    beginReply,
+  } = useKithVoice({
+    onAssistantSentence: (index) => {
+      const sentences = replySentences.current;
+      if (!sentences) return;
+      const action = actionForSentence(sentences[index] ?? '');
+      if (action) startAction(demoState.current, action);
+    },
+    onReplyDone: () => {
+      demoState.current.session = false;
+      replySentences.current = null;
+    },
+  });
 
   const [messages, setMessages] = useState<StageMessage[]>([]);
   const [input, setInput] = useState('');
@@ -229,6 +237,19 @@ export default function CompanionStageScreen() {
     if (!listening) bargeIn();
     toggleVoiceInput();
   }, [listening, bargeIn, toggleVoiceInput]);
+
+  // Silence Kaori (and stop the mic) the moment the stage loses focus —
+  // navigating away or hitting back. expo-router keeps this screen mounted so
+  // the useKithVoice unmount cleanup won't fire; without this her voice keeps
+  // talking after you leave. Fires exactly once on the focused→blurred edge.
+  const wasFocused = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocused.current && !isFocused) {
+      stop();
+      if (listening) toggleVoiceInput();
+    }
+    wasFocused.current = isFocused;
+  }, [isFocused, stop, listening, toggleVoiceInput]);
 
   const lastMessages = messages.slice(-2);
 
