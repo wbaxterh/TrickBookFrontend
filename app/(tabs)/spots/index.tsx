@@ -882,15 +882,17 @@ export default function SpotsScreen() {
                 </Pressable>
               </View>
 
-              {/* Selected spot card or spots preview — lifted above the bottom
+              {/* Selected-spot card — shown ONLY when a pin is tapped. Tapping
+                  the map clears the selection (onPress on MapView) and hides it;
+                  tapping another pin swaps in that spot. Lifted above the bottom
                   safe area when fullscreen (no tab bar padding then). */}
-              <View
-                style={[
-                  styles.mapSpotsContainer,
-                  isMapFullscreen && { paddingBottom: insets.bottom + 16 },
-                ]}
-              >
-                {selectedSpot ? (
+              {selectedSpot && (
+                <View
+                  style={[
+                    styles.mapSpotsContainer,
+                    isMapFullscreen && { paddingBottom: insets.bottom + 16 },
+                  ]}
+                >
                   <SpotMapCard
                     spot={selectedSpot}
                     theme={theme}
@@ -899,37 +901,8 @@ export default function SpotsScreen() {
                     onToggleSave={() => handleToggleSave(selectedSpot)}
                     onOpenListPicker={() => handleOpenListPicker(selectedSpot)}
                   />
-                ) : spots.length > 0 ? (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.mapSpotsScroll}
-                  >
-                    {spots.slice(0, 5).map((spot) => (
-                      <SpotMapCard
-                        key={spot._id}
-                        spot={spot}
-                        theme={theme}
-                        saved={savedSpotIds.has(spot._id)}
-                        onPress={() => {
-                          setSelectedSpot(spot);
-                          mapRef.current?.animateToRegion(
-                            {
-                              latitude: spot.latitude,
-                              longitude: spot.longitude,
-                              latitudeDelta: 0.05,
-                              longitudeDelta: 0.05,
-                            },
-                            500,
-                          );
-                        }}
-                        onToggleSave={() => handleToggleSave(spot)}
-                        onOpenListPicker={() => handleOpenListPicker(spot)}
-                      />
-                    ))}
-                  </ScrollView>
-                ) : null}
-              </View>
+                </View>
+              )}
             </View>
           ) : (
             // List View
