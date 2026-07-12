@@ -543,7 +543,8 @@ function KaoriModel({
   const elapsed = useRef(0);
   useFrame((_, delta) => {
     elapsed.current += delta;
-    if (isDemoActive(demo.current)) {
+    const demoActive = isDemoActive(demo.current);
+    if (demoActive) {
       // The demo session owns the body; face keeps talking (mouth/blink/
       // emotes) so she narrates while riding and performing.
       const active = driveDemo(vrm, demo.current, delta);
@@ -558,6 +559,13 @@ function KaoriModel({
       driveCharacter(vrm, elapsed.current, delta, voice.current);
     }
     vrm.update(delta);
+    // With the skeleton fully updated, lock the trick board under the actual
+    // feet so the bindings stay attached and the board angle follows the legs.
+    if (demoActive && demo.current.boardOpacity > 0.05) {
+      lockBoardToFeet(vrm, demo.current);
+    } else {
+      demo.current.boardLocked = false;
+    }
   });
 
   return <primitive object={vrm.scene} />;
@@ -593,6 +601,67 @@ function makeBoardGeometry(
   return geometry;
 }
 
+// Scratch objects reused every frame so locking the board allocates nothing.
+const _footL = new THREE.Vector3();
+const _footR = new THREE.Vector3();
+const _boardX = new THREE.Vector3();
+const _boardY = new THREE.Vector3();
+const _boardZ = new THREE.Vector3();
+const _worldUp = new THREE.Vector3(0, 1, 0);
+const _boardBasis = new THREE.Matrix4();
+const _boardQuat = new THREE.Quaternion();
+/** Foot bone ≈ ankle; drop the deck this far below the midpoint so the soles
+ *  sit on top of the board rather than through it. */
+const BOARD_SOLE_DROP = 0.07;
+
+/**
+ * Lock the trick board to the rider's actual feet. The board's long axis (+X,
+ * where the bindings live at ±0.24) is aimed straight down the line between the
+ * two foot bones and the deck kept facing up, so the bindings stay under the
+ * soles and the board ANGLE follows the legs — lift the back leg and the tail
+ * rises because that foot rose. Writes the world transform into demo state for
+ * TrickBoard to copy. Must run after vrm.update() so the foot bones are posed.
+ */
+function lockBoardToFeet(vrm: VRM, state: TrickDemoState) {
+  const humanoid = vrm.humanoid;
+  const lf = humanoid?.getRawBoneNode('leftFoot');
+  const rf = humanoid?.getRawBoneNode('rightFoot');
+  if (!lf || !rf) {
+    state.boardLocked = false;
+    return;
+  }
+  lf.getWorldPosition(_footL);
+  rf.getWorldPosition(_footR);
+
+  // Board long axis (+X) runs foot-to-foot; rebuild an orthonormal, up-facing
+  // basis around it (degenerate cases — feet coincident or the axis vertical —
+  // fall back to the last transform).
+  _boardX.subVectors(_footR, _footL);
+  if (_boardX.lengthSq() < 1e-6) {
+    state.boardLocked = false;
+    return;
+  }
+  _boardX.normalize();
+  _boardZ.crossVectors(_boardX, _worldUp);
+  if (_boardZ.lengthSq() < 1e-6) {
+    state.boardLocked = false;
+    return;
+  }
+  _boardZ.normalize();
+  _boardY.crossVectors(_boardZ, _boardX).normalize();
+  _boardBasis.makeBasis(_boardX, _boardY, _boardZ);
+  _boardQuat.setFromRotationMatrix(_boardBasis);
+
+  state.boardPos[0] = (_footL.x + _footR.x) / 2 - _boardY.x * BOARD_SOLE_DROP;
+  state.boardPos[1] = (_footL.y + _footR.y) / 2 - _boardY.y * BOARD_SOLE_DROP;
+  state.boardPos[2] = (_footL.z + _footR.z) / 2 - _boardY.z * BOARD_SOLE_DROP;
+  state.boardQuat[0] = _boardQuat.x;
+  state.boardQuat[1] = _boardQuat.y;
+  state.boardQuat[2] = _boardQuat.z;
+  state.boardQuat[3] = _boardQuat.w;
+  state.boardLocked = true;
+}
+
 /** Stylized snowboard that appears under Kaori's feet during trick demos. */
 function TrickBoard({ demo }: { demo: React.MutableRefObject<TrickDemoState> }) {
   const groupRef = useRef<THREE.Group>(null);
@@ -612,15 +681,22 @@ function TrickBoard({ demo }: { demo: React.MutableRefObject<TrickDemoState> }) 
   useFrame(() => {
     const group = groupRef.current;
     if (!group) return;
-    const { boardOpacity, rootYaw, boardY, boardTilt } = demo.current;
+    const { boardOpacity, boardLocked, boardPos, boardQuat, rootYaw, boardY } = demo.current;
     // Cut off a bit higher than 0 so the board doesn't linger as a faint ghost
     // after she's already stood back up (stance return + board vanish together).
     group.visible = boardOpacity > 0.05;
     if (!group.visible) return;
-    group.position.y = boardY + 0.045;
-    group.rotation.y = rootYaw;
-    // Tail up / nose down tilt for stylish trick variants (0 the rest of the time).
-    group.rotation.z = boardTilt;
+    if (boardLocked) {
+      // Bindings stay glued to the feet; angle follows the legs (see
+      // lockBoardToFeet). This is the normal path once the skeleton is posed.
+      group.position.set(boardPos[0], boardPos[1], boardPos[2]);
+      group.quaternion.set(boardQuat[0], boardQuat[1], boardQuat[2], boardQuat[3]);
+    } else {
+      // Fallback for the first frame (or if a foot bone is missing): flat board
+      // under the root at the jump height — barely visible during the fade-in.
+      group.position.set(0, boardY + 0.045, 0);
+      group.rotation.set(0, rootYaw, 0);
+    }
     if (deckRef.current) deckRef.current.opacity = boardOpacity;
     if (baseRef.current) baseRef.current.opacity = boardOpacity;
   });

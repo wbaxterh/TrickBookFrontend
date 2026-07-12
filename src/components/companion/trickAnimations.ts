@@ -136,28 +136,28 @@ function frontside360StylishPoseAt(t: number): RiderPose {
   const base = frontside360PoseAt(t);
   const air = phase(t, FS360_POP_END, FS360_AIR_END);
   const land = phase(t, FS360_AIR_END, FS360_LAND_END);
-  const settle = phase(t, FS360_LAND_END, FS360_SETTLE_END);
   const airborne = air > 0 && land === 0;
 
   // First ~3/4 of the spin vs the last quarter, measured off the spin progress.
   const early = clamp01(base.spin / 0.72);
   const late = clamp01((base.spin - 0.72) / 0.28);
 
+  // Only the LEGS move here — the board is locked to the feet in KaoriStage and
+  // its angle follows them, so lifting a leg tilts that end of the board.
+  // First ~3/4: lift the BACK leg (tail rises). Last quarter: drop it and lift
+  // the FRONT leg (board angles the other way).
   let backLegLift = airborne ? 0.9 * easeInOut(early) * (1 - easeInOut(late)) : 0;
   let frontLegLift = airborne ? 0.7 * easeInOut(late) : 0;
-  // Tail-up while the back leg is lifted, swinging nose-up in the last quarter.
-  let boardTilt = airborne ? 0.5 * easeInOut(early) * (1 - late) - 0.4 * easeInOut(late) : 0;
 
   if (land > 0) {
-    // Slap it down tail-first: board pitches tail-down and levels out.
-    const slap = Math.sin(Math.PI * clamp01(land * 1.6));
-    boardTilt = lerp(-0.4, 0, easeInOut(land)) + 0.35 * slap;
-    frontLegLift = 0.4 * (1 - easeInOut(clamp01(land * 2)));
+    // Land tail-first: the front foot stays up (nose up / tail down) at contact,
+    // then drops so the nose slaps down after it.
+    frontLegLift = 0.5 * (1 - easeInOut(clamp01(land * 2)));
     backLegLift = 0;
   }
-  if (settle > 0) boardTilt = lerp(boardTilt, 0, easeInOut(settle));
 
-  return { ...base, backLegLift, frontLegLift, boardTilt };
+  // boardTilt is unused now (the board derives its angle from the feet).
+  return { ...base, backLegLift, frontLegLift, boardTilt: 0 };
 }
 
 export const TRICKS: Record<TrickId, TrickTimeline> = {
@@ -194,6 +194,12 @@ export interface TrickDemoState {
   boardOpacity: number;
   /** Board angle around its long axis (tail up/down) for stylish variants. */
   boardTilt: number;
+  /** Board world transform locked to the actual feet (computed in KaoriStage
+   *  from the raw foot bones so the bindings stay under the soles and the board
+   *  angle follows the feet). Plain arrays to keep this module three-free. */
+  boardPos: [number, number, number];
+  boardQuat: [number, number, number, number];
+  boardLocked: boolean;
 }
 
 export const createTrickDemoState = (): TrickDemoState => ({
@@ -209,6 +215,9 @@ export const createTrickDemoState = (): TrickDemoState => ({
   boardY: 0,
   boardOpacity: 0,
   boardTilt: 0,
+  boardPos: [0, 0, 0],
+  boardQuat: [0, 0, 0, 1],
+  boardLocked: false,
 });
 
 /** True while the demo system should own the body. */
