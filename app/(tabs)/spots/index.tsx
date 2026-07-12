@@ -595,8 +595,9 @@ export default function SpotsScreen() {
 
       {activeTab === 'allSpots' ? (
         <>
-          {/* Search Bar — hidden in fullscreen map. */}
-          {!isMapFullscreen && (
+          {/* Search Bar — list view only. Map view has its own in-map search
+              (the magnifying-glass map control), so this top bar is redundant there. */}
+          {viewMode === 'list' && (
             <View style={styles.searchContainer}>
               <View style={[styles.searchBar, { backgroundColor: theme.surface }]}>
                 <Ionicons name="search" size={20} color={theme.textSecondary} />
