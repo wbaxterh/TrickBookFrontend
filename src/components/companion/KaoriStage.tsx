@@ -549,11 +549,33 @@ function KaoriModel({
       // emotes) so she narrates while riding and performing.
       const active = driveDemo(vrm, demo.current, delta);
       driveFace(vrm, elapsed.current, voice.current);
-      vrm.scene.rotation.y = demo.current.rootYaw;
-      vrm.scene.position.y = demo.current.rootY;
+      const st = demo.current;
+      // Compose the whole-body orientation: YAW (stance + spin, about Y) THEN
+      // PITCH (flip, about her local board long-axis). q = qYaw * qPitch so the
+      // flip axis rotates WITH her facing. Pure 360 → rootPitch=0 → qPitch=
+      // identity → q is pure Y yaw, identical to before.
+      _flipQYaw.setFromAxisAngle(_flipYAxis, st.rootYaw);
+      _flipQPitch.setFromAxisAngle(_flipPitchAxis, st.rootPitch);
+      _flipQ.copy(_flipQYaw).multiply(_flipQPitch);
+      vrm.scene.quaternion.copy(_flipQ);
+      // Publish the root quaternion so lockBoardToFeet can roll the deck with her
+      // through a flip inversion (else it stays world-flat while she inverts).
+      st.rootQuat[0] = _flipQ.x;
+      st.rootQuat[1] = _flipQ.y;
+      st.rootQuat[2] = _flipQ.z;
+      st.rootQuat[3] = _flipQ.w;
+      // Pivot around the CoM/hip, not the feet: place the scene origin at
+      // arcCoM − q·comLocal so the hip sits at (0, rootY + COM_LOCAL_Y, 0) for
+      // every pitch angle (the body orbits the hip). pitch=0 → position.y=rootY.
+      _flipComOffset.set(0, COM_LOCAL_Y, 0).applyQuaternion(_flipQ);
+      vrm.scene.position.set(
+        -_flipComOffset.x,
+        st.rootY + COM_LOCAL_Y - _flipComOffset.y,
+        -_flipComOffset.z,
+      );
       if (!active) {
-        vrm.scene.rotation.y = 0;
-        vrm.scene.position.y = 0;
+        vrm.scene.quaternion.identity();
+        vrm.scene.position.set(0, 0, 0);
       }
     } else {
       driveCharacter(vrm, elapsed.current, delta, voice.current);
@@ -607,10 +629,26 @@ const _footR = new THREE.Vector3();
 const _boardX = new THREE.Vector3();
 const _boardY = new THREE.Vector3();
 const _boardZ = new THREE.Vector3();
-const _worldUp = new THREE.Vector3(0, 1, 0);
 const _worldFwd = new THREE.Vector3(0, 0, 1);
 const _boardBasis = new THREE.Matrix4();
 const _boardQuat = new THREE.Quaternion();
+// Board "up" derived from her body (for flips) — see lockBoardToFeet.
+const _bodyUp = new THREE.Vector3();
+const _rootQ = new THREE.Quaternion();
+
+// --- Whole-body flip transform (yaw*pitch quaternion pivoted at the CoM) ---
+// Hip/CoM height in the VRM scene-local frame (feet ~y=0; THIGH_LEN+SHIN_LEN ≈
+// 0.84 straight-leg foot→hip). The fixed pivot height for a flip — NOT rootY.
+// Tune 0.80–0.90 on device if a flip orbits her waist/chest instead of her hips.
+const COM_LOCAL_Y = 0.85;
+const _flipQ = new THREE.Quaternion();
+const _flipQYaw = new THREE.Quaternion();
+const _flipQPitch = new THREE.Quaternion();
+const _flipYAxis = new THREE.Vector3(0, 1, 0);
+// Flip axis = board's foot-to-foot line in her LOCAL frame (+X). If a flip
+// tumbles face-on at the apex instead of head-over-heels, flip this to (-1,0,0).
+const _flipPitchAxis = new THREE.Vector3(1, 0, 0);
+const _flipComOffset = new THREE.Vector3();
 /** Foot bone ≈ ankle; drop the deck this far below the midpoint so the soles
  *  sit on top of the board rather than through it. */
 const BOARD_SOLE_DROP = 0.07;
@@ -645,7 +683,17 @@ function lockBoardToFeet(vrm: VRM, state: TrickDemoState) {
     return;
   }
   _boardX.normalize();
-  _boardZ.crossVectors(_boardX, _worldUp);
+  // Board "up" comes from HER body, not the world — so through a flip inversion
+  // the deck ROLLS with her and stays soles-down instead of lying world-flat
+  // under an upside-down rider. rootPitch=0 (spins) → body-up == world-up →
+  // unchanged. (The flip axis IS the foot line, so foot-to-foot never goes
+  // vertical; the world-fwd fallback is only for the near-degenerate stylish lift.)
+  _bodyUp.set(0, 1, 0);
+  if (state.rootPitch) {
+    _rootQ.set(state.rootQuat[0], state.rootQuat[1], state.rootQuat[2], state.rootQuat[3]);
+    _bodyUp.applyQuaternion(_rootQ);
+  }
+  _boardZ.crossVectors(_boardX, _bodyUp);
   if (_boardZ.lengthSq() < 1e-4) {
     _boardZ.crossVectors(_boardX, _worldFwd);
   }

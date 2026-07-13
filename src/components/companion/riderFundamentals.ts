@@ -60,8 +60,11 @@ export function jumpArc(u: number, height: number): number {
  * All fields are normalized amounts the appliers translate to bones.
  */
 export interface RiderPose {
-  /** Rotation progress 0→1 (multiplied by the trick's total spin). */
+  /** Yaw rotation progress 0→1 (multiplied by the trick's total spin). */
   spin: number;
+  /** Flip progress 0→1 (multiplied by the trick's total FLIP — a whole-body
+   *  PITCH about the board's long axis, parallel to `spin`). 0 for pure spins. */
+  pitch: number;
   /** Root height above the board line (jump arc). */
   height: number;
   /** 0 straight legs → 1 full squat (hip drop is derived from this). */
@@ -94,6 +97,7 @@ export interface RiderPose {
 
 export const REST_POSE: RiderPose = {
   spin: 0,
+  pitch: 0,
   height: 0,
   crouch: STANCE_CROUCH,
   coil: 0,

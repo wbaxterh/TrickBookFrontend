@@ -39,14 +39,24 @@ import {
   windUpDemoPose,
 } from './riderFundamentals';
 
-export type TrickId = 'frontside-360' | 'frontside-360-stylish' | 'backside-360';
+export type TrickId =
+  | 'frontside-360'
+  | 'frontside-360-stylish'
+  | 'backside-360'
+  | 'wildcat'
+  | 'tamedog';
 
 export type DemoAction = 'none' | 'full' | 'setup' | 'pop' | 'land';
 
 export interface TrickTimeline {
   duration: number;
-  /** Total root rotation over the trick (radians; + is frontside/CCW). */
+  /** Total root YAW over the trick (radians; + is frontside/CCW). */
   totalSpin: number;
+  /** Total root PITCH/flip over the trick (radians, SIGNED: negative = backflip
+   *  /wildcat over the tail, positive = frontflip/tamedog over the nose). Omit
+   *  for pure spins (treated as 0). Yaw is about vertical, pitch about the
+   *  board's long axis — the two compose independently. */
+  totalFlip?: number;
   poseAt: (t: number) => RiderPose;
 }
 
@@ -131,6 +141,7 @@ function spin360PoseAt(t: number, dir: 1 | -1): RiderPose {
 
   return {
     spin,
+    pitch: 0, // pure yaw spin — no flip
     height,
     crouch,
     coil,
@@ -192,6 +203,107 @@ function frontside360StylishPoseAt(t: number): RiderPose {
   return { ...base, backLegLift, frontLegLift, boardTilt: 0 };
 }
 
+// --- Flips: wildcat (BACKFLIP over the tail) + tamedog (FRONTFLIP over the nose)
+// A flip is a whole-body PITCH about the board's long axis, pivoted at the CoM
+// (hip) in KaoriStage, coordinated with a bigger jump arc. It reuses the 360
+// phase skeleton but drives pose.PITCH (not pose.spin), so rootYaw stays pure
+// STANCE_YAW*ease (totalSpin=0) and applyArms' spin-driven Y cross-body wrap
+// stays ~0 (flip arms are SAGITTAL: tuck draw-in + balance fling, no Y whip).
+const FLIP_PEAK_HEIGHT = 0.62; // bigger air than the 360's 0.55
+const FLIP_TUCK_PEAK = 0.9; // tighter than the 360 (knees-to-chest)
+
+/**
+ * Shared flip core. `dir` = -1 wildcat (backward / over the tail) or +1 tamedog
+ * (forward / over the nose). The actual rotation SIGN is carried by the trick's
+ * signed totalFlip in driveDemo; here `dir` only shapes the HEAD spot — the
+ * biggest read difference (wildcat spots the landing LATE/blind, tamedog EARLY).
+ */
+function flipPoseAt(t: number, dir: 1 | -1): RiderPose {
+  const setup = phase(t, 0, FS360_SETUP_END);
+  const pop = phase(t, FS360_SETUP_END, FS360_POP_END);
+  const air = phase(t, FS360_POP_END, FS360_AIR_END);
+  const land = phase(t, FS360_AIR_END, FS360_LAND_END);
+  const settle = phase(t, FS360_LAND_END, FS360_SETTLE_END);
+
+  // FLIP progress → pose.pitch. Same 0.06 / easeInOut(air) / 0.06 shape as the
+  // 360's spin (velocity-matched at the pop/land edges) and parks EXACTLY at
+  // 1.0 == full 2π == identity (no landing snap). Fastest through the apex.
+  const pitch = pop > 0 ? clamp01(0.06 * pop + 0.88 * easeInOut(air) + 0.06 * land) : 0;
+
+  // Bigger, slightly longer air than a 360.
+  const height = jumpArc(phase(t, FS360_POP_END - 0.08, FS360_AIR_END + 0.15), FLIP_PEAK_HEIGHT);
+
+  // Crouch: deep vertical LOAD, explode at pop, refold through the air, absorb.
+  let crouch = lerp(STANCE_CROUCH, 0.7, easeInOut(setup));
+  if (pop > 0) crouch = lerp(0.7, 0.08, easeInOut(pop));
+  if (air > 0) crouch = lerp(0.08, 0.35, easeInOut(air));
+  if (land > 0) crouch = lerp(0.35, 0.72, easeInOut(clamp01(land * 2)));
+  if (land > 0.5) crouch = lerp(0.72, 0.35, easeInOut((land - 0.5) * 2));
+  if (settle > 0) crouch = lerp(0.35, STANCE_CROUCH, easeInOut(settle));
+
+  // COIL: NO Y-wind for a flip — stay ON-AXIS (a shoulder/hip twist corkscrews
+  // it off-axis). Just a small vertical load feel in setup, ~0 through the air.
+  let coil = -0.35 * easeInOut(setup);
+  if (pop > 0) coil = lerp(-0.35, 0, easeInOut(pop));
+
+  // TUCK: tighter than a 360 (knees-to-chest), bell across the air.
+  const tuck = air > 0 && land === 0 ? FLIP_TUCK_PEAK * Math.sin(Math.PI * air) : 0;
+  const balance = land > 0 ? Math.sin(Math.PI * clamp01(land + settle * 0.4)) * (1 - settle) : 0;
+
+  // HEAD — pitch-based (headSpot = chin up/down), the signature flip read.
+  // wildcat (dir<0): throw the head BACK/up at pop (headSpot NEGATIVE), blind
+  //   through the inverted apex, re-spot the snow LATE (~p 0.7, swings POSITIVE).
+  // tamedog (dir>0): throw the head DOWN/forward early (headSpot POSITIVE), and
+  //   because she flips toward her gaze she re-fixates the landing cleanly ~2/3.
+  const p = pitch;
+  const headLead = DOWNHILL_LOOK; // no yaw here — just hold the downhill gaze
+  let headSpot: number;
+  if (dir < 0) {
+    const throwBack = Math.sin(Math.PI * clamp01(p / 0.7));
+    const reSpot = easeInOut(clamp01((p - 0.7) / 0.3));
+    headSpot = lerp(-0.55 * throwBack, 0.45, reSpot);
+  } else {
+    const throwDown = easeInOut(clamp01(p / 0.44));
+    const reFix = easeInOut(clamp01((p - 0.66) / 0.34));
+    headSpot = lerp(0.25 + 0.2 * throwDown, 0.45, reFix);
+  }
+  // Subtle head-over-shoulder roll toward the flip direction reads as commitment.
+  let headRoll = dir * 0.14 * Math.sin(Math.PI * clamp01(p));
+
+  if (settle > 0) {
+    const s = easeInOut(settle);
+    headSpot = lerp(headSpot, DOWNHILL_CHIN, s);
+    headRoll = lerp(headRoll, 0, s);
+  }
+
+  return {
+    spin: 0, // FLIP: no yaw — rootYaw stays STANCE_YAW*ease
+    pitch,
+    height,
+    crouch,
+    coil,
+    tuck,
+    balance,
+    headLead,
+    headSpot,
+    headRoll,
+    backLegLift: 0,
+    frontLegLift: 0,
+    boardTilt: 0,
+    dir,
+  };
+}
+
+/** Wildcat = BACKFLIP (over the tail, backward). */
+function wildcatPoseAt(t: number): RiderPose {
+  return flipPoseAt(t, -1);
+}
+
+/** Tamedog = FRONTFLIP (over the nose, forward). */
+function tamedogPoseAt(t: number): RiderPose {
+  return flipPoseAt(t, 1);
+}
+
 export const TRICKS: Record<TrickId, TrickTimeline> = {
   'frontside-360': {
     duration: FS360_SETTLE_END,
@@ -208,6 +320,18 @@ export const TRICKS: Record<TrickId, TrickTimeline> = {
     // NEGATIVE = clockwise from above (the mirror of frontside's +2π).
     totalSpin: -Math.PI * 2,
     poseAt: backside360PoseAt,
+  },
+  wildcat: {
+    duration: FS360_SETTLE_END,
+    totalSpin: 0,
+    totalFlip: -Math.PI * 2, // backflip: backward over the tail (verify sign on device)
+    poseAt: wildcatPoseAt,
+  },
+  tamedog: {
+    duration: FS360_SETTLE_END,
+    totalSpin: 0,
+    totalFlip: Math.PI * 2, // frontflip: forward over the nose
+    poseAt: tamedogPoseAt,
   },
 };
 
@@ -231,6 +355,12 @@ export interface TrickDemoState {
   idleT: number;
   /** Outputs for the frame loop + board renderer. */
   rootYaw: number;
+  /** Whole-body flip angle this frame (radians, signed). 0 for spins. */
+  rootPitch: number;
+  /** The composed whole-body quaternion [x,y,z,w] KaoriStage applied this frame
+   *  (yaw*pitch). Written by KaoriStage; read by lockBoardToFeet so the board
+   *  rolls with her through a flip inversion instead of staying world-flat. */
+  rootQuat: [number, number, number, number];
   rootY: number;
   /** Board height — follows the jump but NOT the crouch hip-drop. */
   boardY: number;
@@ -255,6 +385,8 @@ export const createTrickDemoState = (): TrickDemoState => ({
   stance: 0,
   idleT: 0,
   rootYaw: 0,
+  rootPitch: 0,
+  rootQuat: [0, 0, 0, 1],
   rootY: 0,
   boardY: 0,
   boardOpacity: 0,
@@ -370,8 +502,14 @@ export function driveDemo(vrm: VRM, state: TrickDemoState, dt: number): boolean 
     applyRiderPose(humanoid, pose, stanceEase);
   }
 
-  state.rootYaw = STANCE_YAW * stanceEase + TRICKS[state.trick].totalSpin * pose.spin;
-  // Hips sink with the knee fold so the feet stay planted on the board
+  const timeline = TRICKS[state.trick];
+  state.rootYaw = STANCE_YAW * stanceEase + timeline.totalSpin * pose.spin;
+  // Flip pitch: signed totalFlip carried by pose.pitch, gated by stanceEase so a
+  // partial strap-in never half-flips her. 0 for all spins (totalFlip omitted),
+  // and spins keep pitch=0 / flips keep spin=0, so the two channels never fight.
+  state.rootPitch = (timeline.totalFlip ?? 0) * pose.pitch * stanceEase;
+  // Hips sink with the knee fold so the feet stay planted on the board (for a
+  // flip this is the CoM/hip height on the jump arc that KaoriStage pivots around).
   state.rootY = pose.height - hipDropFor(effectiveCrouch);
   state.boardY = pose.height;
   state.boardOpacity = stanceEase;
@@ -385,6 +523,7 @@ export function driveDemo(vrm: VRM, state: TrickDemoState, dt: number): boolean 
   ) {
     state.stance = 0;
     state.rootYaw = 0;
+    state.rootPitch = 0; // no leftover flip tilt into idle
     state.rootY = 0;
     state.boardY = 0;
     state.boardOpacity = 0;

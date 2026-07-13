@@ -58,6 +58,9 @@ const MODE_LABELS: Record<string, string> = {
  * Backside spins the other way; plain "360" / "frontside 360" stays frontside.
  */
 function detectTrickId(text: string): TrickId | null {
+  // Flips first — a wildcat/tamedog is a flip, not a 360 ("backflip" contains "back").
+  if (/\b(wildcat|back[\s-]?flip)\b/i.test(text)) return 'wildcat';
+  if (/\b(tamedog|tame[\s-]?dog|front[\s-]?flip)\b/i.test(text)) return 'tamedog';
   const mentions360 = /\b(360|three[\s-]?sixty|(front|back)side\s*3|(fs|bs)\s*3|back\s*3)\b/i.test(
     text,
   );
@@ -90,6 +93,13 @@ function splitSentences(text: string): string[] {
  */
 function actionForSentence(sentence: string): Exclude<DemoAction, 'none'> | null {
   if (/watch|let me show|show you|check (this|it)|like this|here (we|it) go/i.test(sentence)) {
+    return 'full';
+  }
+  if (
+    /\b(wildcat|tamedog|tame[\s-]?dog|back[\s-]?flip|front[\s-]?flip|flip|invert|somersault)\b/i.test(
+      sentence,
+    )
+  ) {
     return 'full';
   }
   if (/\b(spin|rotat\w*|360|three[\s-]?sixty)\b/i.test(sentence)) return 'full';
