@@ -22,6 +22,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { brandColors } from '@/constants/colors';
+import { SnowWorld } from './SnowWorld';
 import {
   createTrickDemoState,
   driveDemo,
@@ -486,6 +487,9 @@ function downgradeMToonMaterials(root: THREE.Object3D, glCtx: WebGL2RenderingCon
         side: mtoon.side,
         depthWrite: mtoon.depthWrite,
         depthTest: mtoon.depthTest,
+        // Kaori is unlit and always in the foreground — never fog her (the snow
+        // world adds scene fog; MeshBasicMaterial.fog defaults to true).
+        fog: false,
       });
       replacement.name = mtoon.name;
       mtoon.dispose();
@@ -752,11 +756,23 @@ function TrickBoard({ demo }: { demo: React.MutableRefObject<TrickDemoState> }) 
       {/* Deck — sakura-pink topsheet (matches Kaori's jacket, pops against
           the dark floor), long axis through the rider's feet */}
       <mesh geometry={deckGeometry}>
-        <meshStandardMaterial ref={deckRef} color="#f48fb8" roughness={0.35} transparent />
+        <meshStandardMaterial
+          ref={deckRef}
+          color="#f48fb8"
+          roughness={0.35}
+          transparent
+          fog={false}
+        />
       </mesh>
       {/* White rails/base peeking out around the deck */}
       <mesh geometry={baseGeometry} position={[0, -0.004, 0]}>
-        <meshStandardMaterial ref={baseRef} color="#f4f6fb" roughness={0.3} transparent />
+        <meshStandardMaterial
+          ref={baseRef}
+          color="#f4f6fb"
+          roughness={0.3}
+          transparent
+          fog={false}
+        />
       </mesh>
       {/* Binding hints */}
       <mesh position={[-0.24, 0.035, 0]}>
@@ -798,7 +814,7 @@ function StageSet() {
       {/* Brand-yellow stage ring */}
       <mesh position={[0, 0.012, 0]} rotation-x={-Math.PI / 2}>
         <ringGeometry args={[1.35, 1.42, 64]} />
-        <meshBasicMaterial color={brandColors.primary} side={THREE.DoubleSide} />
+        <meshBasicMaterial color={brandColors.primary} side={THREE.DoubleSide} fog={false} />
       </mesh>
     </>
   );
@@ -931,8 +947,11 @@ export function KaoriStage({ active = true, voiceState, demoState }: KaoriStageP
             }}
             style={styles.canvas}
           >
+            {/* Seeds scene.background for frame 0; SnowWorld owns it per-frame after. */}
             <color args={['#0b0e17']} attach="background" />
             <StageSet />
+            {/* Alpine world that crossfades in as she straps onto the board. */}
+            <SnowWorld demo={demo} />
             <CameraRig orbit={orbit} />
             <TrickBoard demo={demo} />
             <Suspense fallback={null}>
