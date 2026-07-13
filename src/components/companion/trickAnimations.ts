@@ -18,6 +18,7 @@ import type { VRM } from '@pixiv/three-vrm';
 import {
   applyRiderPose,
   clamp01,
+  DOWNHILL_CHIN,
   DOWNHILL_LOOK,
   easeInOut,
   hipDropFor,
@@ -28,7 +29,6 @@ import {
   POP_DEMO_DURATION,
   phase,
   popDemoPose,
-  REST_POSE,
   type RiderPose,
   resetRiderBones,
   STANCE_CROUCH,
@@ -86,26 +86,24 @@ function frontside360PoseAt(t: number): RiderPose {
   const tuck = air > 0 && land === 0 ? Math.sin(Math.PI * air) : 0;
   const balance = land > 0 ? Math.sin(Math.PI * clamp01(land + settle * 0.4)) * (1 - settle) : 0;
 
-  // Head: lead the spin HARD and tilt over the leading shoulder through the air,
-  // spot the landing from ~270°, then settle looking downhill (not at camera).
-  const spotting = spin > 0.72;
-  let headLead = 0;
-  let headSpot = 0;
-  let headRoll = 0;
-  if (air > 0 && !spotting) {
-    headLead = 0.65; // head cranks around ahead of the body
-    headRoll = 0.28 * Math.sin(Math.PI * air); // tip the head over the shoulder mid-air
-  }
-  if (spotting && land < 1) {
-    headLead = 0.5; // still turned toward where she's landing
-    headSpot = 0.32; // chin down to spot the snow
-    headRoll = 0.15;
-  }
+  // Head — ONE continuous curve (no snaps) from stance → spin → spot → settle,
+  // all driven off the smooth `spin` progress. She starts looking downhill
+  // toward the nose (matching stance), cranks her head AHEAD of the body to
+  // lead the spin and tips it over the leading shoulder, picks up the landing
+  // in the last quarter (chin down to spot the snow), then eases back to the
+  // exact downhill riding gaze she started from.
+  const leadIn = easeInOut(clamp01(spin / 0.72)); // ramp over the first ~3/4 of the spin
+  const spot = easeInOut(clamp01((spin - 0.72) / 0.28)); // last quarter: spot the landing
+  let headLead = lerp(DOWNHILL_LOOK, 0.68, leadIn); // downhill → full spin lead
+  headLead = lerp(headLead, 0.5, spot); // relax the crank as she spots down
+  let headSpot = lerp(DOWNHILL_CHIN, 0.32, spot); // chin drops to spot the snow
+  let headRoll = 0.26 * Math.sin(Math.PI * clamp01(spin / 0.85)); // over-the-shoulder tilt, peaks mid-air
   if (settle > 0) {
-    // End looking downhill / forward, not straight at the camera.
-    headLead = lerp(headLead, DOWNHILL_LOOK, easeInOut(settle));
-    headSpot = lerp(headSpot, 0, easeInOut(settle));
-    headRoll = lerp(headRoll, 0, easeInOut(settle));
+    // End looking downhill toward the nose — identical to the start.
+    const s = easeInOut(settle);
+    headLead = lerp(headLead, DOWNHILL_LOOK, s);
+    headSpot = lerp(headSpot, DOWNHILL_CHIN, s);
+    headRoll = lerp(headRoll, 0, s);
   }
 
   return {
@@ -269,11 +267,13 @@ export function startAction(state: TrickDemoState, action: Exclude<DemoAction, '
  * the stance has fully blended out (caller resumes idle animation).
  */
 export function driveDemo(vrm: VRM, state: TrickDemoState, dt: number): boolean {
-  // Smooth the on-board weight toward the session target. Blend OUT a little
-  // faster so the stance return and the board fade finish together crisply
-  // (no lingering ghost board after she's already standing).
-  const target = state.session ? 1 : 0;
-  state.stance += (target - state.stance) * Math.min(1, (state.session ? 2.5 : 3.5) * dt);
+  // Stay "on board" (stance held, board visible) while the session is live OR
+  // while any action is still running — a trick that outlasts the spoken reply
+  // must FINISH with the board under her, never spin on after the board faded.
+  // Blend out (a little faster) only once she's truly done performing.
+  const onBoard = state.session || state.action !== 'none';
+  const target = onBoard ? 1 : 0;
+  state.stance += (target - state.stance) * Math.min(1, (onBoard ? 2.5 : 3.5) * dt);
   state.idleT += dt;
 
   if (state.action !== 'none') {
@@ -297,7 +297,9 @@ export function driveDemo(vrm: VRM, state: TrickDemoState, dt: number): boolean 
     }
   }
 
-  const pose = state.action === 'none' && !state.session ? REST_POSE : actionPose(state);
+  // action==='none' → actionPose returns the downhill stance-idle, so the
+  // blend-out after the session ends stays in the riding stance (no REST snap).
+  const pose = actionPose(state);
   const stanceEase = easeInOut(clamp01(state.stance));
   const effectiveCrouch = pose.crouch * stanceEase;
 

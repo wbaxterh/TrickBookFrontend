@@ -100,17 +100,24 @@ export const REST_POSE: RiderPose = {
   boardTilt: 0,
 };
 
-/** Slight head turn to look "downhill" (toward the direction of travel) rather
- *  than straight at the camera while riding. */
-export const DOWNHILL_LOOK = 0.32;
+/** Head turn to look "downhill" — down the board toward the nose (front foot,
+ *  +X side) like a rider watching where they're going — rather than square
+ *  across the board / off to the side. Applied to headLead (neck yaw). Raise
+ *  toward ~0.9 for more of a look down the board, lower for squarer. */
+export const DOWNHILL_LOOK = 0.6;
+/** Small chin-down that pairs with the downhill look (gaze slightly down the
+ *  slope, not level). Applied to headSpot at rest AND at the trick's settle. */
+export const DOWNHILL_CHIN = 0.08;
 
-/** Relaxed on-board bounce while she talks between moves — gaze downhill. */
+/** Relaxed on-board bounce while she talks between moves — gaze downhill,
+ *  head turned down the board toward the nose (not square across / off-camera). */
 export function stanceIdlePose(idleT: number): RiderPose {
   return {
     ...REST_POSE,
     crouch: STANCE_CROUCH + Math.sin(idleT * 1.6) * 0.035,
     coil: Math.sin(idleT * 0.7) * 0.05,
     headLead: DOWNHILL_LOOK,
+    headSpot: DOWNHILL_CHIN,
   };
 }
 
@@ -173,24 +180,72 @@ function applyTorsoAndHead(humanoid: Humanoid, pose: RiderPose) {
 }
 
 function applyArms(humanoid: Humanoid, pose: RiderPose) {
+  // Rest (from T-pose): uz hangs the arms DOWN at the sides; ux ~0 = neutral
+  // fwd/back; fz = slight elbow bend. Everything below is RELATIVE to the
+  // chest, which already carries pose.coil * 0.45 of shoulder rotation — so we
+  // deliberately ADD arm motion on top of that so the arms read as alive
+  // instead of dead pendulums hanging off spinning shoulders.
   const rest = { uz: 1.15, ux: 0.06, fz: 0.15 };
+
+  // --- Tuning magnitudes ---
+  const SWING = 0.9; // fwd/back pump of a DOWN arm about upper.rotation.x
+  const LIFT_COIL = 0.55; // how far the arms come UP off the sides at full coil
+  const LIFT_TUCK = 0.45; // arms pulled in during the airborne tuck
+  const LIFT_BAL = 0.55; // arms thrown wide for landing balance
+  const CROSS = 0.4; // cross-body wrap (asymmetry via upper.rotation.y)
+  const ELBOW = 0.75; // elbow flexion added while winding/whipping
+  const CATCH = 0.25; // arms fling wide/back on the balance catch
+
+  // coil runs the full -0.7 (wound up) -> +0.5 (whip at pop) -> ~0 range.
+  // windup>0 ONLY while coil is negative (the load phase).
   const windup = clamp01(-pose.coil / 0.7);
-  const uzTarget = rest.uz - pose.tuck * 0.45 - pose.balance * 0.55 + windup * 0.1;
-  const uxTarget = rest.ux + pose.tuck * 0.35 + windup * 0.25;
-  const fzTarget = rest.fz + pose.tuck * 0.55;
+  // whip>0 ONLY while coil is positive (the throw at/after the pop).
+  const whip = clamp01(pose.coil / 0.5);
+  // Raise arms off the sides whenever they're doing ANYTHING (loading OR
+  // throwing) — biggest away from the neutral coil, so they pump up then
+  // relax back down. |coil| already peaks at the extremes of the sequence.
+  const coilMag = clamp01(Math.abs(pose.coil) / 0.7);
+
+  // upper.rotation.z (abduction): LOWER uz => arm rises toward the T (out to
+  // the side). Raise off the sides on coil, tuck in during air, wide on land.
+  const uzTarget = rest.uz - coilMag * LIFT_COIL - pose.tuck * LIFT_TUCK - pose.balance * LIFT_BAL;
+
+  // upper.rotation.x is THE visible fwd/back swing of a DOWN arm (rotation
+  // about the world X axis pitches the hanging arm toward +Z=forward / -Z=back;
+  // upper.rotation.y on a down arm only TWISTS it, so it can't do this job).
+  // Load BACK against the spin during wind-up (coil<0 => negative swing), then
+  // THROW FORWARD as coil whips positive. pose.coil is the single driver so the
+  // swing is phase-locked to the shoulders.
+  const swingBase = rest.ux + pose.coil * SWING + pose.tuck * 0.35;
 
   for (const side of ['left', 'right'] as const) {
-    const sign = side === 'left' ? -1 : 1;
+    const sign = side === 'left' ? -1 : 1; // left arm on +X, right on -X
     const upper = humanoid.getNormalizedBoneNode(`${side}UpperArm`);
     const lower = humanoid.getNormalizedBoneNode(`${side}LowerArm`);
     const hand = humanoid.getNormalizedBoneNode(`${side}Hand`);
+
+    // Frontside spin is +Y (CCW from above): the BACK/right arm leads the throw
+    // and reaches ACROSS the chest, the front/left arm trails — so bias the
+    // right arm to swing a touch more forward and the left a touch less. This
+    // asymmetry makes it read as a real wrap, not a symmetric puppet swing.
+    const lead = side === 'right' ? 1 : -0.6;
+    // On the landing she flings the arms wide and slightly back to catch balance.
+    const catchSwing = -pose.balance * CATCH;
+
     if (upper) {
       upper.rotation.z = sign * uzTarget;
-      upper.rotation.x = uxTarget;
-      upper.rotation.y = windup * 0.35;
+      upper.rotation.x = swingBase + lead * whip * 0.35 + catchSwing;
+      // Cross-body wrap: twist the arms across during the whip + air, so the
+      // hands travel around the torso instead of staying pinned to the sides.
+      upper.rotation.y = sign * (whip * CROSS + pose.tuck * 0.3);
     }
-    if (lower) lower.rotation.z = sign * fzTarget;
-    if (hand) hand.rotation.x = 0.1;
+    // Elbows bend as she loads and whips (arms don't stay straight in a spin),
+    // and pull tighter in the tuck. fz base keeps the natural resting bend.
+    if (lower) {
+      lower.rotation.z = sign * (rest.fz + pose.tuck * 0.55 + (windup + whip) * ELBOW * 0.4);
+      lower.rotation.x = -(windup * 0.5 + whip * 0.7 + pose.tuck * 0.6);
+    }
+    if (hand) hand.rotation.x = 0.1 + pose.tuck * 0.2;
   }
 }
 
