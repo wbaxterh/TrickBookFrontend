@@ -17,6 +17,7 @@
 import type { VRM } from '@pixiv/three-vrm';
 import {
   applyRiderPose,
+  clamp,
   clamp01,
   DOWNHILL_CHIN,
   DOWNHILL_LOOK,
@@ -56,6 +57,11 @@ const FS360_AIR_END = 3.1;
 const FS360_LAND_END = 3.7;
 const FS360_SETTLE_END = 4.2;
 
+// Head-spotting knobs (see the head block in spin360PoseAt).
+const NECK_CAP = 1.3; // anatomical neck-yaw limit (~75°) — forces the hold→whip
+const HEAD_HOLD_FRAC = 0.5; // spin fraction she holds the gaze forward before whipping
+const HEAD_WHIP_END = 0.9; // spin fraction the head has re-fixated forward by
+
 /**
  * Shared 360 timeline for frontside AND backside so they never drift apart.
  * `dir` = +1 frontside (CCW / +Y) or -1 backside (CW / -Y): it flips the body
@@ -63,10 +69,9 @@ const FS360_SETTLE_END = 4.2;
  * backside READS as backside. The actual rotation is carried by the trick's
  * signed totalSpin — NOT by the coil, which stays frontside-signed for BOTH so
  * the arm load→whip TIMING (applyArms keys windup/whip off the coil sign) is
- * preserved. `spotStart` = the spin fraction where she picks up the landing
- * (later for the blinder backside, which is blind through the first half).
+ * preserved.
  */
-function spin360PoseAt(t: number, dir: 1 | -1, spotStart: number): RiderPose {
+function spin360PoseAt(t: number, dir: 1 | -1): RiderPose {
   const setup = phase(t, 0, FS360_SETUP_END);
   const pop = phase(t, FS360_SETUP_END, FS360_POP_END);
   const air = phase(t, FS360_POP_END, FS360_AIR_END);
@@ -96,19 +101,28 @@ function spin360PoseAt(t: number, dir: 1 | -1, spotStart: number): RiderPose {
   const tuck = air > 0 && land === 0 ? Math.sin(Math.PI * air) : 0;
   const balance = land > 0 ? Math.sin(Math.PI * clamp01(land + settle * 0.4)) * (1 - settle) : 0;
 
-  // Head — ONE continuous curve (no snaps) from stance → spin → spot → settle.
-  // She starts looking downhill toward the nose, cranks her head AHEAD of the
-  // body over the leading shoulder (dir flips WHICH shoulder — front for FS,
-  // back for BS), picks up the landing in the last quarter (chin down to spot),
-  // then eases back to the exact downhill riding gaze she started from.
-  const leadIn = easeInOut(clamp01(spin / spotStart)); // ramp over the spin up to the spot
-  const spot = easeInOut(clamp01((spin - spotStart) / (1 - spotStart))); // spot the landing
-  let headLead = lerp(DOWNHILL_LOOK, dir * 0.68, leadIn); // downhill → full spin lead
-  headLead = lerp(headLead, dir * 0.5, spot); // relax the crank as she spots down
-  let headSpot = lerp(DOWNHILL_CHIN, 0.32, spot); // chin drops to spot the snow
-  let headRoll = dir * 0.26 * Math.sin(Math.PI * clamp01(spin / 0.85)); // over-the-shoulder tilt
+  // Head — HEAD-SPOTTING (one continuous curve, no snaps). The BODY sweeps a
+  // full dir*2π via rootYaw; the neck (its child) COUNTER-rotates to keep her
+  // GAZE on the landing. World head yaw = dir*2π*spin + neck.y, so the neck
+  // target to hold world-forward (the downhill riding gaze) is DOWNHILL_LOOK −
+  // dir*2π*spin, capped at the neck limit. She holds the gaze forward as long as
+  // she anatomically can, then the body drags her head around FAST (a quick apex
+  // glance, not the old slow blind lead-the-spin sweep) and she RE-FIXATES
+  // forward — measured from the END of the revolution — landing looking downhill.
+  // (Frontside holds a touch longer than backside because she spins toward her
+  // downhill gaze; that small asymmetry is physical, not a bug.)
+  const bodyYaw = dir * Math.PI * 2 * spin;
+  const holdLead = clamp(DOWNHILL_LOOK - bodyYaw, -NECK_CAP, NECK_CAP);
+  const reFixLead = clamp(DOWNHILL_LOOK - dir * Math.PI * 2 * (spin - 1), -NECK_CAP, NECK_CAP);
+  const whip = easeInOut(clamp01((spin - HEAD_HOLD_FRAC) / (HEAD_WHIP_END - HEAD_HOLD_FRAC)));
+  let headLead = lerp(holdLead, reFixLead, whip);
+  // Chin drops and head rolls over the shoulder AS she whips her eyes around to
+  // re-spot the snow, then relaxes — peaks mid-whip, zero at both ends.
+  const spotArc = Math.sin(Math.PI * whip);
+  let headSpot = lerp(DOWNHILL_CHIN, 0.32, spotArc);
+  let headRoll = dir * 0.26 * spotArc;
   if (settle > 0) {
-    // End looking downhill toward the nose — identical to the start.
+    // End on the exact downhill riding gaze she started from.
     const s = easeInOut(settle);
     headLead = lerp(headLead, DOWNHILL_LOOK, s);
     headSpot = lerp(headSpot, DOWNHILL_CHIN, s);
@@ -132,14 +146,14 @@ function spin360PoseAt(t: number, dir: 1 | -1, spotStart: number): RiderPose {
   };
 }
 
-/** Frontside 360 — CCW / +Y; picks up the landing at ~3/4 through the spin. */
+/** Frontside 360 — CCW / +Y. */
 function frontside360PoseAt(t: number): RiderPose {
-  return spin360PoseAt(t, 1, 0.72);
+  return spin360PoseAt(t, 1);
 }
 
-/** Backside 360 — CW / -Y; blind through the first half, so it spots later. */
+/** Backside 360 — CW / -Y (mirror). */
 function backside360PoseAt(t: number): RiderPose {
-  return spin360PoseAt(t, -1, 0.55);
+  return spin360PoseAt(t, -1);
 }
 
 /**

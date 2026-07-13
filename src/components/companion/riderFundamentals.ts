@@ -20,6 +20,7 @@ export type Humanoid = NonNullable<VRM['humanoid']>;
 
 // --- Easing / timeline helpers ---
 export const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+export const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 export const easeInOut = (u: number) => u * u * (3 - 2 * u);
 export const lerp = (a: number, b: number, u: number) => a + (b - a) * u;
 /** Progress 0→1 of t between phase bounds. */
@@ -203,35 +204,52 @@ function applyArms(humanoid: Humanoid, pose: RiderPose, w: number) {
   const rest = { uz: 1.15, ux: 0.06, fz: 0.15 };
 
   // --- Tuning magnitudes ---
-  const SWING = 0.9; // fwd/back pump of a DOWN arm about upper.rotation.x
+  const SWING = 0.9; // fwd/back pump of a DOWN arm about upper.rotation.x (coil load/throw)
   const LIFT_COIL = 0.55; // how far the arms come UP off the sides at full coil
   const LIFT_TUCK = 0.45; // arms pulled in during the airborne tuck
   const LIFT_BAL = 0.55; // arms thrown wide for landing balance
-  const CROSS = 0.4; // cross-body wrap (asymmetry via upper.rotation.y)
+  const LIFT_AIR = 0.6; // draw-in lift carried through the WHOLE air/spin
+  const CROSS = 0.4; // cross-body wrap on the whip (upper.rotation.y)
+  const WRAP_AIR = 0.6; // continuous cross-body wrap that travels WITH the spin
+  const AIR_SWING = 0.5; // fwd swing of the arms into the spin through the air
   const ELBOW = 0.75; // elbow flexion added while winding/whipping
+  const ELBOW_AIR = 0.8; // elbows fold in as the arms wrap around mid-air
   const CATCH = 0.25; // arms fling wide/back on the balance catch
 
   // coil runs the full -0.7 (wound up) -> +0.5 (whip at pop) -> ~0 range.
-  // windup>0 ONLY while coil is negative (the load phase).
+  // windup>0 ONLY while coil is negative (the load phase). whip>0 ONLY while
+  // coil is positive (the throw at/after the pop). Both UNCHANGED so the good
+  // frontside wind-up load/throw keeps its shape.
   const windup = clamp01(-pose.coil / 0.7);
-  // whip>0 ONLY while coil is positive (the throw at/after the pop).
   const whip = clamp01(pose.coil / 0.5);
-  // Raise arms off the sides whenever they're doing ANYTHING (loading OR
-  // throwing) — biggest away from the neutral coil, so they pump up then
-  // relax back down. |coil| already peaks at the extremes of the sequence.
   const coilMag = clamp01(Math.abs(pose.coil) / 0.7);
 
-  // upper.rotation.z (abduction): LOWER uz => arm rises toward the T (out to
-  // the side). Raise off the sides on coil, tuck in during air, wide on land.
-  const uzTarget = rest.uz - coilMag * LIFT_COIL - pose.tuck * LIFT_TUCK - pose.balance * LIFT_BAL;
+  // The OLD problem: past the pop, coil decays to ~0 so windup=whip=0 and the
+  // arms went DEAD at the sides for the whole rotation. These two bells give the
+  // arms a driver for the ENTIRE air, C0-seamless at both boundaries:
+  //   airDrive = pose.tuck  -> already sin(π·air): 0 at the pop & land edges.
+  //   spinSwing = sin(π·spin) -> 0 at spin=0 (stance handoff) AND spin=1 (opens
+  //     for the landing), peaks at mid-spin — exactly where the arms hung still.
+  const airDrive = pose.tuck;
+  const spinSwing = Math.sin(Math.PI * clamp01(pose.spin));
 
-  // upper.rotation.x is THE visible fwd/back swing of a DOWN arm (rotation
-  // about the world X axis pitches the hanging arm toward +Z=forward / -Z=back;
-  // upper.rotation.y on a down arm only TWISTS it, so it can't do this job).
-  // Load BACK against the spin during wind-up (coil<0 => negative swing), then
-  // THROW FORWARD as coil whips positive. pose.coil is the single driver so the
-  // swing is phase-locked to the shoulders.
-  const swingBase = rest.ux + pose.coil * SWING + pose.tuck * 0.35;
+  // upper.rotation.z (abduction): LOWER uz => arm rises toward the T. Rise on
+  // coil, DRAW IN across the whole air (LIFT_AIR via spinSwing), tuck tighter,
+  // wide on land. Clamp so it never rotates PAST the T into overhead.
+  const uzTarget = Math.max(
+    0.1,
+    rest.uz -
+      coilMag * LIFT_COIL -
+      pose.tuck * LIFT_TUCK -
+      spinSwing * LIFT_AIR -
+      pose.balance * LIFT_BAL,
+  );
+
+  // upper.rotation.x — fwd/back swing of a DOWN arm (−x = forward). coil loads
+  // BACK in the wind-up then THROWS FORWARD at the pop (UNCHANGED). On top,
+  // AIR_SWING keeps the arms swung into the spin across the whole air instead of
+  // drifting back to neutral once coil fades.
+  const swingBase = rest.ux + pose.coil * SWING + pose.tuck * 0.35 + spinSwing * AIR_SWING;
 
   for (const side of ['left', 'right'] as const) {
     const sign = side === 'left' ? -1 : 1; // left arm on +X, right on -X
@@ -252,19 +270,32 @@ function applyArms(humanoid: Humanoid, pose: RiderPose, w: number) {
     // snapping (neutral = rest for uz/ux/fz/hand, 0 for the wrap/pitch).
     if (upper) {
       upper.rotation.z = sign * lerp(rest.uz, uzTarget, w);
-      upper.rotation.x = lerp(rest.ux, swingBase + lead * whip * 0.35 + catchSwing, w);
-      // Cross-body wrap: twist the arms across during the whip + air, so the
-      // hands travel around the torso. Wraps the OPPOSITE way backside (× dir).
-      upper.rotation.y = pose.dir * sign * (whip * CROSS + pose.tuck * 0.3) * w;
+      // Lead arm reaches a touch farther forward through the air too, so the
+      // wrap reads like a lead/trail pair, not a symmetric flap.
+      upper.rotation.x = lerp(
+        rest.ux,
+        swingBase + lead * whip * 0.35 + lead * spinSwing * airDrive * 0.15 + catchSwing,
+        w,
+      );
+      // Cross-body wrap: hands travel AROUND the torso. OLD wrap fired only on
+      // whip+tuck (dead through the air); the WRAP_AIR term now carries it for
+      // the whole rotation. Wraps the OPPOSITE way backside (× dir).
+      upper.rotation.y =
+        pose.dir * sign * (whip * CROSS + spinSwing * WRAP_AIR + pose.tuck * 0.3) * w;
     }
-    // Elbows bend as she loads and whips (arms don't stay straight in a spin),
-    // and pull tighter in the tuck. fz base keeps the natural resting bend.
+    // Elbows bend as she loads and whips, fold TIGHTER as the arms wrap around
+    // mid-air (ELBOW_AIR via the spin bell), and pull in on the tuck.
     if (lower) {
       lower.rotation.z =
-        sign * lerp(rest.fz, rest.fz + pose.tuck * 0.55 + (windup + whip) * ELBOW * 0.4, w);
-      lower.rotation.x = -(windup * 0.5 + whip * 0.7 + pose.tuck * 0.6) * w;
+        sign *
+        lerp(
+          rest.fz,
+          rest.fz + pose.tuck * 0.55 + (windup + whip) * ELBOW * 0.4 + spinSwing * ELBOW_AIR * 0.35,
+          w,
+        );
+      lower.rotation.x = -(windup * 0.5 + whip * 0.7 + pose.tuck * 0.6 + spinSwing * 0.45) * w;
     }
-    if (hand) hand.rotation.x = lerp(0.1, 0.1 + pose.tuck * 0.2, w);
+    if (hand) hand.rotation.x = lerp(0.1, 0.1 + pose.tuck * 0.2 + spinSwing * 0.15, w);
   }
 }
 
