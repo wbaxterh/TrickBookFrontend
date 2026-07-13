@@ -58,8 +58,13 @@ const MODE_LABELS: Record<string, string> = {
  */
 function detectTrickDemo(text: string): TrickId | null {
   const wantsDemo = /\b(show|demo|demonstrate|do)\b/i.test(text);
-  const mentions360 = /\b(360|three[\s-]?sixty|frontside\s*3)\b/i.test(text);
-  return wantsDemo && mentions360 ? 'frontside-360' : null;
+  const mentions360 = /\b(360|three[\s-]?sixty|(front|back)side\s*3|(fs|bs)\s*3|back\s*3)\b/i.test(
+    text,
+  );
+  if (!(wantsDemo && mentions360)) return null;
+  // Backside spins the other way; plain "360" / "frontside 360" stays frontside.
+  const isBackside = /\b(backside|bs)\s*(360|three[\s-]?sixty|3)\b|\bback\s*3\b/i.test(text);
+  return isBackside ? 'backside-360' : 'frontside-360';
 }
 
 /** Split a reply the way Kith chunks speech — one sentence per turn. */

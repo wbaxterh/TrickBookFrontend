@@ -608,6 +608,7 @@ const _boardX = new THREE.Vector3();
 const _boardY = new THREE.Vector3();
 const _boardZ = new THREE.Vector3();
 const _worldUp = new THREE.Vector3(0, 1, 0);
+const _worldFwd = new THREE.Vector3(0, 0, 1);
 const _boardBasis = new THREE.Matrix4();
 const _boardQuat = new THREE.Quaternion();
 /** Foot bone ≈ ankle; drop the deck this far below the midpoint so the soles
@@ -633,9 +634,11 @@ function lockBoardToFeet(vrm: VRM, state: TrickDemoState) {
   lf.getWorldPosition(_footL);
   rf.getWorldPosition(_footR);
 
-  // Board long axis (+X) runs foot-to-foot; rebuild an orthonormal, up-facing
-  // basis around it (degenerate cases — feet coincident or the axis vertical —
-  // fall back to the last transform).
+  // Board long axis (+X) runs foot-to-foot; build an orthonormal, up-facing
+  // basis around it. Feet coincident (never really happens) keeps the last
+  // transform; a near-VERTICAL axis (big stylish leg-lift) rebuilds off
+  // world-forward so the board STAYS locked instead of unlocking and getting
+  // flung to the origin.
   _boardX.subVectors(_footR, _footL);
   if (_boardX.lengthSq() < 1e-6) {
     state.boardLocked = false;
@@ -643,9 +646,8 @@ function lockBoardToFeet(vrm: VRM, state: TrickDemoState) {
   }
   _boardX.normalize();
   _boardZ.crossVectors(_boardX, _worldUp);
-  if (_boardZ.lengthSq() < 1e-6) {
-    state.boardLocked = false;
-    return;
+  if (_boardZ.lengthSq() < 1e-4) {
+    _boardZ.crossVectors(_boardX, _worldFwd);
   }
   _boardZ.normalize();
   _boardY.crossVectors(_boardZ, _boardX).normalize();
@@ -681,22 +683,18 @@ function TrickBoard({ demo }: { demo: React.MutableRefObject<TrickDemoState> }) 
   useFrame(() => {
     const group = groupRef.current;
     if (!group) return;
-    const { boardOpacity, boardLocked, boardPos, boardQuat, rootYaw, boardY } = demo.current;
+    const { boardOpacity, boardPos, boardQuat } = demo.current;
     // Cut off a bit higher than 0 so the board doesn't linger as a faint ghost
     // after she's already stood back up (stance return + board vanish together).
     group.visible = boardOpacity > 0.05;
     if (!group.visible) return;
-    if (boardLocked) {
-      // Bindings stay glued to the feet; angle follows the legs (see
-      // lockBoardToFeet). This is the normal path once the skeleton is posed.
-      group.position.set(boardPos[0], boardPos[1], boardPos[2]);
-      group.quaternion.set(boardQuat[0], boardQuat[1], boardQuat[2], boardQuat[3]);
-    } else {
-      // Fallback for the first frame (or if a foot bone is missing): flat board
-      // under the root at the jump height — barely visible during the fade-in.
-      group.position.set(0, boardY + 0.045, 0);
-      group.rotation.set(0, rootYaw, 0);
-    }
+    // Bindings stay glued to the feet — lockBoardToFeet writes boardPos/boardQuat
+    // each frame after the skeleton is posed. If a frame fails to lock (first
+    // frame / missing bone / degenerate basis) these hold the LAST good
+    // transform, so the deck never flings to the world origin under an airborne,
+    // spinning Kaori (barely visible during fade-in anyway).
+    group.position.set(boardPos[0], boardPos[1], boardPos[2]);
+    group.quaternion.set(boardQuat[0], boardQuat[1], boardQuat[2], boardQuat[3]);
     if (deckRef.current) deckRef.current.opacity = boardOpacity;
     if (baseRef.current) baseRef.current.opacity = boardOpacity;
   });

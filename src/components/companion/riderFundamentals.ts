@@ -83,6 +83,12 @@ export interface RiderPose {
   frontLegLift: number;
   /** Board angle around its long axis (radians; + = tail up / nose down). */
   boardTilt: number;
+  /** Spin direction: +1 frontside (CCW / +Y), -1 backside (CW / -Y). Flips the
+   *  body wind, head look and arm wrap so a backside READS as backside. The
+   *  actual rotation is carried by the trick's signed totalSpin, and `coil`
+   *  stays frontside-signed either way so the arm load→whip TIMING is preserved
+   *  (applyArms keys windup/whip off the coil sign). */
+  dir: number;
 }
 
 export const REST_POSE: RiderPose = {
@@ -98,6 +104,7 @@ export const REST_POSE: RiderPose = {
   backLegLift: 0,
   frontLegLift: 0,
   boardTilt: 0,
+  dir: 1,
 };
 
 /** Head turn to look "downhill" — down the board toward the nose (front foot,
@@ -152,34 +159,42 @@ function applyLegs(
   }
 }
 
-function applyTorsoAndHead(humanoid: Humanoid, pose: RiderPose) {
+function applyTorsoAndHead(humanoid: Humanoid, pose: RiderPose, w: number) {
   const hips = humanoid.getNormalizedBoneNode('hips');
   const spine = humanoid.getNormalizedBoneNode('spine');
   const chest = humanoid.getNormalizedBoneNode('chest');
   const neck = humanoid.getNormalizedBoneNode('neck');
 
+  // Every channel scales by the stance weight `w` (neutral = 0 for all of
+  // them), so the whole upper body eases IN as she steps onto the board and OUT
+  // as she steps off — no torso/head SNAP at the idle↔demo handoff (that snap,
+  // e.g. headLead jumping 0→0.6 at full strength while the legs were still
+  // ramping, was the begin/end "glitch back into home position").
+  // The coil-driven WIND flips with the spin direction (pose.dir) so a backside
+  // winds the opposite way; headLead/headRoll already carry dir from the pose.
+  const wind = pose.coil * pose.dir;
   if (hips) {
-    hips.rotation.y = pose.coil * 0.35;
+    hips.rotation.y = wind * 0.35 * w;
     hips.rotation.z = 0;
   }
   if (spine) {
-    spine.rotation.y = pose.coil * 0.5;
-    spine.rotation.x = pose.crouch * 0.3 + pose.tuck * 0.25;
+    spine.rotation.y = wind * 0.5 * w;
+    spine.rotation.x = (pose.crouch * 0.3 + pose.tuck * 0.25) * w;
     spine.rotation.z = 0;
   }
   if (chest) {
-    chest.rotation.y = pose.coil * 0.45;
-    chest.rotation.x = pose.crouch * 0.18;
+    chest.rotation.y = wind * 0.45 * w;
+    chest.rotation.x = pose.crouch * 0.18 * w;
   }
   if (neck) {
-    neck.rotation.y = pose.coil * 0.4 + pose.headLead;
-    neck.rotation.x = pose.headSpot - pose.tuck * 0.15;
+    neck.rotation.y = (wind * 0.4 + pose.headLead) * w;
+    neck.rotation.x = (pose.headSpot - pose.tuck * 0.15) * w;
     // Tilt the head over the leading shoulder while spinning/spotting.
-    neck.rotation.z = pose.headRoll;
+    neck.rotation.z = pose.headRoll * w;
   }
 }
 
-function applyArms(humanoid: Humanoid, pose: RiderPose) {
+function applyArms(humanoid: Humanoid, pose: RiderPose, w: number) {
   // Rest (from T-pose): uz hangs the arms DOWN at the sides; ux ~0 = neutral
   // fwd/back; fz = slight elbow bend. Everything below is RELATIVE to the
   // chest, which already carries pose.coil * 0.45 of shoulder rotation — so we
@@ -224,28 +239,32 @@ function applyArms(humanoid: Humanoid, pose: RiderPose) {
     const lower = humanoid.getNormalizedBoneNode(`${side}LowerArm`);
     const hand = humanoid.getNormalizedBoneNode(`${side}Hand`);
 
-    // Frontside spin is +Y (CCW from above): the BACK/right arm leads the throw
-    // and reaches ACROSS the chest, the front/left arm trails — so bias the
-    // right arm to swing a touch more forward and the left a touch less. This
-    // asymmetry makes it read as a real wrap, not a symmetric puppet swing.
-    const lead = side === 'right' ? 1 : -0.6;
+    // The BACK arm leads the throw and reaches ACROSS the chest, the front arm
+    // trails — bias the leader a touch more forward. Which arm leads flips with
+    // the spin direction: frontside (+Y) the back/RIGHT arm leads; backside the
+    // front/LEFT. This asymmetry reads as a real wrap, not a puppet swing.
+    const lead = (pose.dir > 0 ? side === 'right' : side === 'left') ? 1 : -0.6;
     // On the landing she flings the arms wide and slightly back to catch balance.
     const catchSwing = -pose.balance * CATCH;
 
+    // Everything below eases from the REST (arms-down) pose by the stance
+    // weight `w`, so the arms blend in/out at the idle↔demo handoff instead of
+    // snapping (neutral = rest for uz/ux/fz/hand, 0 for the wrap/pitch).
     if (upper) {
-      upper.rotation.z = sign * uzTarget;
-      upper.rotation.x = swingBase + lead * whip * 0.35 + catchSwing;
+      upper.rotation.z = sign * lerp(rest.uz, uzTarget, w);
+      upper.rotation.x = lerp(rest.ux, swingBase + lead * whip * 0.35 + catchSwing, w);
       // Cross-body wrap: twist the arms across during the whip + air, so the
-      // hands travel around the torso instead of staying pinned to the sides.
-      upper.rotation.y = sign * (whip * CROSS + pose.tuck * 0.3);
+      // hands travel around the torso. Wraps the OPPOSITE way backside (× dir).
+      upper.rotation.y = pose.dir * sign * (whip * CROSS + pose.tuck * 0.3) * w;
     }
     // Elbows bend as she loads and whips (arms don't stay straight in a spin),
     // and pull tighter in the tuck. fz base keeps the natural resting bend.
     if (lower) {
-      lower.rotation.z = sign * (rest.fz + pose.tuck * 0.55 + (windup + whip) * ELBOW * 0.4);
-      lower.rotation.x = -(windup * 0.5 + whip * 0.7 + pose.tuck * 0.6);
+      lower.rotation.z =
+        sign * lerp(rest.fz, rest.fz + pose.tuck * 0.55 + (windup + whip) * ELBOW * 0.4, w);
+      lower.rotation.x = -(windup * 0.5 + whip * 0.7 + pose.tuck * 0.6) * w;
     }
-    if (hand) hand.rotation.x = 0.1 + pose.tuck * 0.2;
+    if (hand) hand.rotation.x = lerp(0.1, 0.1 + pose.tuck * 0.2, w);
   }
 }
 
@@ -258,8 +277,8 @@ export function applyRiderPose(humanoid: Humanoid, pose: RiderPose, stanceWeight
     pose.backLegLift * stanceWeight,
     pose.frontLegLift * stanceWeight,
   );
-  applyTorsoAndHead(humanoid, pose);
-  applyArms(humanoid, pose);
+  applyTorsoAndHead(humanoid, pose, stanceWeight);
+  applyArms(humanoid, pose, stanceWeight);
 }
 
 /** Zero out the bones the idle system never touches (legs, arm Y, neck roll/pitch). */
