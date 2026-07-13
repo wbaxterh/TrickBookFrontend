@@ -53,18 +53,26 @@ const MODE_LABELS: Record<string, string> = {
 };
 
 /**
- * Detect "show me a trick" intents so Kaori demonstrates with her body
- * while she explains. First trick in the library: frontside 360.
+ * WHICH 360 does this text name? Identification only — no demo-intent gate, so
+ * it also works on Kaori's own reply ("...watch this backside 360...").
+ * Backside spins the other way; plain "360" / "frontside 360" stays frontside.
  */
-function detectTrickDemo(text: string): TrickId | null {
-  const wantsDemo = /\b(show|demo|demonstrate|do)\b/i.test(text);
+function detectTrickId(text: string): TrickId | null {
   const mentions360 = /\b(360|three[\s-]?sixty|(front|back)side\s*3|(fs|bs)\s*3|back\s*3)\b/i.test(
     text,
   );
-  if (!(wantsDemo && mentions360)) return null;
-  // Backside spins the other way; plain "360" / "frontside 360" stays frontside.
+  if (!mentions360) return null;
   const isBackside = /\b(backside|bs)\s*(360|three[\s-]?sixty|3)\b|\bback\s*3\b/i.test(text);
   return isBackside ? 'backside-360' : 'frontside-360';
+}
+
+/**
+ * Detect "show me a trick" intents so Kaori demonstrates with her body while
+ * she explains. Intent verb + a named trick → that trick.
+ */
+function detectTrickDemo(text: string): TrickId | null {
+  const wantsDemo = /\b(show|demo|demonstrate|do|see|watch|hit|throw|bust|try|land)\b/i.test(text);
+  return wantsDemo ? detectTrickId(text) : null;
 }
 
 /** Split a reply the way Kith chunks speech — one sentence per turn. */
@@ -180,7 +188,12 @@ export default function CompanionStageScreen() {
         const wantsDemo =
           reply && (requestedTrick !== null || /watch this|let me show/i.test(reply));
         if (wantsDemo) {
-          if (requestedTrick) demoState.current.trick = requestedTrick;
+          // ALWAYS resolve the trick — the user's explicit ask first, else what
+          // her reply names, else keep the current one. Never fall through to a
+          // stale/default frontside when the user asked for a backside.
+          const trick = requestedTrick ?? detectTrickId(reply) ?? demoState.current.trick;
+          demoState.current.trick = trick;
+          if (__DEV__) console.log('[stage] demo trick:', trick);
           demoState.current.session = true;
           demoState.current.idleT = 0;
           replySentences.current = splitSentences(reply);
