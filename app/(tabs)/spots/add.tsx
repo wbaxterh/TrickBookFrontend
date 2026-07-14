@@ -10,6 +10,7 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import * as ImagePicker from 'expo-image-picker';
 import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -18,6 +19,7 @@ import {
   Alert,
   Dimensions,
   FlatList,
+  Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -39,7 +41,10 @@ import {
   reverseGeocode,
   type SportType,
   type SpotCategory,
+  saveSpot,
   searchPlaces,
+  updateSpot,
+  uploadSpotPhoto,
 } from '@/lib/api/spots';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
@@ -100,9 +105,13 @@ export default function AddSpotScreen() {
   const [sportTypes, setSportTypes] = useState<SportType[]>([]);
   const [spotCategories, setSpotCategories] = useState<SpotCategory[]>([]);
 
+  // Photo state (local asset URIs selected for upload)
+  const [photos, setPhotos] = useState<{ uri: string; mimeType: string }[]>([]);
+
   // UI state
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [sportModalVisible, setSportModalVisible] = useState(false);
 
   // Get user location on mount
@@ -269,22 +278,93 @@ export default function AddSpotScreen() {
     );
   }, []);
 
-  // Submit spot
-  const handleSubmit = useCallback(async () => {
+  // Add photos from the gallery (multiple allowed)
+  const handleAddFromGallery = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow access to your photo library.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      const picked = result.assets.map((asset) => ({
+        uri: asset.uri,
+        mimeType: asset.mimeType || 'image/jpeg',
+      }));
+      setPhotos((prev) => [...prev, ...picked]);
+    }
+  }, []);
+
+  // Capture a photo with the camera
+  const handleTakePhoto = useCallback(async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow access to your camera.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      setPhotos((prev) => [...prev, { uri: asset.uri, mimeType: asset.mimeType || 'image/jpeg' }]);
+    }
+  }, []);
+
+  // Remove a selected photo before upload
+  const handleRemovePhoto = useCallback((uri: string) => {
+    setPhotos((prev) => prev.filter((p) => p.uri !== uri));
+  }, []);
+
+  // Upload all selected photos to a spot; returns the first successfully-uploaded URL.
+  const uploadPhotosForSpot = useCallback(
+    async (spotId: string): Promise<{ firstUrl: string | null; failed: number }> => {
+      let firstUrl: string | null = null;
+      let failed = 0;
+      for (let i = 0; i < photos.length; i++) {
+        setUploadStatus(`Uploading photo ${i + 1} of ${photos.length}...`);
+        const uploaded = await uploadSpotPhoto(spotId, photos[i].uri, photos[i].mimeType);
+        if (uploaded?.url) {
+          if (!firstUrl) firstUrl = uploaded.url;
+        } else {
+          failed++;
+        }
+      }
+      return { firstUrl, failed };
+    },
+    [photos],
+  );
+
+  // Validate required fields before submitting; alerts and returns false if invalid.
+  const validateForm = useCallback((): boolean => {
     if (!spotName.trim()) {
       Alert.alert('Required', 'Please enter a spot name.');
-      return;
+      return false;
     }
     if (!selectedLocation) {
       Alert.alert('Required', 'Location is required.');
-      return;
+      return false;
     }
     if (selectedSports.length === 0) {
       Alert.alert('Required', 'Please select at least one sport type.');
+      return false;
+    }
+    return true;
+  }, [spotName, selectedLocation, selectedSports]);
+
+  // Submit spot
+  const handleSubmit = useCallback(async () => {
+    if (!validateForm() || !selectedLocation) {
       return;
     }
 
     setSaving(true);
+    setUploadStatus(null);
     try {
       const spotData = {
         name: spotName.trim(),
@@ -293,36 +373,58 @@ export default function AddSpotScreen() {
         description: description.trim() || undefined,
         city: city || undefined,
         state: state || undefined,
-        category: selectedCategory as 'park' | 'street' | 'indoor' | 'diy' | 'other',
+        category: selectedCategory as 'park' | 'street' | 'indoor' | 'diy' | 'resort' | 'other',
         sportTypes: selectedSports,
         isPublic,
         googlePlaceId: selectedPlaceId || undefined,
       };
 
+      // 1. Create the spot first so we have an _id to attach photos to.
       const result = await createSpot(spotData);
 
-      if (result) {
-        Alert.alert(
-          'Spot Added!',
-          isPublic
-            ? 'Your spot has been submitted for review. It will appear publicly once approved.'
-            : 'Your private spot has been saved.',
-          [
-            {
-              text: 'OK',
-              onPress: () => router.back(),
-            },
-          ],
-        );
-      } else {
+      if (!result) {
         Alert.alert('Error', 'Failed to create spot. Please try again.');
+        return;
       }
+
+      // If the backend deduped to an existing spot owned by someone else, we
+      // don't own it: save it to "My Spots" and DON'T attach our photos to it.
+      const currentUserId = user?._id || user?.id;
+      const isExistingOtherSpot =
+        !!result.userId && !!currentUserId && result.userId !== currentUserId;
+
+      let title = 'Spot Added!';
+      let message = isPublic
+        ? 'Your spot has been submitted for review. It will appear publicly once approved.'
+        : 'Your private spot has been saved.';
+
+      if (isExistingOtherSpot) {
+        await saveSpot(result._id);
+        title = 'Already Exists';
+        message =
+          'That spot already existed, so we saved it to your My Spots.' +
+          (photos.length > 0 ? ' Your photos were not added to it.' : '');
+      } else if (photos.length > 0) {
+        // 2. Upload each selected photo; use the first as the spot's main image.
+        const { firstUrl, failed } = await uploadPhotosForSpot(result._id);
+        if (firstUrl && !result.imageURL) {
+          setUploadStatus('Finishing up...');
+          await updateSpot(result._id, { imageURL: firstUrl });
+        }
+        if (failed > 0) {
+          message += ` (${failed} photo${failed > 1 ? 's' : ''} couldn't be uploaded — you can add them later from the spot.)`;
+        }
+      }
+
+      Alert.alert(title, message, [{ text: 'OK', onPress: () => router.back() }]);
     } catch (_error) {
       Alert.alert('Error', 'Failed to create spot. Please try again.');
     } finally {
       setSaving(false);
+      setUploadStatus(null);
     }
   }, [
+    validateForm,
     spotName,
     selectedLocation,
     description,
@@ -332,6 +434,8 @@ export default function AddSpotScreen() {
     selectedSports,
     isPublic,
     selectedPlaceId,
+    uploadPhotosForSpot,
+    user,
   ]);
 
   // Render location selection step
@@ -361,6 +465,14 @@ export default function AddSpotScreen() {
               }
         }
       >
+        {/*
+          WARNING: react-native-maps <Marker> can CRASH under the New Architecture.
+          This existing draggable drop-pin is intentionally left in place to avoid
+          breaking the working location step. If crashes appear, migrate this to a
+          fixed center-crosshair overlay (a centered pin icon rendered OUTSIDE the
+          MapView) that reads the map region center via onRegionChangeComplete,
+          instead of rendering a <Marker> child.
+        */}
         {selectedLocation && (
           <Marker coordinate={selectedLocation} draggable onDragEnd={handleMapPress}>
             <View style={styles.markerContainer}>
@@ -592,6 +704,55 @@ export default function AddSpotScreen() {
             numberOfLines={3}
           />
 
+          {/* Photos */}
+          <Text style={[styles.label, { color: theme.text }]}>Photos</Text>
+          <View style={styles.photoButtonsRow}>
+            <Pressable
+              style={[
+                styles.photoButton,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+              ]}
+              onPress={handleAddFromGallery}
+              disabled={saving}
+            >
+              <Ionicons name="images-outline" size={20} color={theme.text} />
+              <Text style={[styles.photoButtonText, { color: theme.text }]}>Add from Gallery</Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.photoButton,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+              ]}
+              onPress={handleTakePhoto}
+              disabled={saving}
+            >
+              <Ionicons name="camera-outline" size={20} color={theme.text} />
+              <Text style={[styles.photoButtonText, { color: theme.text }]}>Take Photo</Text>
+            </Pressable>
+          </View>
+          {photos.length > 0 && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.thumbnailRow}
+              contentContainerStyle={styles.thumbnailRowContent}
+            >
+              {photos.map((photo) => (
+                <View key={photo.uri} style={styles.thumbnailWrapper}>
+                  <Image source={{ uri: photo.uri }} style={styles.thumbnail} />
+                  <Pressable
+                    style={styles.thumbnailRemove}
+                    onPress={() => handleRemovePhoto(photo.uri)}
+                    disabled={saving}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="close" size={14} color="#fff" />
+                  </Pressable>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+
           {/* Category */}
           <Text style={[styles.label, { color: theme.text }]}>Category *</Text>
           <View style={styles.categoryContainer}>
@@ -674,7 +835,10 @@ export default function AddSpotScreen() {
             disabled={saving}
           >
             {saving ? (
-              <ActivityIndicator size="small" color={DARK} />
+              <>
+                <ActivityIndicator size="small" color={DARK} />
+                {uploadStatus && <Text style={styles.submitButtonText}>{uploadStatus}</Text>}
+              </>
             ) : (
               <>
                 <Ionicons name="checkmark-circle" size={22} color={DARK} />
@@ -1041,6 +1205,56 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     marginBottom: 20,
+  },
+
+  // Photos
+  photoButtonsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 12,
+  },
+  photoButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  photoButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  thumbnailRow: {
+    marginBottom: 20,
+  },
+  thumbnailRowContent: {
+    gap: 10,
+    paddingRight: 4,
+  },
+  thumbnailWrapper: {
+    width: 88,
+    height: 88,
+    borderRadius: 12,
+  },
+  thumbnail: {
+    width: 88,
+    height: 88,
+    borderRadius: 12,
+    backgroundColor: '#000',
+  },
+  thumbnailRemove: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   toggleContainer: {
     flexDirection: 'row',
