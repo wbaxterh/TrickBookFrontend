@@ -417,6 +417,37 @@ export async function uploadSpotPhoto(
   }
 }
 
+/**
+ * Report a user-uploaded spot photo for review (any authenticated user).
+ * Returns true on success.
+ */
+export async function reportSpotPhoto(spotId: string, photoKey: string): Promise<boolean> {
+  try {
+    // The S3 key contains a "/" (e.g. "spots/<uuid>.jpg"); encode it so it stays
+    // a single path segment and the :photoKey route matches.
+    await apiClient.post(
+      `${ENDPOINTS.spots.detail(spotId)}/photos/${encodeURIComponent(photoKey)}/report`,
+    );
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+/**
+ * Delete a user-uploaded spot photo (uploader/owner or admin). Returns true on success.
+ */
+export async function deleteSpotPhoto(spotId: string, photoKey: string): Promise<boolean> {
+  try {
+    await apiClient.delete(
+      `${ENDPOINTS.spots.detail(spotId)}/photos/${encodeURIComponent(photoKey)}`,
+    );
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
 // Google Places integration types
 export interface PlaceSearchResult {
   placeId: string;

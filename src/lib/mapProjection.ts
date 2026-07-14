@@ -38,3 +38,34 @@ export function projectToScreen(
   if (x < -60 || x > layout.width + 60 || y < -80 || y > layout.height + 40) return null;
   return { x, y };
 }
+
+/**
+ * Like projectToScreen, but NEVER returns null for an off-screen point — instead
+ * it returns the coordinates plus an `onScreen` flag. Callers keep the marker
+ * view MOUNTED and merely hide it (opacity/pointerEvents) when off-screen.
+ *
+ * This is critical on the New Architecture: unmounting a touch-target view while
+ * a UIKit touch is still active desyncs Fabric's touch registry and hard-crashes
+ * ("Inconsistency between local and UIKit touch registries", RN #53303). Keeping
+ * markers mounted during pan/zoom removes that trigger.
+ */
+export function projectToScreenXY(
+  lat: number,
+  lng: number,
+  region: ProjRegion | null,
+  layout: { width: number; height: number },
+): { x: number; y: number; onScreen: boolean } | null {
+  if (!region || !layout.width || !layout.height) return null;
+  const { latitude, longitude, latitudeDelta, longitudeDelta } = region;
+
+  const west = longitude - longitudeDelta / 2;
+  const x = ((lng - west) / longitudeDelta) * layout.width;
+
+  const mercY = (l: number) => Math.log(Math.tan(Math.PI / 4 + (l * Math.PI) / 360));
+  const yN = mercY(latitude + latitudeDelta / 2);
+  const yS = mercY(latitude - latitudeDelta / 2);
+  const y = ((yN - mercY(lat)) / (yN - yS)) * layout.height;
+
+  const onScreen = !(x < -60 || x > layout.width + 60 || y < -80 || y > layout.height + 40);
+  return { x, y, onScreen };
+}

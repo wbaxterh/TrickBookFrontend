@@ -38,13 +38,16 @@ import {
   getSpotCategories,
   getSpots,
   type MapPin,
+  type PlaceSearchResult,
   type SportType,
   type Spot,
   type SpotCategory,
   saveSpot,
+  searchPlaces,
+  searchSpots,
   unsaveSpot,
 } from '@/lib/api/spots';
-import { projectToScreen } from '@/lib/mapProjection';
+import { projectToScreenXY } from '@/lib/mapProjection';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
 import type { CreateSpotListInput, SpotList } from '@/types/spots';
@@ -144,6 +147,14 @@ export default function SpotsScreen() {
   const [mapReady, setMapReady] = useState(false);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const mapPinsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Google-Maps-style in-map search: type a query, get matching places (Google
+  // Places, biased to the current viewport) + our spots, tap one to fly there.
+  const [mapSearchVisible, setMapSearchVisible] = useState(false);
+  const [mapSearchText, setMapSearchText] = useState('');
+  const [mapSearchPlaces, setMapSearchPlaces] = useState<PlaceSearchResult[]>([]);
+  const [mapSearchSpots, setMapSearchSpots] = useState<Spot[]>([]);
+  const [mapSearchLoading, setMapSearchLoading] = useState(false);
 
   // My Spots state
   // Sub-view within the My Spots tab: the flat authored+saved list ('spots')
@@ -252,6 +263,81 @@ export default function SpotsScreen() {
     const timer = setTimeout(() => setDebouncedSearchQuery(searchQuery), 300);
     return () => clearTimeout(timer);
   }, [searchQuery]);
+
+  const openMapSearch = useCallback(() => {
+    setMapSearchVisible(true);
+  }, []);
+
+  const closeMapSearch = useCallback(() => {
+    setMapSearchVisible(false);
+    setMapSearchText('');
+    setMapSearchPlaces([]);
+    setMapSearchSpots([]);
+  }, []);
+
+  // In-map search: debounce the query, then fetch Google Places (biased to the
+  // current viewport center) and matching spots in parallel.
+  useEffect(() => {
+    if (!mapSearchVisible) return;
+    const q = mapSearchText.trim();
+    if (q.length < 2) {
+      setMapSearchPlaces([]);
+      setMapSearchSpots([]);
+      setMapSearchLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setMapSearchLoading(true);
+    const timer = setTimeout(async () => {
+      const [places, spotsRes] = await Promise.all([
+        searchPlaces(q, region.latitude, region.longitude),
+        searchSpots(q),
+      ]);
+      if (cancelled) return;
+      setMapSearchPlaces(places.slice(0, 6));
+      setMapSearchSpots(spotsRes.spots.slice(0, 6));
+      setMapSearchLoading(false);
+    }, 350);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [mapSearchText, mapSearchVisible, region.latitude, region.longitude]);
+
+  // Fly the map to a searched Google place.
+  const handleSelectSearchPlace = useCallback(
+    (place: PlaceSearchResult) => {
+      closeMapSearch();
+      mapRef.current?.animateToRegion(
+        {
+          latitude: place.latitude,
+          longitude: place.longitude,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
+        },
+        500,
+      );
+    },
+    [closeMapSearch],
+  );
+
+  // Fly to a matched spot and select it (shows its card).
+  const handleSelectSearchSpot = useCallback(
+    (spot: Spot) => {
+      closeMapSearch();
+      setSelectedSpot(spot);
+      mapRef.current?.animateToRegion(
+        {
+          latitude: spot.latitude,
+          longitude: spot.longitude,
+          latitudeDelta: 0.02,
+          longitudeDelta: 0.02,
+        },
+        500,
+      );
+    },
+    [closeMapSearch],
+  );
 
   // Fetch spots when filters change
   const fetchSpots = useCallback(async () => {
@@ -509,8 +595,9 @@ export default function SpotsScreen() {
 
       {activeTab === 'allSpots' ? (
         <>
-          {/* Search Bar — hidden in fullscreen map. */}
-          {!isMapFullscreen && (
+          {/* Search Bar — list view only. Map view has its own in-map search
+              (the magnifying-glass map control), so this top bar is redundant there. */}
+          {viewMode === 'list' && (
             <View style={styles.searchContainer}>
               <View style={[styles.searchBar, { backgroundColor: theme.surface }]}>
                 <Ionicons name="search" size={20} color={theme.textSecondary} />
@@ -645,36 +732,46 @@ export default function SpotsScreen() {
               {mapReady && mapLayout.width > 0 && (
                 <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
                   {clusters.map((item) => {
-                    const pt = projectToScreen(
+                    const pt = projectToScreenXY(
                       item.latitude,
                       item.longitude,
                       projectionRegion,
                       mapLayout,
                     );
                     if (!pt) return null;
+                    // NEVER unmount an off-screen marker while panning — that
+                    // desyncs Fabric's touch registry and hard-crashes on the New
+                    // Architecture (RN #53303). Keep it mounted but hidden and
+                    // non-interactive instead.
+                    const hidden = !pt.onScreen;
 
                     if (item.type === 'cluster') {
                       return (
                         <Pressable
                           key={item.id}
+                          pointerEvents={hidden ? 'none' : 'auto'}
                           style={[
                             styles.overlayMarker,
                             {
                               left: pt.x,
                               top: pt.y,
+                              opacity: hidden ? 0 : 1,
                               transform: [{ translateX: -20 }, { translateY: -20 }],
                             },
                           ]}
-                          onPress={() =>
-                            mapRef.current?.animateToRegion(
-                              getClusterExpansionRegion(
-                                item.clusterId as number,
-                                item.latitude,
-                                item.longitude,
-                              ),
-                              300,
-                            )
-                          }
+                          onPress={() => {
+                            // Defer the camera animation past this touch's end so
+                            // re-projection/re-clustering can't move or unmount the
+                            // pressed marker while UIKit is still finalizing it.
+                            const target = getClusterExpansionRegion(
+                              item.clusterId as number,
+                              item.latitude,
+                              item.longitude,
+                            );
+                            requestAnimationFrame(() =>
+                              mapRef.current?.animateToRegion(target, 300),
+                            );
+                          }}
                         >
                           <View style={styles.clusterBubble}>
                             <Text style={styles.clusterText}>{item.count}</Text>
@@ -684,28 +781,35 @@ export default function SpotsScreen() {
                     }
 
                     const selected = selectedSpot?._id === item.pin?._id;
+                    const pin = item.pin;
                     return (
                       <Pressable
                         key={item.id}
+                        pointerEvents={hidden ? 'none' : 'auto'}
                         style={[
                           styles.overlayMarker,
                           {
                             left: pt.x,
                             top: pt.y,
+                            opacity: hidden ? 0 : 1,
                             transform: [{ translateX: -20 }, { translateY: -47 }],
                           },
                         ]}
                         onPress={() => {
-                          setSelectedSpot(item.pin as unknown as Spot);
-                          mapRef.current?.animateToRegion(
-                            {
-                              latitude: item.latitude,
-                              longitude: item.longitude,
-                              latitudeDelta: 0.05,
-                              longitudeDelta: 0.05,
-                            },
-                            300,
-                          );
+                          const lat = item.latitude;
+                          const lng = item.longitude;
+                          requestAnimationFrame(() => {
+                            setSelectedSpot(pin as unknown as Spot);
+                            mapRef.current?.animateToRegion(
+                              {
+                                latitude: lat,
+                                longitude: lng,
+                                latitudeDelta: 0.05,
+                                longitudeDelta: 0.05,
+                              },
+                              300,
+                            );
+                          });
                         }}
                       >
                         <View style={styles.markerContainer}>
@@ -760,44 +864,13 @@ export default function SpotsScreen() {
                   <Ionicons name="navigate" size={20} color={DARK} />
                 </Pressable>
 
-                {/* Zoom In */}
+                {/* Search places & spots (Google-Maps style). Replaces the +/-
+                    zoom buttons — pinch-to-zoom covers zooming. */}
                 <Pressable
                   style={[styles.mapControlButton, { backgroundColor: YELLOW }]}
-                  onPress={() => {
-                    mapRef.current?.getCamera().then((camera) => {
-                      if (camera) {
-                        mapRef.current?.animateCamera(
-                          {
-                            ...camera,
-                            zoom: (camera.zoom || 10) + 1,
-                          },
-                          { duration: 300 },
-                        );
-                      }
-                    });
-                  }}
+                  onPress={openMapSearch}
                 >
-                  <Ionicons name="add" size={22} color={DARK} />
-                </Pressable>
-
-                {/* Zoom Out */}
-                <Pressable
-                  style={[styles.mapControlButton, { backgroundColor: YELLOW }]}
-                  onPress={() => {
-                    mapRef.current?.getCamera().then((camera) => {
-                      if (camera) {
-                        mapRef.current?.animateCamera(
-                          {
-                            ...camera,
-                            zoom: (camera.zoom || 10) - 1,
-                          },
-                          { duration: 300 },
-                        );
-                      }
-                    });
-                  }}
-                >
-                  <Ionicons name="remove" size={22} color={DARK} />
+                  <Ionicons name="search" size={20} color={DARK} />
                 </Pressable>
 
                 {/* Toggle full-screen map */}
@@ -809,15 +882,17 @@ export default function SpotsScreen() {
                 </Pressable>
               </View>
 
-              {/* Selected spot card or spots preview — lifted above the bottom
+              {/* Selected-spot card — shown ONLY when a pin is tapped. Tapping
+                  the map clears the selection (onPress on MapView) and hides it;
+                  tapping another pin swaps in that spot. Lifted above the bottom
                   safe area when fullscreen (no tab bar padding then). */}
-              <View
-                style={[
-                  styles.mapSpotsContainer,
-                  isMapFullscreen && { paddingBottom: insets.bottom + 16 },
-                ]}
-              >
-                {selectedSpot ? (
+              {selectedSpot && (
+                <View
+                  style={[
+                    styles.mapSpotsContainer,
+                    isMapFullscreen && { paddingBottom: insets.bottom + 16 },
+                  ]}
+                >
                   <SpotMapCard
                     spot={selectedSpot}
                     theme={theme}
@@ -826,37 +901,8 @@ export default function SpotsScreen() {
                     onToggleSave={() => handleToggleSave(selectedSpot)}
                     onOpenListPicker={() => handleOpenListPicker(selectedSpot)}
                   />
-                ) : spots.length > 0 ? (
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.mapSpotsScroll}
-                  >
-                    {spots.slice(0, 5).map((spot) => (
-                      <SpotMapCard
-                        key={spot._id}
-                        spot={spot}
-                        theme={theme}
-                        saved={savedSpotIds.has(spot._id)}
-                        onPress={() => {
-                          setSelectedSpot(spot);
-                          mapRef.current?.animateToRegion(
-                            {
-                              latitude: spot.latitude,
-                              longitude: spot.longitude,
-                              latitudeDelta: 0.05,
-                              longitudeDelta: 0.05,
-                            },
-                            500,
-                          );
-                        }}
-                        onToggleSave={() => handleToggleSave(spot)}
-                        onOpenListPicker={() => handleOpenListPicker(spot)}
-                      />
-                    ))}
-                  </ScrollView>
-                ) : null}
-              </View>
+                </View>
+              )}
             </View>
           ) : (
             // List View
@@ -1271,6 +1317,118 @@ export default function SpotsScreen() {
           }
         }}
       />
+
+      {/* Google-Maps-style in-map search: places (Google) + our spots. */}
+      <Modal
+        visible={mapSearchVisible}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={closeMapSearch}
+        presentationStyle="fullScreen"
+      >
+        <View
+          style={[
+            styles.mapSearchScreen,
+            { backgroundColor: theme.background, paddingTop: insets.top },
+          ]}
+        >
+          <View style={styles.mapSearchHeader}>
+            <View
+              style={[
+                styles.mapSearchBar,
+                { backgroundColor: theme.surface, borderColor: theme.border },
+              ]}
+            >
+              <Ionicons name="search" size={18} color={theme.textSecondary} />
+              <TextInput
+                style={[styles.mapSearchInput, { color: theme.text }]}
+                placeholder="Search places or spots"
+                placeholderTextColor={theme.textSecondary}
+                value={mapSearchText}
+                onChangeText={setMapSearchText}
+                autoFocus
+                returnKeyType="search"
+              />
+              {mapSearchText.length > 0 && (
+                <Pressable onPress={() => setMapSearchText('')} hitSlop={8}>
+                  <Ionicons name="close-circle" size={18} color={theme.textSecondary} />
+                </Pressable>
+              )}
+            </View>
+            <Pressable onPress={closeMapSearch} style={styles.mapSearchCancel}>
+              <Text style={{ color: '#B8A800', fontWeight: '600' }}>Cancel</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView keyboardShouldPersistTaps="handled" style={styles.mapSearchResults}>
+            {mapSearchLoading && <ActivityIndicator style={{ marginTop: 24 }} color={YELLOW} />}
+
+            {mapSearchSpots.length > 0 && (
+              <Text style={[styles.mapSearchSection, { color: theme.textSecondary }]}>Spots</Text>
+            )}
+            {mapSearchSpots.map((s) => (
+              <Pressable
+                key={s._id}
+                style={[styles.mapSearchRow, { borderBottomColor: theme.border }]}
+                onPress={() => handleSelectSearchSpot(s)}
+              >
+                <View style={styles.mapSearchIcon}>
+                  <Ionicons name="location" size={18} color={DARK} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.mapSearchRowTitle, { color: theme.text }]} numberOfLines={1}>
+                    {s.name}
+                  </Text>
+                  <Text
+                    style={[styles.mapSearchRowSub, { color: theme.textSecondary }]}
+                    numberOfLines={1}
+                  >
+                    {[s.city, s.state].filter(Boolean).join(', ') || 'Spot'}
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+
+            {mapSearchPlaces.length > 0 && (
+              <Text style={[styles.mapSearchSection, { color: theme.textSecondary }]}>Places</Text>
+            )}
+            {mapSearchPlaces.map((p) => (
+              <Pressable
+                key={p.placeId}
+                style={[styles.mapSearchRow, { borderBottomColor: theme.border }]}
+                onPress={() => handleSelectSearchPlace(p)}
+              >
+                <Ionicons
+                  name="business-outline"
+                  size={20}
+                  color={theme.textSecondary}
+                  style={{ width: 32 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.mapSearchRowTitle, { color: theme.text }]} numberOfLines={1}>
+                    {p.name}
+                  </Text>
+                  <Text
+                    style={[styles.mapSearchRowSub, { color: theme.textSecondary }]}
+                    numberOfLines={1}
+                  >
+                    {p.address}
+                  </Text>
+                </View>
+              </Pressable>
+            ))}
+
+            {!mapSearchLoading &&
+              mapSearchText.trim().length >= 2 &&
+              mapSearchSpots.length === 0 &&
+              mapSearchPlaces.length === 0 && (
+                <Text style={[styles.mapSearchEmpty, { color: theme.textSecondary }]}>
+                  No results for “{mapSearchText.trim()}”
+                </Text>
+              )}
+          </ScrollView>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1632,6 +1790,76 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 6,
+  },
+  // In-map search (Google-Maps style)
+  mapSearchScreen: {
+    flex: 1,
+  },
+  mapSearchHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  mapSearchBar: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  mapSearchInput: {
+    flex: 1,
+    fontSize: 16,
+  },
+  mapSearchCancel: {
+    paddingHorizontal: 4,
+    paddingVertical: 8,
+  },
+  mapSearchResults: {
+    flex: 1,
+  },
+  mapSearchSection: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 6,
+  },
+  mapSearchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  mapSearchIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: YELLOW,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mapSearchRowTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  mapSearchRowSub: {
+    fontSize: 13,
+    marginTop: 2,
+  },
+  mapSearchEmpty: {
+    textAlign: 'center',
+    marginTop: 32,
+    fontSize: 15,
   },
   overlayMarker: {
     position: 'absolute',
