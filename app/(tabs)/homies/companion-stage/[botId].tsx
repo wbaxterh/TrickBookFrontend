@@ -53,13 +53,29 @@ const MODE_LABELS: Record<string, string> = {
 };
 
 /**
- * Detect "show me a trick" intents so Kaori demonstrates with her body
- * while she explains. First trick in the library: frontside 360.
+ * WHICH 360 does this text name? Identification only — no demo-intent gate, so
+ * it also works on Kaori's own reply ("...watch this backside 360...").
+ * Backside spins the other way; plain "360" / "frontside 360" stays frontside.
+ */
+function detectTrickId(text: string): TrickId | null {
+  // Flips first — a wildcat/tamedog is a flip, not a 360 ("backflip" contains "back").
+  if (/\b(wildcat|back[\s-]?flip)\b/i.test(text)) return 'wildcat';
+  if (/\b(tamedog|tame[\s-]?dog|front[\s-]?flip)\b/i.test(text)) return 'tamedog';
+  const mentions360 = /\b(360|three[\s-]?sixty|(front|back)side\s*3|(fs|bs)\s*3|back\s*3)\b/i.test(
+    text,
+  );
+  if (!mentions360) return null;
+  const isBackside = /\b(backside|bs)\s*(360|three[\s-]?sixty|3)\b|\bback\s*3\b/i.test(text);
+  return isBackside ? 'backside-360' : 'frontside-360';
+}
+
+/**
+ * Detect "show me a trick" intents so Kaori demonstrates with her body while
+ * she explains. Intent verb + a named trick → that trick.
  */
 function detectTrickDemo(text: string): TrickId | null {
-  const wantsDemo = /\b(show|demo|demonstrate|do)\b/i.test(text);
-  const mentions360 = /\b(360|three[\s-]?sixty|frontside\s*3)\b/i.test(text);
-  return wantsDemo && mentions360 ? 'frontside-360' : null;
+  const wantsDemo = /\b(show|demo|demonstrate|do|see|watch|hit|throw|bust|try|land)\b/i.test(text);
+  return wantsDemo ? detectTrickId(text) : null;
 }
 
 /** Split a reply the way Kith chunks speech — one sentence per turn. */
@@ -79,6 +95,13 @@ function actionForSentence(sentence: string): Exclude<DemoAction, 'none'> | null
   if (/watch|let me show|show you|check (this|it)|like this|here (we|it) go/i.test(sentence)) {
     return 'full';
   }
+  if (
+    /\b(wildcat|tamedog|tame[\s-]?dog|back[\s-]?flip|front[\s-]?flip|flip|invert|somersault)\b/i.test(
+      sentence,
+    )
+  ) {
+    return 'full';
+  }
   if (/\b(spin|rotat\w*|360|three[\s-]?sixty)\b/i.test(sentence)) return 'full';
   if (/\b(wind|coil|crouch|bend|set[\s-]?up|load)\b/i.test(sentence)) return 'setup';
   if (/\b(pop|jump|snap|spring)\b/i.test(sentence)) return 'pop';
@@ -93,19 +116,27 @@ export default function CompanionStageScreen() {
   const demoState = useRef(createTrickDemoState());
   const replySentences = useRef<string[] | null>(null);
 
-  const { voiceState, voiceReady, getSessionId, bargeIn, reassertPlayback, setMode, beginReply } =
-    useKithVoice({
-      onAssistantSentence: (index) => {
-        const sentences = replySentences.current;
-        if (!sentences) return;
-        const action = actionForSentence(sentences[index] ?? '');
-        if (action) startAction(demoState.current, action);
-      },
-      onReplyDone: () => {
-        demoState.current.session = false;
-        replySentences.current = null;
-      },
-    });
+  const {
+    voiceState,
+    voiceReady,
+    getSessionId,
+    bargeIn,
+    stop,
+    reassertPlayback,
+    setMode,
+    beginReply,
+  } = useKithVoice({
+    onAssistantSentence: (index) => {
+      const sentences = replySentences.current;
+      if (!sentences) return;
+      const action = actionForSentence(sentences[index] ?? '');
+      if (action) startAction(demoState.current, action);
+    },
+    onReplyDone: () => {
+      demoState.current.session = false;
+      replySentences.current = null;
+    },
+  });
 
   const [messages, setMessages] = useState<StageMessage[]>([]);
   const [input, setInput] = useState('');
@@ -167,7 +198,12 @@ export default function CompanionStageScreen() {
         const wantsDemo =
           reply && (requestedTrick !== null || /watch this|let me show/i.test(reply));
         if (wantsDemo) {
-          if (requestedTrick) demoState.current.trick = requestedTrick;
+          // ALWAYS resolve the trick — the user's explicit ask first, else what
+          // her reply names, else keep the current one. Never fall through to a
+          // stale/default frontside when the user asked for a backside.
+          const trick = requestedTrick ?? detectTrickId(reply) ?? demoState.current.trick;
+          demoState.current.trick = trick;
+          if (__DEV__) console.log('[stage] demo trick:', trick);
           demoState.current.session = true;
           demoState.current.idleT = 0;
           replySentences.current = splitSentences(reply);
@@ -229,6 +265,19 @@ export default function CompanionStageScreen() {
     if (!listening) bargeIn();
     toggleVoiceInput();
   }, [listening, bargeIn, toggleVoiceInput]);
+
+  // Silence Kaori (and stop the mic) the moment the stage loses focus —
+  // navigating away or hitting back. expo-router keeps this screen mounted so
+  // the useKithVoice unmount cleanup won't fire; without this her voice keeps
+  // talking after you leave. Fires exactly once on the focused→blurred edge.
+  const wasFocused = useRef(isFocused);
+  useEffect(() => {
+    if (wasFocused.current && !isFocused) {
+      stop();
+      if (listening) toggleVoiceInput();
+    }
+    wasFocused.current = isFocused;
+  }, [isFocused, stop, listening, toggleVoiceInput]);
 
   const lastMessages = messages.slice(-2);
 

@@ -119,6 +119,16 @@ export function useKithVoice(callbacks?: KithVoiceCallbacks) {
       playerRef.current?.interrupt();
       sessionRef.current?.bargeIn();
     },
+    /**
+     * Immediately silence Kaori — stop playback AND tell the backend to stop
+     * generating. Call this when the stage loses focus (navigating away), since
+     * expo-router keeps the screen mounted, so the unmount cleanup won't fire.
+     */
+    stop: () => {
+      playerRef.current?.interrupt();
+      sessionRef.current?.bargeIn();
+      voiceState.current.mode = 'idle';
+    },
     /** Restore the playback audio session after the mic releases it. */
     reassertPlayback: () => playerRef.current?.reassertSession(),
     setMode: (mode: CompanionVoiceState['mode']) => {

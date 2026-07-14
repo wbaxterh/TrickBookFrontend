@@ -22,6 +22,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { brandColors } from '@/constants/colors';
+import { SnowWorld } from './SnowWorld';
 import {
   createTrickDemoState,
   driveDemo,
@@ -486,6 +487,9 @@ function downgradeMToonMaterials(root: THREE.Object3D, glCtx: WebGL2RenderingCon
         side: mtoon.side,
         depthWrite: mtoon.depthWrite,
         depthTest: mtoon.depthTest,
+        // Kaori is unlit and always in the foreground — never fog her (the snow
+        // world adds scene fog; MeshBasicMaterial.fog defaults to true).
+        fog: false,
       });
       replacement.name = mtoon.name;
       mtoon.dispose();
@@ -543,21 +547,51 @@ function KaoriModel({
   const elapsed = useRef(0);
   useFrame((_, delta) => {
     elapsed.current += delta;
-    if (isDemoActive(demo.current)) {
+    const demoActive = isDemoActive(demo.current);
+    if (demoActive) {
       // The demo session owns the body; face keeps talking (mouth/blink/
       // emotes) so she narrates while riding and performing.
       const active = driveDemo(vrm, demo.current, delta);
       driveFace(vrm, elapsed.current, voice.current);
-      vrm.scene.rotation.y = demo.current.rootYaw;
-      vrm.scene.position.y = demo.current.rootY;
+      const st = demo.current;
+      // Compose the whole-body orientation: YAW (stance + spin, about Y) THEN
+      // PITCH (flip, about her local board long-axis). q = qYaw * qPitch so the
+      // flip axis rotates WITH her facing. Pure 360 → rootPitch=0 → qPitch=
+      // identity → q is pure Y yaw, identical to before.
+      _flipQYaw.setFromAxisAngle(_flipYAxis, st.rootYaw);
+      _flipQPitch.setFromAxisAngle(_flipPitchAxis, st.rootPitch);
+      _flipQ.copy(_flipQYaw).multiply(_flipQPitch);
+      vrm.scene.quaternion.copy(_flipQ);
+      // Publish the root quaternion so lockBoardToFeet can roll the deck with her
+      // through a flip inversion (else it stays world-flat while she inverts).
+      st.rootQuat[0] = _flipQ.x;
+      st.rootQuat[1] = _flipQ.y;
+      st.rootQuat[2] = _flipQ.z;
+      st.rootQuat[3] = _flipQ.w;
+      // Pivot around the CoM/hip, not the feet: place the scene origin at
+      // arcCoM − q·comLocal so the hip sits at (0, rootY + COM_LOCAL_Y, 0) for
+      // every pitch angle (the body orbits the hip). pitch=0 → position.y=rootY.
+      _flipComOffset.set(0, COM_LOCAL_Y, 0).applyQuaternion(_flipQ);
+      vrm.scene.position.set(
+        -_flipComOffset.x,
+        st.rootY + COM_LOCAL_Y - _flipComOffset.y,
+        -_flipComOffset.z,
+      );
       if (!active) {
-        vrm.scene.rotation.y = 0;
-        vrm.scene.position.y = 0;
+        vrm.scene.quaternion.identity();
+        vrm.scene.position.set(0, 0, 0);
       }
     } else {
       driveCharacter(vrm, elapsed.current, delta, voice.current);
     }
     vrm.update(delta);
+    // With the skeleton fully updated, lock the trick board under the actual
+    // feet so the bindings stay attached and the board angle follows the legs.
+    if (demoActive && demo.current.boardOpacity > 0.05) {
+      lockBoardToFeet(vrm, demo.current);
+    } else {
+      demo.current.boardLocked = false;
+    }
   });
 
   return <primitive object={vrm.scene} />;
@@ -593,6 +627,95 @@ function makeBoardGeometry(
   return geometry;
 }
 
+// Scratch objects reused every frame so locking the board allocates nothing.
+const _footL = new THREE.Vector3();
+const _footR = new THREE.Vector3();
+const _boardX = new THREE.Vector3();
+const _boardY = new THREE.Vector3();
+const _boardZ = new THREE.Vector3();
+const _worldFwd = new THREE.Vector3(0, 0, 1);
+const _boardBasis = new THREE.Matrix4();
+const _boardQuat = new THREE.Quaternion();
+// Board "up" derived from her body (for flips) — see lockBoardToFeet.
+const _bodyUp = new THREE.Vector3();
+const _rootQ = new THREE.Quaternion();
+
+// --- Whole-body flip transform (yaw*pitch quaternion pivoted at the CoM) ---
+// Hip/CoM height in the VRM scene-local frame (feet ~y=0; THIGH_LEN+SHIN_LEN ≈
+// 0.84 straight-leg foot→hip). The fixed pivot height for a flip — NOT rootY.
+// Tune 0.80–0.90 on device if a flip orbits her waist/chest instead of her hips.
+const COM_LOCAL_Y = 0.85;
+const _flipQ = new THREE.Quaternion();
+const _flipQYaw = new THREE.Quaternion();
+const _flipQPitch = new THREE.Quaternion();
+const _flipYAxis = new THREE.Vector3(0, 1, 0);
+// Flip axis = board's foot-to-foot line in her LOCAL frame (+X). If a flip
+// tumbles face-on at the apex instead of head-over-heels, flip this to (-1,0,0).
+const _flipPitchAxis = new THREE.Vector3(1, 0, 0);
+const _flipComOffset = new THREE.Vector3();
+/** Foot bone ≈ ankle; drop the deck this far below the midpoint so the soles
+ *  sit on top of the board rather than through it. */
+const BOARD_SOLE_DROP = 0.07;
+
+/**
+ * Lock the trick board to the rider's actual feet. The board's long axis (+X,
+ * where the bindings live at ±0.24) is aimed straight down the line between the
+ * two foot bones and the deck kept facing up, so the bindings stay under the
+ * soles and the board ANGLE follows the legs — lift the back leg and the tail
+ * rises because that foot rose. Writes the world transform into demo state for
+ * TrickBoard to copy. Must run after vrm.update() so the foot bones are posed.
+ */
+function lockBoardToFeet(vrm: VRM, state: TrickDemoState) {
+  const humanoid = vrm.humanoid;
+  const lf = humanoid?.getRawBoneNode('leftFoot');
+  const rf = humanoid?.getRawBoneNode('rightFoot');
+  if (!lf || !rf) {
+    state.boardLocked = false;
+    return;
+  }
+  lf.getWorldPosition(_footL);
+  rf.getWorldPosition(_footR);
+
+  // Board long axis (+X) runs foot-to-foot; build an orthonormal, up-facing
+  // basis around it. Feet coincident (never really happens) keeps the last
+  // transform; a near-VERTICAL axis (big stylish leg-lift) rebuilds off
+  // world-forward so the board STAYS locked instead of unlocking and getting
+  // flung to the origin.
+  _boardX.subVectors(_footR, _footL);
+  if (_boardX.lengthSq() < 1e-6) {
+    state.boardLocked = false;
+    return;
+  }
+  _boardX.normalize();
+  // Board "up" comes from HER body, not the world — so through a flip inversion
+  // the deck ROLLS with her and stays soles-down instead of lying world-flat
+  // under an upside-down rider. rootPitch=0 (spins) → body-up == world-up →
+  // unchanged. (The flip axis IS the foot line, so foot-to-foot never goes
+  // vertical; the world-fwd fallback is only for the near-degenerate stylish lift.)
+  _bodyUp.set(0, 1, 0);
+  if (state.rootPitch) {
+    _rootQ.set(state.rootQuat[0], state.rootQuat[1], state.rootQuat[2], state.rootQuat[3]);
+    _bodyUp.applyQuaternion(_rootQ);
+  }
+  _boardZ.crossVectors(_boardX, _bodyUp);
+  if (_boardZ.lengthSq() < 1e-4) {
+    _boardZ.crossVectors(_boardX, _worldFwd);
+  }
+  _boardZ.normalize();
+  _boardY.crossVectors(_boardZ, _boardX).normalize();
+  _boardBasis.makeBasis(_boardX, _boardY, _boardZ);
+  _boardQuat.setFromRotationMatrix(_boardBasis);
+
+  state.boardPos[0] = (_footL.x + _footR.x) / 2 - _boardY.x * BOARD_SOLE_DROP;
+  state.boardPos[1] = (_footL.y + _footR.y) / 2 - _boardY.y * BOARD_SOLE_DROP;
+  state.boardPos[2] = (_footL.z + _footR.z) / 2 - _boardY.z * BOARD_SOLE_DROP;
+  state.boardQuat[0] = _boardQuat.x;
+  state.boardQuat[1] = _boardQuat.y;
+  state.boardQuat[2] = _boardQuat.z;
+  state.boardQuat[3] = _boardQuat.w;
+  state.boardLocked = true;
+}
+
 /** Stylized snowboard that appears under Kaori's feet during trick demos. */
 function TrickBoard({ demo }: { demo: React.MutableRefObject<TrickDemoState> }) {
   const groupRef = useRef<THREE.Group>(null);
@@ -612,11 +735,18 @@ function TrickBoard({ demo }: { demo: React.MutableRefObject<TrickDemoState> }) 
   useFrame(() => {
     const group = groupRef.current;
     if (!group) return;
-    const { boardOpacity, rootYaw, boardY } = demo.current;
-    group.visible = boardOpacity > 0.01;
+    const { boardOpacity, boardPos, boardQuat } = demo.current;
+    // Cut off a bit higher than 0 so the board doesn't linger as a faint ghost
+    // after she's already stood back up (stance return + board vanish together).
+    group.visible = boardOpacity > 0.05;
     if (!group.visible) return;
-    group.position.y = boardY + 0.045;
-    group.rotation.y = rootYaw;
+    // Bindings stay glued to the feet — lockBoardToFeet writes boardPos/boardQuat
+    // each frame after the skeleton is posed. If a frame fails to lock (first
+    // frame / missing bone / degenerate basis) these hold the LAST good
+    // transform, so the deck never flings to the world origin under an airborne,
+    // spinning Kaori (barely visible during fade-in anyway).
+    group.position.set(boardPos[0], boardPos[1], boardPos[2]);
+    group.quaternion.set(boardQuat[0], boardQuat[1], boardQuat[2], boardQuat[3]);
     if (deckRef.current) deckRef.current.opacity = boardOpacity;
     if (baseRef.current) baseRef.current.opacity = boardOpacity;
   });
@@ -626,11 +756,23 @@ function TrickBoard({ demo }: { demo: React.MutableRefObject<TrickDemoState> }) 
       {/* Deck — sakura-pink topsheet (matches Kaori's jacket, pops against
           the dark floor), long axis through the rider's feet */}
       <mesh geometry={deckGeometry}>
-        <meshStandardMaterial ref={deckRef} color="#f48fb8" roughness={0.35} transparent />
+        <meshStandardMaterial
+          ref={deckRef}
+          color="#f48fb8"
+          roughness={0.35}
+          transparent
+          fog={false}
+        />
       </mesh>
       {/* White rails/base peeking out around the deck */}
       <mesh geometry={baseGeometry} position={[0, -0.004, 0]}>
-        <meshStandardMaterial ref={baseRef} color="#f4f6fb" roughness={0.3} transparent />
+        <meshStandardMaterial
+          ref={baseRef}
+          color="#f4f6fb"
+          roughness={0.3}
+          transparent
+          fog={false}
+        />
       </mesh>
       {/* Binding hints */}
       <mesh position={[-0.24, 0.035, 0]}>
@@ -672,7 +814,7 @@ function StageSet() {
       {/* Brand-yellow stage ring */}
       <mesh position={[0, 0.012, 0]} rotation-x={-Math.PI / 2}>
         <ringGeometry args={[1.35, 1.42, 64]} />
-        <meshBasicMaterial color={brandColors.primary} side={THREE.DoubleSide} />
+        <meshBasicMaterial color={brandColors.primary} side={THREE.DoubleSide} fog={false} />
       </mesh>
     </>
   );
@@ -805,8 +947,11 @@ export function KaoriStage({ active = true, voiceState, demoState }: KaoriStageP
             }}
             style={styles.canvas}
           >
+            {/* Seeds scene.background for frame 0; SnowWorld owns it per-frame after. */}
             <color args={['#0b0e17']} attach="background" />
             <StageSet />
+            {/* Alpine world that crossfades in as she straps onto the board. */}
+            <SnowWorld demo={demo} />
             <CameraRig orbit={orbit} />
             <TrickBoard demo={demo} />
             <Suspense fallback={null}>
