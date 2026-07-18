@@ -483,11 +483,10 @@ export function driveDemo(vrm: VRM, state: TrickDemoState, dt: number): boolean 
       state.action = 'full';
       state.actionT = 0;
       state.gapT = 0;
-      // Alternate ONLY within the requested trick's family — frontside cycles
-      // clean↔stylish so both show; backside just re-runs (no stylish variant
-      // yet). Never drag a backside session back to frontside.
+      // Frontside always demos the stylish variant (clean variant retired per
+      // request) — upgrade clean → stylish and stay there; never swap back.
+      // Backside just re-runs (no stylish variant yet).
       if (state.trick === 'frontside-360') state.trick = 'frontside-360-stylish';
-      else if (state.trick === 'frontside-360-stylish') state.trick = 'frontside-360';
     }
   }
 

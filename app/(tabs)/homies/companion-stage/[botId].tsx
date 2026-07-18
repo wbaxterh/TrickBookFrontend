@@ -66,7 +66,8 @@ function detectTrickId(text: string): TrickId | null {
   );
   if (!mentions360) return null;
   const isBackside = /\b(backside|bs)\s*(360|three[\s-]?sixty|3)\b|\bback\s*3\b/i.test(text);
-  return isBackside ? 'backside-360' : 'frontside-360';
+  // Frontside 360 always demos the stylish variant (clean variant retired per request).
+  return isBackside ? 'backside-360' : 'frontside-360-stylish';
 }
 
 /**

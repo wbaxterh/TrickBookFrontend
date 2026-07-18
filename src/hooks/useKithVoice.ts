@@ -62,6 +62,10 @@ export function useKithVoice(callbacks?: KithVoiceCallbacks) {
           break;
         case 'turn_start':
           if (event.role === 'assistant') {
+            // A new sentence is starting — the reply isn't over. Cancel any
+            // pending end-of-reply drain timer before this sentence's audio
+            // arrives, so a slow next sentence can't cut the reply off early.
+            player.keepAlive();
             callbacksRef.current?.onAssistantSentence?.(sentenceIndex.current);
             sentenceIndex.current += 1;
           }
