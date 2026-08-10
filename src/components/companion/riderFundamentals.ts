@@ -199,26 +199,70 @@ function applyTorsoAndHead(humanoid: Humanoid, pose: RiderPose, w: number) {
   }
 }
 
+/**
+ * Live-tunable arm magnitudes. The Trick Lab binds sliders directly to this
+ * object, so mutating a field retunes applyArms in REAL TIME with no rebuild.
+ * The defaults are the device-tuned values — this is the single source of truth
+ * for the app too, so once the lab finds better numbers, edit them here.
+ */
+export const ARM_TUNING = {
+  rest: { uz: 1.15, ux: 0.06, fz: 0.15 }, // arms-down rest pose (uz=abduction, ux=fwd/back, fz=elbow)
+  SWING: 0.9, // fwd/back pump of a DOWN arm about upper.x (coil load/throw)
+  LIFT_COIL: 0.45, // how far the arms come UP off the sides at full coil
+  LIFT_TUCK: 0.18, // arms pulled in during the airborne tuck (was 0.45 — it was raising them)
+  LIFT_BAL: 0.55, // arms thrown wide for landing balance
+  LIFT_AIR: 0.12, // draw-in LIFT through the air/spin (was 0.6 — the main "winging")
+  CROSS: 0.4, // cross-body wrap on the whip (upper.rotation.y)
+  WRAP_AIR: 1.05, // continuous cross-body wrap that travels WITH the spin (the real "wrap")
+  AIR_SWING: 0.05, // fwd swing into the spin (kept low — too much = "T-rex arms")
+  ELBOW: 0.75, // elbow flexion added while winding/whipping
+  ELBOW_AIR: 1.05, // elbows fold in tight as the arms wrap around mid-air
+  CATCH: 0.25, // arms fling wide/back on the balance catch
+};
+
+// Backside spins want a DIFFERENT arm shape than frontside — frontside you can
+// track the landing, backside is blind and the arms wrap the other way. applyArms
+// uses THIS object for backside tricks (pose.dir < 0). It starts as an independent
+// copy of ARM_TUNING (so nothing changes until you tune it), and the Trick Lab
+// binds a separate "Arms — BACKSIDE" panel to it.
+export const ARM_TUNING_BS: typeof ARM_TUNING = {
+  rest: { uz: 1.15, ux: 0.06, fz: 0.15 },
+  SWING: 0.9,
+  LIFT_COIL: 0.48,
+  LIFT_TUCK: 0.08,
+  LIFT_BAL: -0.55,
+  LIFT_AIR: -0.03,
+  CROSS: 0.71,
+  WRAP_AIR: -1.18,
+  AIR_SWING: -0.84,
+  ELBOW: 0.14,
+  ELBOW_AIR: 1.05,
+  CATCH: 0.82,
+};
+
 function applyArms(humanoid: Humanoid, pose: RiderPose, w: number) {
   // Rest (from T-pose): uz hangs the arms DOWN at the sides; ux ~0 = neutral
   // fwd/back; fz = slight elbow bend. Everything below is RELATIVE to the
   // chest, which already carries pose.coil * 0.45 of shoulder rotation — so we
   // deliberately ADD arm motion on top of that so the arms read as alive
   // instead of dead pendulums hanging off spinning shoulders.
-  const rest = { uz: 1.15, ux: 0.06, fz: 0.15 };
-
-  // --- Tuning magnitudes ---
-  const SWING = 0.9; // fwd/back pump of a DOWN arm about upper.rotation.x (coil load/throw)
-  const LIFT_COIL = 0.55; // how far the arms come UP off the sides at full coil
-  const LIFT_TUCK = 0.45; // arms pulled in during the airborne tuck
-  const LIFT_BAL = 0.55; // arms thrown wide for landing balance
-  const LIFT_AIR = 0.6; // draw-in lift carried through the WHOLE air/spin
-  const CROSS = 0.4; // cross-body wrap on the whip (upper.rotation.y)
-  const WRAP_AIR = 0.6; // continuous cross-body wrap that travels WITH the spin
-  const AIR_SWING = 0.5; // fwd swing of the arms into the spin through the air
-  const ELBOW = 0.75; // elbow flexion added while winding/whipping
-  const ELBOW_AIR = 0.8; // elbows fold in as the arms wrap around mid-air
-  const CATCH = 0.25; // arms fling wide/back on the balance catch
+  // All magnitudes come from the live-tunable ARM_TUNING object (top of file),
+  // so the Trick Lab can retune the arms in real time.
+  // Backside tricks pull from their own tuning object (see ARM_TUNING_BS).
+  const {
+    rest,
+    SWING,
+    LIFT_COIL,
+    LIFT_TUCK,
+    LIFT_BAL,
+    LIFT_AIR,
+    CROSS,
+    WRAP_AIR,
+    AIR_SWING,
+    ELBOW,
+    ELBOW_AIR,
+    CATCH,
+  } = pose.dir < 0 ? ARM_TUNING_BS : ARM_TUNING;
 
   // coil runs the full -0.7 (wound up) -> +0.5 (whip at pop) -> ~0 range.
   // windup>0 ONLY while coil is negative (the load phase). whip>0 ONLY while
@@ -253,7 +297,10 @@ function applyArms(humanoid: Humanoid, pose: RiderPose, w: number) {
   // BACK in the wind-up then THROWS FORWARD at the pop (UNCHANGED). On top,
   // AIR_SWING keeps the arms swung into the spin across the whole air instead of
   // drifting back to neutral once coil fades.
-  const swingBase = rest.ux + pose.coil * SWING + pose.tuck * 0.35 + spinSwing * AIR_SWING;
+  // Keep the wind-up load/throw (coil*SWING) but cut the SYMMETRIC forward swing
+  // that made both arms reach straight forward ("T-rex arms") — the cross-body
+  // WRAP_AIR + lead/trail bias below should carry the spin instead.
+  const swingBase = rest.ux + pose.coil * SWING + pose.tuck * 0.08 + spinSwing * AIR_SWING;
 
   for (const side of ['left', 'right'] as const) {
     const sign = side === 'left' ? -1 : 1; // left arm on +X, right on -X

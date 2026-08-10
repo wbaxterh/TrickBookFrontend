@@ -67,10 +67,30 @@ const FS360_AIR_END = 3.1;
 const FS360_LAND_END = 3.7;
 const FS360_SETTLE_END = 4.2;
 
-// Head-spotting knobs (see the head block in spin360PoseAt).
-const NECK_CAP = 1.3; // anatomical neck-yaw limit (~75°) — forces the hold→whip
-const HEAD_HOLD_FRAC = 0.5; // spin fraction she holds the gaze forward before whipping
-const HEAD_WHIP_END = 0.9; // spin fraction the head has re-fixated forward by
+// Head-spotting — live-tunable (the Trick Lab binds a HEAD panel per direction).
+// Backside spins lead + spot over the OTHER shoulder, so they get their own
+// HEAD_TUNING_BS. Defaults reproduce the prior behavior (LEAD 0 = no change),
+// so only what you tune changes.
+export const HEAD_TUNING = {
+  DOWNHILL: 0.6, // resting downhill riding gaze (toward the nose / front foot)
+  LEAD: 0, // look over the BACK shoulder at pop to LEAD the spin (signed; - = right/back shoulder)
+  LEAD_END: 0.35, // spin fraction by which the lead fades into the spot
+  HOLD_FRAC: 0.5, // spin fraction she holds the gaze forward before whipping
+  WHIP_END: 0.9, // spin fraction the head has re-fixated forward by
+  SPOT: 0.32, // apex chin-down / spot magnitude
+  ROLL: 0.26, // head roll over the shoulder at the apex
+  NECK_CAP: 1.3, // anatomical neck-yaw limit (~75°) — forces the hold→whip
+};
+export const HEAD_TUNING_BS: typeof HEAD_TUNING = {
+  DOWNHILL: 0.6,
+  LEAD: -0.9, // look over her RIGHT/back shoulder at the pop (regular-stance backside)
+  LEAD_END: 0.45,
+  HOLD_FRAC: 0.5,
+  WHIP_END: 0.9,
+  SPOT: 0.32,
+  ROLL: 0.26,
+  NECK_CAP: 1.3,
+};
 
 /**
  * Shared 360 timeline for frontside AND backside so they never drift apart.
@@ -121,20 +141,34 @@ function spin360PoseAt(t: number, dir: 1 | -1): RiderPose {
   // forward — measured from the END of the revolution — landing looking downhill.
   // (Frontside holds a touch longer than backside because she spins toward her
   // downhill gaze; that small asymmetry is physical, not a bug.)
+  const H = dir < 0 ? HEAD_TUNING_BS : HEAD_TUNING;
   const bodyYaw = dir * Math.PI * 2 * spin;
-  const holdLead = clamp(DOWNHILL_LOOK - bodyYaw, -NECK_CAP, NECK_CAP);
-  const reFixLead = clamp(DOWNHILL_LOOK - dir * Math.PI * 2 * (spin - 1), -NECK_CAP, NECK_CAP);
-  const whip = easeInOut(clamp01((spin - HEAD_HOLD_FRAC) / (HEAD_WHIP_END - HEAD_HOLD_FRAC)));
-  let headLead = lerp(holdLead, reFixLead, whip);
+  const holdLead = clamp(H.DOWNHILL - bodyYaw, -H.NECK_CAP, H.NECK_CAP);
+  const reFixLead = clamp(H.DOWNHILL - dir * Math.PI * 2 * (spin - 1), -H.NECK_CAP, H.NECK_CAP);
+  const whip = easeInOut(clamp01((spin - H.HOLD_FRAC) / (H.WHIP_END - H.HOLD_FRAC)));
+  // LEAD the spin: as she pops she turns to look over her BACK shoulder to
+  // initiate the rotation (H.LEAD signed — negative = over the right/back
+  // shoulder for a regular-stance backside), peaking early and fading into the
+  // spot by H.LEAD_END. Clamped to the neck limit.
+  // Peaks AT the pop (before she's really rotating — the anticipation look) and
+  // fades over the first LEAD_END of the air, so she's already looking over her
+  // back shoulder as she leaves the lip.
+  const leadArc = pop < 1 ? easeInOut(pop) : clamp01(1 - air / Math.max(0.05, H.LEAD_END));
+  // At the pop she LOOKS over her back shoulder (gaze = DOWNHILL + LEAD); as
+  // leadArc fades, the normal hold→whip spot model takes over. Lerp (not add) so
+  // the lead DOMINATES at the pop instead of just nudging the downhill hold.
+  const leadLook = clamp(H.DOWNHILL + H.LEAD, -H.NECK_CAP, H.NECK_CAP);
+  const spotLead = lerp(holdLead, reFixLead, whip);
+  let headLead = lerp(spotLead, leadLook, leadArc);
   // Chin drops and head rolls over the shoulder AS she whips her eyes around to
   // re-spot the snow, then relaxes — peaks mid-whip, zero at both ends.
   const spotArc = Math.sin(Math.PI * whip);
-  let headSpot = lerp(DOWNHILL_CHIN, 0.32, spotArc);
-  let headRoll = dir * 0.26 * spotArc;
+  let headSpot = lerp(DOWNHILL_CHIN, H.SPOT, spotArc);
+  let headRoll = dir * H.ROLL * spotArc;
   if (settle > 0) {
     // End on the exact downhill riding gaze she started from.
     const s = easeInOut(settle);
-    headLead = lerp(headLead, DOWNHILL_LOOK, s);
+    headLead = lerp(headLead, H.DOWNHILL, s);
     headSpot = lerp(headSpot, DOWNHILL_CHIN, s);
     headRoll = lerp(headRoll, 0, s);
   }

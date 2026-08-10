@@ -1,0 +1,19 @@
+{
+  "name": "kaori-tricklab",
+  "private": true,
+  "type": "module",
+  "description": "Browser live-tuner for Kaori's procedural snowboard trick animations. Shares the exact pose engine (src/components/companion) with the app so tuned values drop straight in.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@pixiv/three-vrm": "3.5.2",
+    "lil-gui": "^0.19.2",
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.4",
+    "vite": "^5.4.10"
+  }
+}

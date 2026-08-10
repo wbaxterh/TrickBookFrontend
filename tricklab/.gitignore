@@ -1,0 +1,4 @@
+node_modules
+dist
+# the VRM is copied in from ../assets/models — don't commit the 14MB duplicate
+public/*.vrm
