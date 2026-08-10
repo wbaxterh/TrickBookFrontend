@@ -43,6 +43,7 @@ export type TrickId =
   | 'frontside-360'
   | 'frontside-360-stylish'
   | 'backside-360'
+  | 'backside-360-stylish'
   | 'wildcat'
   | 'tamedog';
 
@@ -74,17 +75,19 @@ const FS360_SETTLE_END = 4.2;
 export const HEAD_TUNING = {
   DOWNHILL: 0.6, // resting downhill riding gaze (toward the nose / front foot)
   LEAD: 0, // look over the BACK shoulder at pop to LEAD the spin (signed; - = right/back shoulder)
-  LEAD_END: 0.35, // spin fraction by which the lead fades into the spot
-  HOLD_FRAC: 0.5, // spin fraction she holds the gaze forward before whipping
-  WHIP_END: 0.9, // spin fraction the head has re-fixated forward by
+  LEAD_END: 0.35, // how much of the air the lead persists before handing off
+  FOLLOW: 0, // 0 = SPOT the landing (neck counter-rotates + whips — a mid-spin "pause"); 1 = head rides around WITH the body as one smooth rotation
+  HOLD_FRAC: 0.5, // (spot mode) spin fraction she holds the gaze forward before whipping
+  WHIP_END: 0.9, // (spot mode) spin fraction the head has re-fixated forward by
   SPOT: 0.32, // apex chin-down / spot magnitude
   ROLL: 0.26, // head roll over the shoulder at the apex
-  NECK_CAP: 1.3, // anatomical neck-yaw limit (~75°) — forces the hold→whip
+  NECK_CAP: 1.3, // anatomical neck-yaw limit (~75°)
 };
 export const HEAD_TUNING_BS: typeof HEAD_TUNING = {
   DOWNHILL: 0.6,
   LEAD: -0.9, // look over her RIGHT/back shoulder at the pop (regular-stance backside)
   LEAD_END: 0.45,
+  FOLLOW: 1, // backside: head rotates smoothly WITH the body — no spotting pause
   HOLD_FRAC: 0.5,
   WHIP_END: 0.9,
   SPOT: 0.32,
@@ -158,13 +161,20 @@ function spin360PoseAt(t: number, dir: 1 | -1): RiderPose {
   // leadArc fades, the normal hold→whip spot model takes over. Lerp (not add) so
   // the lead DOMINATES at the pop instead of just nudging the downhill hold.
   const leadLook = clamp(H.DOWNHILL + H.LEAD, -H.NECK_CAP, H.NECK_CAP);
+  // Two head styles, blended by H.FOLLOW:
+  //  SPOT (0): neck COUNTER-rotates to hold the gaze, then whips → reads as a
+  //   mid-spin PAUSE. FOLLOW (1): the head rides around WITH the body (a steady
+  //   lead, no counter-rotation) so head + shoulders are ONE smooth rotation
+  //   that carries through the whole spin and slows to a stop at the settle.
   const spotLead = lerp(holdLead, reFixLead, whip);
-  let headLead = lerp(spotLead, leadLook, leadArc);
-  // Chin drops and head rolls over the shoulder AS she whips her eyes around to
-  // re-spot the snow, then relaxes — peaks mid-whip, zero at both ends.
-  const spotArc = Math.sin(Math.PI * whip);
-  let headSpot = lerp(DOWNHILL_CHIN, H.SPOT, spotArc);
-  let headRoll = dir * H.ROLL * spotArc;
+  const followLead = clamp(H.DOWNHILL + H.LEAD * 0.4, -H.NECK_CAP, H.NECK_CAP);
+  const baseLead = lerp(spotLead, followLead, H.FOLLOW);
+  let headLead = lerp(baseLead, leadLook, leadArc);
+  // Chin/roll: whip-peaked when spotting; a smooth rise-and-fall over the spin
+  // when following (no mid-spin chin bob).
+  const arc = lerp(Math.sin(Math.PI * whip), Math.sin(Math.PI * clamp01(spin)), H.FOLLOW);
+  let headSpot = lerp(DOWNHILL_CHIN, H.SPOT, arc);
+  let headRoll = dir * H.ROLL * arc;
   if (settle > 0) {
     // End on the exact downhill riding gaze she started from.
     const s = easeInOut(settle);
@@ -234,6 +244,54 @@ function frontside360StylishPoseAt(t: number): RiderPose {
   }
 
   // boardTilt is unused now (the board derives its angle from the feet).
+  return { ...base, backLegLift, frontLegLift, boardTilt: 0 };
+}
+
+/** Live-tunable leg tweak for the STYLISH backside 360 (the Trick Lab binds a
+ *  Style panel to it). Amounts are leg-lift magnitudes; P1_END/P2_END are the
+ *  spin fractions where the nose-up → tail-up → nose-down phases hand off. */
+export const STYLE_BS = {
+  FRONT_EARLY: 0.85, // nose UP off the lip (front foot lifts first)
+  BACK_MID: 0.9, // tail UP through the middle (back foot lifts)
+  FRONT_LATE: 0.6, // nose UP again into the landing (front foot lifts)
+  P1_END: 0.33, // spin fraction the nose-up (front) phase ends
+  P2_END: 0.66, // spin fraction the tail-up (back) phase ends
+  LAND_FRONT: 0.5, // nose-up at touchdown so the TAIL lands first, then the nose slaps
+};
+
+/**
+ * A STYLISH backside 360 — a boned-out board play through the spin, driven by
+ * the LEGS (the board is locked to the feet in KaoriStage, so lifting a foot
+ * tilts that end): front up → nose up off the lip; ~1/3 in the back foot lifts
+ * (tail up) as the front extends (nose points down); then it switches back so
+ * the nose is up and the TAIL lands first, then the nose slaps down. Arms + head
+ * inherit from the base backside 360 (dir < 0). Tune it in the lab (STYLE_BS).
+ */
+function backside360StylishPoseAt(t: number): RiderPose {
+  const base = backside360PoseAt(t);
+  const air = phase(t, FS360_POP_END, FS360_AIR_END);
+  const land = phase(t, FS360_AIR_END, FS360_LAND_END);
+  const airborne = air > 0 && land === 0;
+  const s = base.spin;
+
+  const p1 = clamp01(s / STYLE_BS.P1_END); // front UP (nose up)
+  const p2 = clamp01((s - STYLE_BS.P1_END) / Math.max(0.05, STYLE_BS.P2_END - STYLE_BS.P1_END)); // back UP, front extends
+  const p3 = clamp01((s - STYLE_BS.P2_END) / Math.max(0.05, 1 - STYLE_BS.P2_END)); // switch back
+
+  // Front foot: UP early (nose up) → extends DOWN mid (nose down) → UP again late.
+  let frontLegLift = airborne
+    ? STYLE_BS.FRONT_EARLY * easeInOut(p1) * (1 - easeInOut(p2)) +
+      STYLE_BS.FRONT_LATE * easeInOut(p3)
+    : 0;
+  // Back foot: 0 early → UP mid (tail up) → DOWN late (drops to land).
+  let backLegLift = airborne ? STYLE_BS.BACK_MID * easeInOut(p2) * (1 - easeInOut(p3)) : 0;
+
+  if (land > 0) {
+    // Tail-first landing: the nose stays up at contact, then drops (nose slaps).
+    frontLegLift = STYLE_BS.LAND_FRONT * (1 - easeInOut(clamp01(land * 2)));
+    backLegLift = 0;
+  }
+
   return { ...base, backLegLift, frontLegLift, boardTilt: 0 };
 }
 
@@ -354,6 +412,11 @@ export const TRICKS: Record<TrickId, TrickTimeline> = {
     // NEGATIVE = clockwise from above (the mirror of frontside's +2π).
     totalSpin: -Math.PI * 2,
     poseAt: backside360PoseAt,
+  },
+  'backside-360-stylish': {
+    duration: FS360_SETTLE_END,
+    totalSpin: -Math.PI * 2,
+    poseAt: backside360StylishPoseAt,
   },
   wildcat: {
     duration: FS360_SETTLE_END,

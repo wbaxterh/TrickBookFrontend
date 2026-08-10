@@ -24,6 +24,7 @@ import {
 import {
   HEAD_TUNING,
   HEAD_TUNING_BS,
+  STYLE_BS,
   TRICKS,
 } from '../../src/components/companion/trickAnimations';
 
@@ -66,6 +67,55 @@ loader.load(
   (err) => console.error('VRM load failed:', err),
 );
 
+// ---- snowboard, locked to her feet (like KaoriStage) so the leg tweaks read ----
+const board = new THREE.Group();
+board.add(
+  new THREE.Mesh(
+    new THREE.BoxGeometry(1.15, 0.025, 0.26),
+    new THREE.MeshStandardMaterial({ color: 0xf48fb8, roughness: 0.6 }),
+  ),
+);
+for (const bx of [0.24, -0.24]) {
+  const bind = new THREE.Mesh(
+    new THREE.BoxGeometry(0.14, 0.05, 0.14),
+    new THREE.MeshStandardMaterial({ color: 0x141414 }),
+  );
+  bind.position.set(bx, 0.035, 0);
+  board.add(bind);
+}
+board.visible = false;
+scene.add(board);
+
+const _lp = new THREE.Vector3();
+const _rp = new THREE.Vector3();
+const _along = new THREE.Vector3();
+const _bodyUp = new THREE.Vector3();
+const _up2 = new THREE.Vector3();
+const _z = new THREE.Vector3();
+const _basis = new THREE.Matrix4();
+// Board long axis (+X) = the foot-to-foot line (tilts when a foot lifts → the
+// nose/tail tweak); up derives from the body so it rolls through spins/flips.
+function lockBoardToFeet() {
+  if (!vrm) return;
+  const lf = vrm.humanoid.getRawBoneNode('leftFoot');
+  const rf = vrm.humanoid.getRawBoneNode('rightFoot');
+  if (!lf || !rf) return;
+  lf.getWorldPosition(_lp);
+  rf.getWorldPosition(_rp);
+  _along.subVectors(_lp, _rp); // right(tail) → left(nose) = board +X (regular stance)
+  if (_along.lengthSq() < 1e-6) return;
+  _along.normalize();
+  _bodyUp.set(0, 1, 0).applyQuaternion(vrm.scene.quaternion);
+  _z.crossVectors(_along, _bodyUp);
+  if (_z.lengthSq() < 1e-5) return; // near-degenerate — keep last orientation
+  _z.normalize();
+  _up2.crossVectors(_z, _along).normalize();
+  _basis.makeBasis(_along, _up2, _z);
+  board.quaternion.setFromRotationMatrix(_basis);
+  board.position.addVectors(_lp, _rp).multiplyScalar(0.5).addScaledVector(_up2, -0.07);
+  board.visible = true;
+}
+
 // ---- controls / state ----
 // speed ≈ 1/duration plays a trick near real-time; the scrubber t is normalized.
 const state = { trick: Object.keys(TRICKS)[0], t: 0, playing: true, speed: 0.25 };
@@ -77,6 +127,7 @@ const state = { trick: Object.keys(TRICKS)[0], t: 0, playing: true, speed: 0.25 
 (window as unknown as { __ARM_BS: typeof ARM_TUNING_BS }).__ARM_BS = ARM_TUNING_BS;
 (window as unknown as { __HEAD: typeof HEAD_TUNING }).__HEAD = HEAD_TUNING;
 (window as unknown as { __HEAD_BS: typeof HEAD_TUNING_BS }).__HEAD_BS = HEAD_TUNING_BS;
+(window as unknown as { __STYLE_BS: typeof STYLE_BS }).__STYLE_BS = STYLE_BS;
 
 const gui = new GUI({ title: 'Kaori Trick Lab' });
 gui.add(state, 'trick', Object.keys(TRICKS)).name('trick');
@@ -118,6 +169,7 @@ const HEAD_KEYS: [string, number, number][] = [
   ['DOWNHILL', -1.5, 1.5],
   ['LEAD', -1.5, 1.5],
   ['LEAD_END', 0.05, 1],
+  ['FOLLOW', 0, 1], // 0 = spot the landing (whip); 1 = head rides around WITH the body (one motion)
   ['HOLD_FRAC', 0.05, 0.95],
   ['WHIP_END', 0.1, 1],
   ['SPOT', -1, 1.5],
@@ -130,7 +182,21 @@ for (const [k, mn, mx] of HEAD_KEYS)
 const headBS = gui.addFolder('Head — BACKSIDE (HEAD_TUNING_BS)');
 for (const [k, mn, mx] of HEAD_KEYS)
   headBS.add(HEAD_TUNING_BS as unknown as Record<string, number>, k, mn, mx, 0.01).listen();
-headBS.open();
+
+// Stylish backside-360 leg tweak (select the 'backside-360-stylish' trick).
+// FRONT/BACK amounts = leg-lift magnitudes; P1/P2_END = spin fractions the
+// nose-up → tail-up → nose-down phases hand off.
+const STYLE_KEYS: [string, number, number][] = [
+  ['FRONT_EARLY', 0, 1.5],
+  ['BACK_MID', 0, 1.5],
+  ['FRONT_LATE', 0, 1.5],
+  ['P1_END', 0.05, 0.9],
+  ['P2_END', 0.1, 0.95],
+  ['LAND_FRONT', 0, 1.5],
+];
+const styleBS = gui.addFolder('Style — BACKSIDE tweak (STYLE_BS)');
+for (const [k, mn, mx] of STYLE_KEYS)
+  styleBS.add(STYLE_BS as unknown as Record<string, number>, k, mn, mx, 0.01).listen();
 
 gui
   .add(
@@ -140,7 +206,8 @@ gui
           `ARM_TUNING = ${JSON.stringify(ARM_TUNING, null, 2)}\n\n` +
           `ARM_TUNING_BS = ${JSON.stringify(ARM_TUNING_BS, null, 2)}\n\n` +
           `HEAD_TUNING = ${JSON.stringify(HEAD_TUNING, null, 2)}\n\n` +
-          `HEAD_TUNING_BS = ${JSON.stringify(HEAD_TUNING_BS, null, 2)}`;
+          `HEAD_TUNING_BS = ${JSON.stringify(HEAD_TUNING_BS, null, 2)}\n\n` +
+          `STYLE_BS = ${JSON.stringify(STYLE_BS, null, 2)}`;
         navigator.clipboard?.writeText(out).catch(() => {});
         console.log(out);
         alert('Arm + head tuning (front & back) copied to clipboard + logged.');
@@ -205,6 +272,7 @@ function frame() {
     vrm.scene.position.set(-comOffset.x, COM_Y + (pose.height || 0) - comOffset.y, -comOffset.z);
 
     vrm.update(dt);
+    lockBoardToFeet();
   }
   renderer.render(scene, camera);
 }
