@@ -267,6 +267,37 @@ export default function CompanionStageScreen() {
     toggleVoiceInput();
   }, [listening, bargeIn, toggleVoiceInput]);
 
+  // Greet on open: once the Kith voice session is live (and again each time the
+  // stage is re-focused), Kaori SPEAKS a homie greeting — the backend fires Kith
+  // /speak when it sees the x-kith-session header — and we show it as a bubble.
+  // Ephemeral: not persisted to bot_chats. greetedRef resets on blur (below).
+  const greetedRef = useRef(false);
+  useEffect(() => {
+    if (!isFocused || !voiceReady || !botId || greetedRef.current) return;
+    greetedRef.current = true;
+    (async () => {
+      try {
+        const sessionId = getSessionId();
+        beginReply();
+        const res = await apiClient.post<{ greeting?: string }>(
+          `/companion/profile/${botId}/greeting`,
+          {},
+          sessionId ? { headers: { 'x-kith-session': sessionId } } : undefined,
+        );
+        const greeting = res?.greeting;
+        if (greeting) {
+          setMessages((prev) => [
+            ...prev.slice(-6),
+            { id: `k-greet-${Date.now()}`, role: 'kaori', text: greeting },
+          ]);
+          syncMode('speaking');
+        }
+      } catch {
+        // greeting is best-effort — never block the stage
+      }
+    })();
+  }, [isFocused, voiceReady, botId, getSessionId, beginReply, syncMode]);
+
   // Silence Kaori (and stop the mic) the moment the stage loses focus —
   // navigating away or hitting back. expo-router keeps this screen mounted so
   // the useKithVoice unmount cleanup won't fire; without this her voice keeps
@@ -276,6 +307,7 @@ export default function CompanionStageScreen() {
     if (wasFocused.current && !isFocused) {
       stop();
       if (listening) toggleVoiceInput();
+      greetedRef.current = false; // re-greet next time the stage is opened
     }
     wasFocused.current = isFocused;
   }, [isFocused, stop, listening, toggleVoiceInput]);
