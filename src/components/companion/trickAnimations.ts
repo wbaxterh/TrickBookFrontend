@@ -474,7 +474,8 @@ export interface TrickDemoState {
 
 export const createTrickDemoState = (): TrickDemoState => ({
   session: false,
-  trick: 'frontside-360',
+  trick: 'frontside-360-stylish', // both 360s demo the stylish variant
+
   action: 'none',
   actionT: 0,
   gapT: 0,
@@ -580,10 +581,10 @@ export function driveDemo(vrm: VRM, state: TrickDemoState, dt: number): boolean 
       state.action = 'full';
       state.actionT = 0;
       state.gapT = 0;
-      // Frontside always demos the stylish variant (clean variant retired per
+      // Both 360s always demo the STYLISH variant (clean variants retired per
       // request) — upgrade clean → stylish and stay there; never swap back.
-      // Backside just re-runs (no stylish variant yet).
       if (state.trick === 'frontside-360') state.trick = 'frontside-360-stylish';
+      if (state.trick === 'backside-360') state.trick = 'backside-360-stylish';
     }
   }
 
