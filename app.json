@@ -33,7 +33,7 @@
       }
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./app/assets/icon.png"
     },
     "extra": {
       "eas": {
