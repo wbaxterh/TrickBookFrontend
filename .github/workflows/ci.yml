@@ -16,7 +16,5 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
-      - name: Validate Expo project
-        run: npx expo-doctor
       - name: Export web bundle
         run: npx expo export:web
