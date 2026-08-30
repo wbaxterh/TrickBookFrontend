@@ -18,3 +18,6 @@ jobs:
       - run: npm ci
       - name: Export web bundle
         run: npx expo export:web
+        env:
+          # Expo 47's Webpack uses a legacy OpenSSL hashing algorithm on Node 20.
+          NODE_OPTIONS: --openssl-legacy-provider
