@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [master]
+  push:
+    branches: [master]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Export web bundle
+        run: npx expo export:web
+        env:
+          # Expo 47's Webpack uses a legacy OpenSSL hashing algorithm on Node 20.
+          NODE_OPTIONS: --openssl-legacy-provider
