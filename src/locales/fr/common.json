@@ -1,0 +1,40 @@
+{
+  "common": {
+    "cancel": "Annuler",
+    "ok": "OK",
+    "save": "Enregistrer",
+    "done": "Terminé",
+    "back": "Retour",
+    "close": "Fermer",
+    "retry": "Réessayer",
+    "loading": "Chargement…"
+  },
+  "tabs": {
+    "home": "Accueil",
+    "trickbook": "TrickBook",
+    "spots": "Spots",
+    "homies": "Homies",
+    "media": "Médias"
+  },
+  "settings": {
+    "title": "Réglages",
+    "account": "Compte",
+    "notifications": "Notifications",
+    "privacy": "Confidentialité",
+    "theme": "Thème (sombre/clair)",
+    "language": "Langue",
+    "helpSupport": "Aide et assistance",
+    "logOut": "Se déconnecter",
+    "logOutConfirmTitle": "Se déconnecter",
+    "logOutConfirmMessage": "Voulez-vous vraiment vous déconnecter ?",
+    "version": "TrickBook v{{version}}"
+  },
+  "language": {
+    "title": "Langue",
+    "current": "Langue actuelle",
+    "systemDefault": "Par défaut du système",
+    "systemDefaultDescription": "Suivre la langue de l'appareil",
+    "info": "Choisissez la langue de l'interface TrickBook. « Par défaut du système » suit les réglages de votre appareil.",
+    "active": "Actif"
+  }
+}

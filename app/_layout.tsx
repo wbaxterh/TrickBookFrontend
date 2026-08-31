@@ -19,6 +19,9 @@ import {
 } from '@/lib/notifications';
 import { ThemeProvider } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { useLanguageStore } from '@/lib/stores/languageStore';
+// Initialize i18n before first render (detects device locale, falls back to en)
+import '@/lib/i18n';
 import '../global.css';
 
 // React Query client
@@ -148,6 +151,11 @@ function AuthGate({ children }: { children: React.ReactNode }) {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
+
+  // Re-apply the user's persisted language choice over the device-locale default
+  useEffect(() => {
+    useLanguageStore.getState().loadStoredPreference();
+  }, []);
 
   return (
     <SafeAreaProvider>

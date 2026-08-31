@@ -1,0 +1,40 @@
+{
+  "common": {
+    "cancel": "取消",
+    "ok": "确定",
+    "save": "保存",
+    "done": "完成",
+    "back": "返回",
+    "close": "关闭",
+    "retry": "重试",
+    "loading": "加载中…"
+  },
+  "tabs": {
+    "home": "首页",
+    "trickbook": "TrickBook",
+    "spots": "地点",
+    "homies": "Homies",
+    "media": "媒体"
+  },
+  "settings": {
+    "title": "设置",
+    "account": "账号",
+    "notifications": "通知",
+    "privacy": "隐私",
+    "theme": "主题（深色/浅色）",
+    "language": "语言",
+    "helpSupport": "帮助与支持",
+    "logOut": "退出登录",
+    "logOutConfirmTitle": "退出登录",
+    "logOutConfirmMessage": "确定要退出登录吗？",
+    "version": "TrickBook v{{version}}"
+  },
+  "language": {
+    "title": "语言",
+    "current": "当前语言",
+    "systemDefault": "跟随系统",
+    "systemDefaultDescription": "使用设备语言",
+    "info": "选择 TrickBook 界面语言。“跟随系统”将使用你的设备设置。",
+    "active": "使用中"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "common": {
+    "cancel": "रद्द करें",
+    "ok": "ठीक है",
+    "save": "सहेजें",
+    "done": "हो गया",
+    "back": "वापस",
+    "close": "बंद करें",
+    "retry": "फिर से आज़माएँ",
+    "loading": "लोड हो रहा है…"
+  },
+  "tabs": {
+    "home": "होम",
+    "trickbook": "TrickBook",
+    "spots": "स्पॉट्स",
+    "homies": "Homies",
+    "media": "मीडिया"
+  },
+  "settings": {
+    "title": "सेटिंग्स",
+    "account": "खाता",
+    "notifications": "सूचनाएँ",
+    "privacy": "गोपनीयता",
+    "theme": "थीम (डार्क/लाइट)",
+    "language": "भाषा",
+    "helpSupport": "सहायता और समर्थन",
+    "logOut": "लॉग आउट",
+    "logOutConfirmTitle": "लॉग आउट",
+    "logOutConfirmMessage": "क्या आप वाकई लॉग आउट करना चाहते हैं?",
+    "version": "TrickBook v{{version}}"
+  },
+  "language": {
+    "title": "भाषा",
+    "current": "वर्तमान भाषा",
+    "systemDefault": "सिस्टम डिफ़ॉल्ट",
+    "systemDefaultDescription": "डिवाइस की भाषा का उपयोग करें",
+    "info": "TrickBook इंटरफ़ेस की भाषा चुनें। \"सिस्टम डिफ़ॉल्ट\" आपके डिवाइस की सेटिंग्स का पालन करता है।",
+    "active": "सक्रिय"
+  }
+}
