@@ -7,6 +7,7 @@ import GuestTrickNavigator from "./GuestTrickNavigator";
 import GuestAccountNavigator from "./GuestAccountNavigator";
 import {MaterialCommunityIcons} from '@expo/vector-icons';
 import NewListButton from "./NewListButton";
+import TrickipediaNavigator from './TrickipediaNavigator';
 
 const Tab = createBottomTabNavigator();
 
@@ -21,6 +22,8 @@ const AppNavigator = () =>{
         )}/>
         <Tab.Screen name="TrickList" component={GuestTrickNavigator} options={{headerShown: false,
         tabBarIcon: ({color, size}) => <MaterialCommunityIcons name="format-list-bulleted" color={color} size={size}/>}}/>
+        <Tab.Screen name="Learn" component={TrickipediaNavigator} options={{headerShown: false,
+        tabBarIcon: ({color, size}) => <MaterialCommunityIcons name="book-open-page-variant" color={color} size={size}/>}}/>
         
     </Tab.Navigator>
     );
