@@ -21,6 +21,8 @@ export default {
       'expo-router',
       'expo-video',
       'expo-apple-authentication',
+      // Device locale detection for i18n (per-app language support on native)
+      'expo-localization',
       [
         'expo-location',
         {

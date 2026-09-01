@@ -6,6 +6,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '@/constants/colors';
@@ -27,6 +28,7 @@ function TabBarIcon({ focused, color, size, name, focusedName }: TabBarIconProps
 
 export default function TabsLayout() {
   const { isDark, theme } = useThemeContext();
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const bottomPadding = Platform.OS === 'ios' ? 28 : Math.max(insets.bottom, 8);
 
@@ -54,7 +56,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: t('tabs.home'),
           tabBarIcon: ({ focused, color, size }) => (
             <TabBarIcon
               focused={focused}
@@ -69,7 +71,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="trickbook"
         options={{
-          title: 'TrickBook',
+          title: t('tabs.trickbook'),
           tabBarIcon: ({ focused, color, size }) => (
             <TabBarIcon
               focused={focused}
@@ -84,7 +86,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="spots"
         options={{
-          title: 'Spots',
+          title: t('tabs.spots'),
           tabBarIcon: ({ focused, color, size }) => (
             <TabBarIcon
               focused={focused}
@@ -99,7 +101,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="homies"
         options={{
-          title: 'Homies',
+          title: t('tabs.homies'),
           tabBarIcon: ({ focused, color, size }) => (
             <TabBarIcon
               focused={focused}
@@ -114,7 +116,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="media"
         options={{
-          title: 'Media',
+          title: t('tabs.media'),
           tabBarIcon: ({ focused, color, size }) => (
             <TabBarIcon
               focused={focused}

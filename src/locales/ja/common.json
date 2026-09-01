@@ -1,0 +1,40 @@
+{
+  "common": {
+    "cancel": "キャンセル",
+    "ok": "OK",
+    "save": "保存",
+    "done": "完了",
+    "back": "戻る",
+    "close": "閉じる",
+    "retry": "再試行",
+    "loading": "読み込み中…"
+  },
+  "tabs": {
+    "home": "ホーム",
+    "trickbook": "TrickBook",
+    "spots": "スポット",
+    "homies": "Homies",
+    "media": "メディア"
+  },
+  "settings": {
+    "title": "設定",
+    "account": "アカウント",
+    "notifications": "通知",
+    "privacy": "プライバシー",
+    "theme": "テーマ（ダーク/ライト）",
+    "language": "言語",
+    "helpSupport": "ヘルプとサポート",
+    "logOut": "ログアウト",
+    "logOutConfirmTitle": "ログアウト",
+    "logOutConfirmMessage": "本当にログアウトしますか？",
+    "version": "TrickBook v{{version}}"
+  },
+  "language": {
+    "title": "言語",
+    "current": "現在の言語",
+    "systemDefault": "システムのデフォルト",
+    "systemDefaultDescription": "端末の言語に従う",
+    "info": "TrickBookの表示言語を選択します。「システムのデフォルト」は端末の設定に従います。",
+    "active": "使用中"
+  }
+}
