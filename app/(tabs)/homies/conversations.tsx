@@ -1,11 +1,12 @@
 /**
- * Conversations Screen
- * List of all direct message conversations
+ * Conversations (DM inbox)
+ * Primary messages + a Requests tab for message requests from non-homies.
+ * Renders 1:1 and group threads; updates live over the messaging socket.
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -17,62 +18,64 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { type Conversation, getConversations } from '@/lib/api/messages';
+import { useMessageSocket } from '@/hooks/useMessageSocket';
+import {
+  type Conversation,
+  getConversations,
+  getConversationTitle,
+  getMessageRequests,
+  getUnreadFor,
+} from '@/lib/api/messages';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
 
 const YELLOW = '#FCF150';
 const DARK = '#1a1a1a';
 
-// Sport emojis mapping
-const _SPORT_EMOJIS: Record<string, string> = {
-  skateboarding: '🛹',
-  snowboarding: '🏂',
-  skiing: '⛷️',
-  bmx: '🚲',
-  mtb: '🚵',
-  scooter: '🛴',
-  rollerblading: '🛼',
-  surfing: '🏄',
-  wakeboarding: '🏄',
-};
+type Tab = 'primary' | 'requests';
 
 export default function ConversationsScreen() {
-  const { theme, colors } = useThemeContext();
+  const { theme } = useThemeContext();
   const { user } = useAuthStore();
 
-  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [tab, setTab] = useState<Tab>('primary');
+  const [primary, setPrimary] = useState<Conversation[]>([]);
+  const [requests, setRequests] = useState<Conversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchConversations = useCallback(async () => {
-    try {
-      const data = await getConversations();
-      setConversations(data);
-    } catch (_error) {
-    } finally {
-      setLoading(false);
-    }
+  const fetchAll = useCallback(async () => {
+    const [active, reqs] = await Promise.all([getConversations('active'), getMessageRequests()]);
+    setPrimary(active);
+    setRequests(reqs);
+    setLoading(false);
   }, []);
 
-  useEffect(() => {
-    fetchConversations();
-  }, [fetchConversations]);
+  useFocusEffect(
+    useCallback(() => {
+      fetchAll();
+    }, [fetchAll]),
+  );
+
+  // Live: any new message / read receipt reshuffles the inbox — refetch.
+  useMessageSocket({
+    onNewMessage: () => fetchAll(),
+    onMessagesRead: () => fetchAll(),
+    onConversationUpdated: () => fetchAll(),
+  });
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchConversations();
+    await fetchAll();
     setRefreshing(false);
-  }, [fetchConversations]);
+  }, [fetchAll]);
 
   const formatTime = (dateString: string) => {
     const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
+    const diffMs = Date.now() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
     const diffHours = Math.floor(diffMs / 3600000);
     const diffDays = Math.floor(diffMs / 86400000);
-
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins}m`;
     if (diffHours < 24) return `${diffHours}h`;
@@ -80,23 +83,74 @@ export default function ConversationsScreen() {
     return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
   };
 
-  const getOtherUser = (conversation: Conversation) => {
-    // Use precomputed otherUser if available
-    if (conversation.otherUser) {
-      return conversation.otherUser;
-    }
-    // Find in participantDetails
-    if (conversation.participantDetails) {
-      return conversation.participantDetails.find((p) => p._id !== user?._id);
-    }
-    return null;
-  };
+  const data = tab === 'primary' ? primary : requests;
 
-  const getUnreadCount = (conversation: Conversation) => {
-    if (conversation.unreadCount && user?._id) {
-      return conversation.unreadCount[user._id] || 0;
-    }
-    return 0;
+  const renderItem = ({ item }: { item: Conversation }) => {
+    const title = getConversationTitle(item);
+    const unread = getUnreadFor(item, user?._id);
+    const avatarUri = item.isGroup ? null : item.otherUser?.imageUri;
+
+    return (
+      <Pressable
+        style={[styles.card, { backgroundColor: theme.surface }]}
+        onPress={() => router.push(`/(tabs)/homies/chat/${item._id}`)}
+      >
+        <View style={styles.avatarContainer}>
+          {avatarUri ? (
+            <Image source={{ uri: avatarUri }} style={styles.avatar} />
+          ) : (
+            <View
+              style={[
+                styles.avatarPlaceholder,
+                { backgroundColor: theme.surfaceElevated || theme.border },
+              ]}
+            >
+              <Ionicons
+                name={item.isGroup ? 'people' : 'person'}
+                size={24}
+                color={theme.textSecondary}
+              />
+            </View>
+          )}
+          {unread > 0 && (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadBadgeText}>{unread > 9 ? '9+' : unread}</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.info}>
+          <View style={styles.rowHeader}>
+            <Text
+              style={[styles.name, { color: theme.text }, unread > 0 && styles.bold]}
+              numberOfLines={1}
+            >
+              {title}
+            </Text>
+            {item.lastMessage && (
+              <Text style={[styles.time, { color: theme.textSecondary }]}>
+                {formatTime(item.lastMessage.createdAt)}
+              </Text>
+            )}
+          </View>
+          {item.lastMessage ? (
+            <Text
+              style={[styles.last, { color: theme.textSecondary }, unread > 0 && styles.bold]}
+              numberOfLines={1}
+            >
+              {item.lastMessage.senderId === user?._id ? 'You: ' : ''}
+              {item.lastMessage.content}
+            </Text>
+          ) : (
+            <Text style={[styles.last, { color: theme.textSecondary }]} numberOfLines={1}>
+              {tab === 'requests' ? 'wants to message you' : 'Say hey 👋'}
+            </Text>
+          )}
+        </View>
+
+        <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+      </Pressable>
+    );
   };
 
   return (
@@ -104,23 +158,43 @@ export default function ConversationsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Pressable
-          style={[styles.backButton, { backgroundColor: theme.surface }]}
+          style={[styles.iconButton, { backgroundColor: theme.surface }]}
           onPress={() => router.back()}
         >
           <Ionicons name="arrow-back" size={22} color={theme.text} />
         </Pressable>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Messages</Text>
-        <View style={styles.placeholder} />
+        <Pressable
+          style={[styles.iconButton, { backgroundColor: theme.surface }]}
+          onPress={() => router.push('/(tabs)/homies/new-chat')}
+        >
+          <Ionicons name="create-outline" size={22} color={theme.text} />
+        </Pressable>
       </View>
 
-      {/* Content */}
+      {/* Primary / Requests toggle */}
+      <View style={[styles.tabs, { backgroundColor: theme.surface }]}>
+        {(['primary', 'requests'] as Tab[]).map((t) => (
+          <Pressable
+            key={t}
+            style={[styles.tab, tab === t && { backgroundColor: YELLOW }]}
+            onPress={() => setTab(t)}
+          >
+            <Text style={[styles.tabText, { color: tab === t ? DARK : theme.textSecondary }]}>
+              {t === 'primary' ? 'Messages' : 'Requests'}
+              {t === 'requests' && requests.length > 0 ? ` (${requests.length})` : ''}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
       {loading ? (
-        <View style={styles.loadingContainer}>
+        <View style={styles.center}>
           <ActivityIndicator size="large" color={YELLOW} />
         </View>
       ) : (
         <FlatList
-          data={conversations}
+          data={data}
           keyExtractor={(item) => item._id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
@@ -130,85 +204,22 @@ export default function ConversationsScreen() {
           ItemSeparatorComponent={() => <View style={styles.separator} />}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Ionicons name="chatbubbles-outline" size={64} color={theme.textSecondary} />
-              <Text style={[styles.emptyTitle, { color: theme.text }]}>No messages yet</Text>
+              <Ionicons
+                name={tab === 'requests' ? 'mail-outline' : 'chatbubbles-outline'}
+                size={64}
+                color={theme.textSecondary}
+              />
+              <Text style={[styles.emptyTitle, { color: theme.text }]}>
+                {tab === 'requests' ? 'No requests' : 'No messages yet'}
+              </Text>
               <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                Start a conversation with a homie
+                {tab === 'requests'
+                  ? 'Messages from riders who aren’t your homies show up here'
+                  : 'Tap the compose button to start a chat'}
               </Text>
             </View>
           }
-          renderItem={({ item }) => {
-            const otherUser = getOtherUser(item);
-            const unreadCount = getUnreadCount(item);
-            const sportEmoji = '🛹'; // Default for now
-
-            return (
-              <Pressable
-                style={[styles.conversationCard, { backgroundColor: theme.surface }]}
-                onPress={() => router.push(`/(tabs)/homies/chat/${item._id}`)}
-              >
-                {/* Avatar */}
-                <View style={styles.avatarContainer}>
-                  {otherUser?.imageUri ? (
-                    <Image source={{ uri: otherUser.imageUri }} style={styles.avatar} />
-                  ) : (
-                    <View
-                      style={[
-                        styles.avatarPlaceholder,
-                        { backgroundColor: theme.surfaceElevated || theme.border },
-                      ]}
-                    >
-                      <Text style={styles.avatarEmoji}>{sportEmoji}</Text>
-                    </View>
-                  )}
-                  {unreadCount > 0 && (
-                    <View style={styles.unreadBadge}>
-                      <Text style={styles.unreadBadgeText}>
-                        {unreadCount > 9 ? '9+' : unreadCount}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-
-                {/* Content */}
-                <View style={styles.conversationInfo}>
-                  <View style={styles.conversationHeader}>
-                    <Text
-                      style={[
-                        styles.conversationName,
-                        { color: theme.text },
-                        unreadCount > 0 && styles.unreadText,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {otherUser?.name || 'Unknown User'}
-                    </Text>
-                    {item.lastMessage && (
-                      <Text style={[styles.timeText, { color: theme.textSecondary }]}>
-                        {formatTime(item.lastMessage.createdAt)}
-                      </Text>
-                    )}
-                  </View>
-                  {item.lastMessage && (
-                    <Text
-                      style={[
-                        styles.lastMessage,
-                        { color: theme.textSecondary },
-                        unreadCount > 0 && styles.unreadText,
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {item.lastMessage.senderId === user?._id ? 'You: ' : ''}
-                      {item.lastMessage.content}
-                    </Text>
-                  )}
-                </View>
-
-                {/* Chevron */}
-                <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-              </Pressable>
-            );
-          }}
+          renderItem={renderItem}
         />
       )}
     </SafeAreaView>
@@ -216,84 +227,52 @@ export default function ConversationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
+  container: { flex: 1 },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingTop: 16,
-    paddingBottom: 16,
+    paddingBottom: 12,
   },
-  backButton: {
+  iconButton: {
     width: 44,
     height: 44,
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  placeholder: {
-    width: 44,
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  listContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-  },
-  separator: {
-    height: 8,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 80,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginTop: 20,
-  },
-  emptySubtitle: {
-    fontSize: 15,
-    marginTop: 8,
-    textAlign: 'center',
-  },
-
-  // Conversation Card
-  conversationCard: {
+  headerTitle: { fontSize: 20, fontWeight: '700' },
+  tabs: {
     flexDirection: 'row',
+    marginHorizontal: 20,
+    borderRadius: 12,
+    padding: 4,
+    gap: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 9,
     alignItems: 'center',
-    padding: 14,
-    borderRadius: 14,
   },
-  avatarContainer: {
-    position: 'relative',
-    marginRight: 12,
-  },
-  avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-  },
+  tabText: { fontSize: 14, fontWeight: '600' },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  listContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 24 },
+  separator: { height: 8 },
+  emptyContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 80 },
+  emptyTitle: { fontSize: 20, fontWeight: '600', marginTop: 20 },
+  emptySubtitle: { fontSize: 15, marginTop: 8, textAlign: 'center', paddingHorizontal: 24 },
+  card: { flexDirection: 'row', alignItems: 'center', padding: 14, borderRadius: 14 },
+  avatarContainer: { position: 'relative', marginRight: 12 },
+  avatar: { width: 56, height: 56, borderRadius: 28 },
   avatarPlaceholder: {
     width: 56,
     height: 56,
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  avatarEmoji: {
-    fontSize: 26,
   },
   unreadBadge: {
     position: 'absolute',
@@ -307,34 +286,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 6,
   },
-  unreadBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: DARK,
-  },
-  conversationInfo: {
-    flex: 1,
-    marginRight: 8,
-  },
-  conversationHeader: {
+  unreadBadgeText: { fontSize: 11, fontWeight: '700', color: DARK },
+  info: { flex: 1, marginRight: 8 },
+  rowHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: 4,
   },
-  conversationName: {
-    fontSize: 16,
-    fontWeight: '600',
-    flex: 1,
-    marginRight: 8,
-  },
-  timeText: {
-    fontSize: 12,
-  },
-  lastMessage: {
-    fontSize: 14,
-  },
-  unreadText: {
-    fontWeight: '700',
-  },
+  name: { fontSize: 16, fontWeight: '600', flex: 1, marginRight: 8 },
+  time: { fontSize: 12 },
+  last: { fontSize: 14 },
+  bold: { fontWeight: '700' },
 });

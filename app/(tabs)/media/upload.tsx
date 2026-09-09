@@ -119,9 +119,17 @@ export default function UploadScreen() {
       }
     } catch (err) {
       console.error('Media picker error:', err);
+      const raw = err instanceof Error ? err.message : 'Unknown error';
+      // A clip offloaded to iCloud that still couldn't be materialized — the
+      // native picker patch forces the download when it can, so this is the
+      // last-resort case (e.g. no connectivity). Give a clear instruction
+      // instead of the raw "PHPhotosErrorDomain error 3164".
+      const isICloudAsset = /PHPhotosErrorDomain|3164|iCloud|network/i.test(raw);
       Alert.alert(
-        'Error',
-        `Failed to select media: ${err instanceof Error ? err.message : 'Unknown error'}`,
+        isICloudAsset ? "Couldn't load that clip" : 'Error',
+        isICloudAsset
+          ? 'This clip is stored in iCloud and couldn’t be downloaded. Connect to Wi-Fi (or open it in Photos to download it), then try again.'
+          : `Failed to select media: ${raw}`,
       );
     }
   };

@@ -1,0 +1,19 @@
+diff --git a/node_modules/expo-image-picker/ios/MediaHandler.swift b/node_modules/expo-image-picker/ios/MediaHandler.swift
+index 6e4fbe1..3819721 100644
+--- a/node_modules/expo-image-picker/ios/MediaHandler.swift
++++ b/node_modules/expo-image-picker/ios/MediaHandler.swift
+@@ -389,7 +389,13 @@ internal struct MediaHandler {
+ 
+           // Stream the resource into our cache directory. This API is asynchronous but doesn't require
+           // a temporary file like `loadFileRepresentation`.
+-          try await PHAssetResourceManager.default().writeData(for: resource, toFile: destinationUrl, options: nil)
++          // Allow network access so videos offloaded to iCloud (optimized
++          // storage) are downloaded on demand instead of failing with
++          // "PHPhotosErrorDomain error 3164". The image path already sets this;
++          // the video fast-path did not. See expo/expo#39937.
++          let resourceRequestOptions = PHAssetResourceRequestOptions()
++          resourceRequestOptions.isNetworkAccessAllowed = true
++          try await PHAssetResourceManager.default().writeData(for: resource, toFile: destinationUrl, options: resourceRequestOptions)
+ 
+           // Build and return the result using the helper.
+           let mimeType = getMimeType(from: destinationUrl.pathExtension)

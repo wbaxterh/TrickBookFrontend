@@ -5,12 +5,13 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Image,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -21,18 +22,25 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RichContentCard } from '@/components/chat/RichContentCards';
+import { useMessageSocket } from '@/hooks/useMessageSocket';
+import { getMyHomies, type Homie } from '@/lib/api/homies';
 import {
+  acceptMessageRequest,
+  addGroupMembers,
   type Conversation,
+  declineMessageRequest,
   getConversation,
   getMessages,
   type Message,
   markAsRead,
   type Participant,
+  renameGroup,
   type SharedContent,
   sendMessage as sendMessageApi,
 } from '@/lib/api/messages';
 import { setCurrentConversationId } from '@/lib/notifications';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { emitTyping } from '@/lib/realtime/socket';
 import { useAuthStore } from '@/lib/stores/authStore';
 
 const YELLOW = '#FCF150';
@@ -183,11 +191,20 @@ export default function ChatScreen() {
   const [sending, setSending] = useState(false);
   const [hasMore, setHasMore] = useState(false);
   const [page, setPage] = useState(1);
+  const [typingUserIds, setTypingUserIds] = useState<Set<string>>(new Set());
+  const [processingRequest, setProcessingRequest] = useState(false);
+  // Group management sheet (three-dots): menu → rename | add people
+  const [sheetMode, setSheetMode] = useState<null | 'menu' | 'rename' | 'add'>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const [addHomies, setAddHomies] = useState<Homie[]>([]);
+  const [addSelected, setAddSelected] = useState<Set<string>>(new Set());
+  const [sheetBusy, setSheetBusy] = useState(false);
 
   // Get user ID (handles both id and _id)
   const userId = user?.id || user?._id;
 
   const flatListRef = useRef<FlatList>(null);
+  const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Fetch conversation and messages
   const fetchData = useCallback(
@@ -271,6 +288,134 @@ export default function ChatScreen() {
 
   const otherUser = getOtherUser();
 
+  // Group + message-request derived state
+  const isGroup = !!conversation?.isGroup;
+  const participantMap = useMemo(() => {
+    const map: Record<string, Participant> = {};
+    (conversation?.participantDetails || []).forEach((p) => {
+      map[p._id] = p;
+    });
+    return map;
+  }, [conversation?.participantDetails]);
+  const isPendingRequestForMe =
+    !!conversation?.isRequest && !!conversation?.requestedBy && conversation.requestedBy !== userId;
+  const isMyOutgoingRequest = !!conversation?.isRequest && conversation?.requestedBy === userId;
+
+  const headerTitle = isGroup
+    ? conversation?.groupName || 'Group'
+    : otherUser?.name || 'Unknown User';
+  const typingNames = [...typingUserIds]
+    .map((id) => participantMap[id]?.name || (isGroup ? 'Someone' : otherUser?.name))
+    .filter(Boolean) as string[];
+  const headerSubtitle =
+    typingNames.length > 0
+      ? isGroup
+        ? `${typingNames.join(', ')} typing…`
+        : 'typing…'
+      : isGroup
+        ? `${conversation?.participants.length || 0} members`
+        : undefined;
+
+  // Live updates for this open thread (append messages, read receipts, typing).
+  useMessageSocket({
+    conversationId,
+    onNewMessage: ({ message }) => {
+      if (message.conversationId !== conversationId) return;
+      setMessages((prev) => (prev.some((m) => m._id === message._id) ? prev : [message, ...prev]));
+      if (message.senderId !== userId && conversationId) markAsRead(conversationId);
+    },
+    onMessagesRead: ({ conversationId: cid }) => {
+      if (cid !== conversationId) return;
+      setMessages((prev) =>
+        prev.map((m) => (m.senderId === userId ? { ...m, status: 'read' as const } : m)),
+      );
+    },
+    onTyping: ({ conversationId: cid, userId: uid, typing }) => {
+      if (cid !== conversationId || uid === userId) return;
+      setTypingUserIds((prev) => {
+        const next = new Set(prev);
+        if (typing) next.add(uid);
+        else next.delete(uid);
+        return next;
+      });
+    },
+    onConversationUpdated: ({ conversationId: cid }) => {
+      if (cid !== conversationId) return;
+      getConversation(conversationId).then((c) => c && setConversation(c));
+    },
+  });
+
+  const handleAcceptRequest = async () => {
+    if (!conversationId) return;
+    setProcessingRequest(true);
+    const ok = await acceptMessageRequest(conversationId);
+    setProcessingRequest(false);
+    if (ok) setConversation((prev) => (prev ? { ...prev, isRequest: false } : prev));
+  };
+
+  const handleDeclineRequest = async () => {
+    if (!conversationId) return;
+    setProcessingRequest(true);
+    const ok = await declineMessageRequest(conversationId);
+    if (ok) router.back();
+    else setProcessingRequest(false);
+  };
+
+  // --- Group management (three-dots) ---
+  const openRename = () => {
+    setRenameValue(conversation?.groupName || '');
+    setSheetMode('rename');
+  };
+
+  const openAddPeople = async () => {
+    setAddSelected(new Set());
+    setSheetMode('add');
+    const homies = await getMyHomies();
+    const current = new Set(conversation?.participants || []);
+    setAddHomies(homies.filter((h) => !current.has(h._id)));
+  };
+
+  const submitRename = async () => {
+    const name = renameValue.trim();
+    if (!name || !conversationId) return;
+    setSheetBusy(true);
+    const ok = await renameGroup(conversationId, name);
+    setSheetBusy(false);
+    if (ok) {
+      setConversation((prev) => (prev ? { ...prev, groupName: name } : prev));
+      setSheetMode(null);
+    }
+  };
+
+  const toggleAdd = (id: string) => {
+    setAddSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const submitAddPeople = async () => {
+    if (addSelected.size === 0 || !conversationId) return;
+    setSheetBusy(true);
+    const updated = await addGroupMembers(conversationId, [...addSelected]);
+    setSheetBusy(false);
+    if (updated) {
+      setConversation(updated);
+      setSheetMode(null);
+    }
+  };
+
+  // Emit typing while the user composes; auto-stop after a short pause.
+  const handleInputChange = (text: string) => {
+    setInputText(text);
+    if (!conversationId) return;
+    emitTyping(conversationId, true);
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    typingTimer.current = setTimeout(() => emitTyping(conversationId, false), 2000);
+  };
+
   // Send message
   const handleSendMessage = async () => {
     if (!inputText.trim() || !conversationId || sending) return;
@@ -278,12 +423,16 @@ export default function ChatScreen() {
     const messageContent = inputText.trim();
     setInputText('');
     setSending(true);
+    if (typingTimer.current) clearTimeout(typingTimer.current);
+    emitTyping(conversationId, false);
 
     try {
       const newMessage = await sendMessageApi(conversationId, messageContent);
       if (newMessage) {
-        // Add to beginning since list is inverted
-        setMessages((prev) => [newMessage, ...prev]);
+        // Add to beginning since list is inverted (dedupe vs the socket echo)
+        setMessages((prev) =>
+          prev.some((m) => m._id === newMessage._id) ? prev : [newMessage, ...prev],
+        );
 
         // Scroll to bottom
         setTimeout(() => {
@@ -347,9 +496,14 @@ export default function ChatScreen() {
 
         <Pressable
           style={styles.userInfo}
-          onPress={() => otherUser && router.push(`/(tabs)/homies/${otherUser._id}`)}
+          disabled={isGroup}
+          onPress={() => !isGroup && otherUser && router.push(`/(tabs)/homies/${otherUser._id}`)}
         >
-          {otherUser?.imageUri ? (
+          {isGroup ? (
+            <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
+              <Ionicons name="people" size={20} color={DARK} />
+            </View>
+          ) : otherUser?.imageUri ? (
             <Image source={{ uri: otherUser.imageUri }} style={styles.avatar} />
           ) : (
             <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
@@ -358,13 +512,26 @@ export default function ChatScreen() {
           )}
           <View style={styles.userText}>
             <Text style={[styles.userName, { color: theme.text }]} numberOfLines={1}>
-              {otherUser?.name || 'Unknown User'}
+              {headerTitle}
             </Text>
+            {headerSubtitle && (
+              <Text style={[styles.userSubtitle, { color: theme.textSecondary }]} numberOfLines={1}>
+                {headerSubtitle}
+              </Text>
+            )}
           </View>
         </Pressable>
 
-        <Pressable style={styles.menuButton}>
-          <Ionicons name="ellipsis-vertical" size={20} color={theme.text} />
+        <Pressable
+          style={styles.menuButton}
+          onPress={() => isGroup && setSheetMode('menu')}
+          disabled={!isGroup}
+        >
+          <Ionicons
+            name="ellipsis-vertical"
+            size={20}
+            color={isGroup ? theme.text : 'transparent'}
+          />
         </Pressable>
       </View>
 
@@ -403,6 +570,11 @@ export default function ChatScreen() {
             return (
               <>
                 <View style={[styles.messageRow, isMe && styles.messageRowMe]}>
+                  {isGroup && !isMe && (
+                    <Text style={[styles.senderName, { color: theme.textSecondary }]}>
+                      {participantMap[item.senderId]?.name || 'Rider'}
+                    </Text>
+                  )}
                   {isSharedContent ? (
                     // Render shared content bubble
                     <SharedContentBubble
@@ -475,6 +647,44 @@ export default function ChatScreen() {
           }}
         />
 
+        {/* Message request banner (received) */}
+        {isPendingRequestForMe && (
+          <View
+            style={[
+              styles.requestBanner,
+              { backgroundColor: theme.surface, borderTopColor: theme.border },
+            ]}
+          >
+            <Text style={[styles.requestText, { color: theme.textSecondary }]} numberOfLines={2}>
+              {headerTitle} wants to message you. Accept to reply.
+            </Text>
+            <View style={styles.requestActions}>
+              <Pressable
+                style={[styles.requestBtn, styles.declineBtn, { borderColor: theme.border }]}
+                onPress={handleDeclineRequest}
+                disabled={processingRequest}
+              >
+                <Text style={[styles.requestBtnText, { color: theme.text }]}>Decline</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.requestBtn, { backgroundColor: colors.primary }]}
+                onPress={handleAcceptRequest}
+                disabled={processingRequest}
+              >
+                <Text style={[styles.requestBtnText, { color: DARK }]}>Accept</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+        {isMyOutgoingRequest && (
+          <View style={[styles.pendingNote, { borderTopColor: theme.border }]}>
+            <Ionicons name="time-outline" size={14} color={theme.textSecondary} />
+            <Text style={[styles.pendingText, { color: theme.textSecondary }]} numberOfLines={1}>
+              Request sent — they’ll see this once they accept
+            </Text>
+          </View>
+        )}
+
         {/* Input */}
         <View style={[styles.inputContainer, { borderTopColor: theme.border }]}>
           <View style={[styles.inputWrapper, { backgroundColor: theme.surface }]}>
@@ -483,7 +693,7 @@ export default function ChatScreen() {
               placeholder="Message..."
               placeholderTextColor={theme.textTertiary}
               value={inputText}
-              onChangeText={setInputText}
+              onChangeText={handleInputChange}
               multiline
               maxLength={1000}
             />
@@ -509,6 +719,143 @@ export default function ChatScreen() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      {/* Group management sheet (three-dots) */}
+      <Modal
+        visible={sheetMode !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSheetMode(null)}
+      >
+        <Pressable style={styles.sheetBackdrop} onPress={() => setSheetMode(null)}>
+          <Pressable
+            style={[styles.sheet, { backgroundColor: theme.surface }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={[styles.sheetHandle, { backgroundColor: theme.border }]} />
+
+            {sheetMode === 'menu' && (
+              <>
+                <Text style={[styles.sheetTitle, { color: theme.text }]}>{headerTitle}</Text>
+                <Pressable style={styles.sheetRow} onPress={openAddPeople}>
+                  <Ionicons name="person-add-outline" size={22} color={theme.text} />
+                  <Text style={[styles.sheetRowText, { color: theme.text }]}>Add people</Text>
+                </Pressable>
+                <Pressable style={styles.sheetRow} onPress={openRename}>
+                  <Ionicons name="create-outline" size={22} color={theme.text} />
+                  <Text style={[styles.sheetRowText, { color: theme.text }]}>Rename group</Text>
+                </Pressable>
+              </>
+            )}
+
+            {sheetMode === 'rename' && (
+              <>
+                <Text style={[styles.sheetTitle, { color: theme.text }]}>Rename group</Text>
+                <TextInput
+                  style={[
+                    styles.sheetInput,
+                    {
+                      color: theme.text,
+                      backgroundColor: theme.background,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  value={renameValue}
+                  onChangeText={setRenameValue}
+                  placeholder="Group name"
+                  placeholderTextColor={theme.textSecondary}
+                  maxLength={40}
+                  autoFocus
+                />
+                <Pressable
+                  style={[
+                    styles.sheetPrimary,
+                    { backgroundColor: colors.primary },
+                    (!renameValue.trim() || sheetBusy) && { opacity: 0.5 },
+                  ]}
+                  onPress={submitRename}
+                  disabled={!renameValue.trim() || sheetBusy}
+                >
+                  {sheetBusy ? (
+                    <ActivityIndicator color={DARK} />
+                  ) : (
+                    <Text style={styles.sheetPrimaryText}>Save</Text>
+                  )}
+                </Pressable>
+              </>
+            )}
+
+            {sheetMode === 'add' && (
+              <>
+                <Text style={[styles.sheetTitle, { color: theme.text }]}>Add people</Text>
+                <FlatList
+                  data={addHomies}
+                  keyExtractor={(item) => item._id}
+                  style={styles.sheetList}
+                  keyboardShouldPersistTaps="handled"
+                  ListEmptyComponent={
+                    <Text style={[styles.sheetEmpty, { color: theme.textSecondary }]}>
+                      All your homies are already here
+                    </Text>
+                  }
+                  renderItem={({ item }) => {
+                    const sel = addSelected.has(item._id);
+                    return (
+                      <Pressable style={styles.sheetPersonRow} onPress={() => toggleAdd(item._id)}>
+                        {item.imageUri ? (
+                          <Image source={{ uri: item.imageUri }} style={styles.sheetAvatar} />
+                        ) : (
+                          <View
+                            style={[
+                              styles.sheetAvatar,
+                              styles.sheetAvatarPh,
+                              { backgroundColor: theme.background },
+                            ]}
+                          >
+                            <Ionicons name="person" size={18} color={theme.textSecondary} />
+                          </View>
+                        )}
+                        <Text
+                          style={[styles.sheetPersonName, { color: theme.text }]}
+                          numberOfLines={1}
+                        >
+                          {item.name}
+                        </Text>
+                        <View
+                          style={[
+                            styles.sheetCheck,
+                            { borderColor: sel ? colors.primary : theme.border },
+                            sel && { backgroundColor: colors.primary },
+                          ]}
+                        >
+                          {sel && <Ionicons name="checkmark" size={14} color={DARK} />}
+                        </View>
+                      </Pressable>
+                    );
+                  }}
+                />
+                <Pressable
+                  style={[
+                    styles.sheetPrimary,
+                    { backgroundColor: colors.primary },
+                    (addSelected.size === 0 || sheetBusy) && { opacity: 0.5 },
+                  ]}
+                  onPress={submitAddPeople}
+                  disabled={addSelected.size === 0 || sheetBusy}
+                >
+                  {sheetBusy ? (
+                    <ActivityIndicator color={DARK} />
+                  ) : (
+                    <Text style={styles.sheetPrimaryText}>
+                      Add{addSelected.size > 0 ? ` (${addSelected.size})` : ''}
+                    </Text>
+                  )}
+                </Pressable>
+              </>
+            )}
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -563,6 +910,143 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  userSubtitle: {
+    fontSize: 12,
+    marginTop: 1,
+  },
+  senderName: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 3,
+    marginLeft: 4,
+  },
+  requestBanner: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    gap: 10,
+  },
+  requestText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  requestActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  requestBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  declineBtn: {
+    borderWidth: 1,
+  },
+  requestBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  pendingNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+  },
+  pendingText: {
+    fontSize: 13,
+  },
+  sheetBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  sheet: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 34,
+    paddingTop: 10,
+    maxHeight: '70%',
+  },
+  sheetHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginBottom: 14,
+  },
+  sheetTitle: {
+    fontSize: 17,
+    fontWeight: '700',
+    marginBottom: 12,
+  },
+  sheetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingVertical: 14,
+  },
+  sheetRowText: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  sheetInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 16,
+    marginBottom: 14,
+  },
+  sheetPrimary: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  sheetPrimaryText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1a1a1a',
+  },
+  sheetList: {
+    marginBottom: 14,
+  },
+  sheetEmpty: {
+    textAlign: 'center',
+    paddingVertical: 24,
+    fontSize: 14,
+  },
+  sheetPersonRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 8,
+  },
+  sheetAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  sheetAvatarPh: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetPersonName: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  sheetCheck: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   menuButton: {
     width: 40,

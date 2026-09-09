@@ -63,12 +63,20 @@ export interface Conversation {
     senderId: string;
     createdAt: string;
   };
-  unreadCount?: {
-    [userId: string]: number;
-  };
+  // List endpoint returns the current user's count as a number; the doc itself
+  // stores a per-user map. Both shapes flow through here.
+  unreadCount?: number | { [userId: string]: number };
   createdAt: string;
   updatedAt: string;
-  // Computed for display
+  // Group chat
+  isGroup?: boolean;
+  groupName?: string;
+  createdBy?: string;
+  admins?: string[];
+  // Message request (a DM from a non-homie, pending the recipient's accept)
+  isRequest?: boolean;
+  requestedBy?: string;
+  // Computed for display (1:1 only)
   otherUser?: Participant;
 }
 
@@ -83,15 +91,40 @@ export interface MessagesResponse {
 }
 
 /**
- * Get all conversations for current user
+ * Get conversations for the current user.
+ * `active` (default) = normal inbox; `requests` = message requests from non-homies.
  */
-export async function getConversations(): Promise<Conversation[]> {
+export async function getConversations(
+  filter: 'active' | 'requests' = 'active',
+): Promise<Conversation[]> {
   try {
-    const response = await apiClient.get<Conversation[]>(ENDPOINTS.messages.conversations);
-    return response;
+    const url =
+      filter === 'requests'
+        ? `${ENDPOINTS.messages.conversations}?filter=requests`
+        : ENDPOINTS.messages.conversations;
+    return await apiClient.get<Conversation[]>(url);
   } catch (_error) {
     return [];
   }
+}
+
+/** Message requests: DMs from non-homies awaiting your accept/decline. */
+export async function getMessageRequests(): Promise<Conversation[]> {
+  return getConversations('requests');
+}
+
+/** Unread count for a user, tolerant of both the list (number) and doc (map) shapes. */
+export function getUnreadFor(conversation: Conversation, userId?: string): number {
+  const u = conversation.unreadCount;
+  if (typeof u === 'number') return u;
+  if (u && userId) return u[userId] || 0;
+  return 0;
+}
+
+/** Display title for a conversation (group name, or the other user's name). */
+export function getConversationTitle(conversation: Conversation): string {
+  if (conversation.isGroup) return conversation.groupName || 'Group';
+  return conversation.otherUser?.name || 'Unknown';
 }
 
 /**
@@ -108,17 +141,82 @@ export async function getConversation(conversationId: string): Promise<Conversat
   }
 }
 
+export type CreateConversationParams =
+  | { targetUserId: string }
+  | { participantIds: string[]; groupName?: string };
+
 /**
- * Start a new conversation with a homie
+ * Create (or fetch) a conversation. A single `targetUserId` makes a 1:1 (which
+ * comes back as a request if you aren't homies); `participantIds` + `groupName`
+ * makes a group.
  */
-export async function startConversation(targetUserId: string): Promise<Conversation | null> {
+export async function createConversation(
+  params: CreateConversationParams,
+): Promise<Conversation | null> {
   try {
-    const response = await apiClient.post<Conversation>(ENDPOINTS.messages.startConversation, {
-      targetUserId,
-    });
-    return response;
+    return await apiClient.post<Conversation>(ENDPOINTS.messages.startConversation, params);
   } catch (_error) {
     return null;
+  }
+}
+
+/** Start (or fetch) a 1:1 conversation. Non-homies come back as a request. */
+export async function startConversation(targetUserId: string): Promise<Conversation | null> {
+  return createConversation({ targetUserId });
+}
+
+/** Create a group chat with the given homie ids. */
+export async function createGroupConversation(
+  participantIds: string[],
+  groupName: string,
+): Promise<Conversation | null> {
+  return createConversation({ participantIds, groupName });
+}
+
+/** Accept a message request → promotes it to an active DM. */
+export async function acceptMessageRequest(conversationId: string): Promise<boolean> {
+  try {
+    await apiClient.post(`${ENDPOINTS.messages.conversation(conversationId)}/accept-request`, {});
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+/** Decline a message request → removes the thread. */
+export async function declineMessageRequest(conversationId: string): Promise<boolean> {
+  try {
+    await apiClient.post(`${ENDPOINTS.messages.conversation(conversationId)}/decline-request`, {});
+    return true;
+  } catch (_error) {
+    return false;
+  }
+}
+
+/** Add homies to a group. They immediately see full message history. */
+export async function addGroupMembers(
+  conversationId: string,
+  userIds: string[],
+): Promise<Conversation | null> {
+  try {
+    return await apiClient.post<Conversation>(
+      `${ENDPOINTS.messages.conversation(conversationId)}/members`,
+      { userIds },
+    );
+  } catch (_error) {
+    return null;
+  }
+}
+
+/** Rename a group chat. */
+export async function renameGroup(conversationId: string, groupName: string): Promise<boolean> {
+  try {
+    await apiClient.post(`${ENDPOINTS.messages.conversation(conversationId)}/rename`, {
+      groupName,
+    });
+    return true;
+  } catch (_error) {
+    return false;
   }
 }
 
