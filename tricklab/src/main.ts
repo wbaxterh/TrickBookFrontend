@@ -128,8 +128,13 @@ const state = { trick: Object.keys(TRICKS)[0], t: 0, playing: true, speed: 0.25 
 (window as unknown as { __HEAD: typeof HEAD_TUNING }).__HEAD = HEAD_TUNING;
 (window as unknown as { __HEAD_BS: typeof HEAD_TUNING_BS }).__HEAD_BS = HEAD_TUNING_BS;
 (window as unknown as { __STYLE_BS: typeof STYLE_BS }).__STYLE_BS = STYLE_BS;
+// Automation hooks (Playwright screenshot runs): camera + gui control.
+(window as unknown as { __cam: typeof camera }).__cam = camera;
+(window as unknown as { __controls: typeof controls }).__controls = controls;
+(window as unknown as { __vrmReady: () => boolean }).__vrmReady = () => vrm !== null;
 
 const gui = new GUI({ title: 'Kaori Trick Lab' });
+(window as unknown as { __gui: typeof gui }).__gui = gui;
 gui.add(state, 'trick', Object.keys(TRICKS)).name('trick');
 gui.add(state, 't', 0, 1, 0.001).name('t (scrub)').listen();
 gui.add(state, 'playing').name('▶ play');
@@ -242,7 +247,10 @@ refVideo.addEventListener('drop', (e) => {
 const COM_Y = 0.85; // hip/CoM height the flip pivots about (matches KaoriStage)
 const clock = new THREE.Clock();
 const yAxis = new THREE.Vector3(0, 1, 0);
-const xAxis = new THREE.Vector3(1, 0, 0);
+// Flip axis = local toe-heel line (+Z), horizontal and PERPENDICULAR to the
+// board — end over end (nose sweeps up and over). MUST match KaoriStage's
+// _flipPitchAxis or the lab verifies a different trick than the app performs.
+const flipAxis = new THREE.Vector3(0, 0, 1);
 
 function frame() {
   requestAnimationFrame(frame);
@@ -262,11 +270,14 @@ function frame() {
 
     // Whole-body yaw (spin) * pitch (flip), pivoted at the CoM so a flip
     // somersaults about the hips rather than the feet.
-    const yaw = STANCE_YAW + (trick.totalSpin || 0) * pose.spin;
+    const yaw =
+      STANCE_YAW +
+      ((trick as { yawOffset?: number }).yawOffset || 0) +
+      (trick.totalSpin || 0) * pose.spin;
     const pitch = ((trick as { totalFlip?: number }).totalFlip || 0) * pose.pitch;
     const q = new THREE.Quaternion()
       .setFromAxisAngle(yAxis, yaw)
-      .multiply(new THREE.Quaternion().setFromAxisAngle(xAxis, pitch));
+      .multiply(new THREE.Quaternion().setFromAxisAngle(flipAxis, pitch));
     vrm.scene.quaternion.copy(q);
     const comOffset = new THREE.Vector3(0, COM_Y, 0).applyQuaternion(q);
     vrm.scene.position.set(-comOffset.x, COM_Y + (pose.height || 0) - comOffset.y, -comOffset.z);

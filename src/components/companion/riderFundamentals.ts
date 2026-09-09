@@ -87,6 +87,23 @@ export interface RiderPose {
   frontLegLift: number;
   /** Board angle around its long axis (radians; + = tail up / nose down). */
   boardTilt: number;
+  /** GRAB channels (all 0 = no grab; existing tricks unaffected).
+   *  grabFront/grabRear: 0→1 reach of the FRONT (lead/left) or REAR (right)
+   *  hand down to the board. grabReach: where along the board the hand aims,
+   *  -1 = nose (+X) … 0 = between the feet … +1 = tail. grabSide: +1 = toe
+   *  edge (her facing side), -1 = heel edge (reach behind). */
+  grabFront: number;
+  grabRear: number;
+  grabReach: number;
+  grabSide: number;
+  /** Leg POKE (bone): 0→1 straightens that knee and pushes that end of the
+   *  board away — the opposite of a lift. Nosebone = front poke. */
+  pokeFront: number;
+  pokeBack: number;
+  /** Back arch (method/japan tweak): 0→1 bends the spine back, chest opens. */
+  arch: number;
+  /** Carve lean: -1 heel-side … +1 toe-side whole-torso lean (radians ≈ ×0.5). */
+  edgeLean: number;
   /** Spin direction: +1 frontside (CCW / +Y), -1 backside (CW / -Y). Flips the
    *  body wind, head look and arm wrap so a backside READS as backside. The
    *  actual rotation is carried by the trick's signed totalSpin, and `coil`
@@ -109,6 +126,14 @@ export const REST_POSE: RiderPose = {
   backLegLift: 0,
   frontLegLift: 0,
   boardTilt: 0,
+  grabFront: 0,
+  grabRear: 0,
+  grabReach: 0,
+  grabSide: 0,
+  pokeFront: 0,
+  pokeBack: 0,
+  arch: 0,
+  edgeLean: 0,
   dir: 1,
 };
 
@@ -141,26 +166,33 @@ function applyLegs(
   stanceWeight: number,
   backLegLift = 0,
   frontLegLift = 0,
+  pokeBack = 0,
+  pokeFront = 0,
 ) {
   const spread = STANCE_SPREAD * stanceWeight;
   for (const side of ['left', 'right'] as const) {
     // Regular stance: left leg leads (front), right leg is back.
     const lift = side === 'left' ? frontLegLift : backLegLift;
+    // A POKE (bone) is the opposite of a lift: the knee straightens and the
+    // leg extends, pushing that end of the board away from the body.
+    const poke = side === 'left' ? pokeFront : pokeBack;
     const upper = humanoid.getNormalizedBoneNode(`${side}UpperLeg`);
     const lower = humanoid.getNormalizedBoneNode(`${side}LowerLeg`);
     const foot = humanoid.getNormalizedBoneNode(`${side}Foot`);
     if (upper) {
       // Thigh pitches forward (knee travels toward the toe side); a leg lift
-      // raises the thigh a little so the knee comes up.
-      upper.rotation.x = -crouch * THIGH_FLEX - lift * 0.5;
-      // Splay OUTWARD: her left leg sits on +X (she faces the camera)
-      upper.rotation.z = side === 'left' ? spread : -spread;
+      // raises the thigh a little so the knee comes up; a poke extends it.
+      upper.rotation.x = -crouch * THIGH_FLEX * (1 - poke * 0.7) - lift * 0.5 + poke * 0.12;
+      // Splay OUTWARD: her left leg sits on +X (she faces the camera). A poke
+      // pushes the leg farther along the board line.
+      const sideSign = side === 'left' ? 1 : -1;
+      upper.rotation.z = sideSign * (spread + poke * 0.3);
     }
     // Shin folds back under the thigh — the human knee hinge; a lift folds it
-    // more so that foot lifts off the board.
-    if (lower) lower.rotation.x = crouch * SHIN_FLEX + lift * 1.3;
+    // more so that foot lifts off the board; a poke straightens it out.
+    if (lower) lower.rotation.x = crouch * SHIN_FLEX * (1 - poke) + lift * 1.3;
     // Keep the sole flat on the board (relaxed when the foot is lifted)
-    if (foot) foot.rotation.x = -crouch * (SHIN_FLEX - THIGH_FLEX) + lift * 0.4;
+    if (foot) foot.rotation.x = -crouch * (SHIN_FLEX - THIGH_FLEX) * (1 - poke) + lift * 0.4;
   }
 }
 
@@ -178,22 +210,26 @@ function applyTorsoAndHead(humanoid: Humanoid, pose: RiderPose, w: number) {
   // The coil-driven WIND flips with the spin direction (pose.dir) so a backside
   // winds the opposite way; headLead/headRoll already carry dir from the pose.
   const wind = pose.coil * pose.dir;
+  // Carve lean tips the whole torso over an edge; back arch (method/japan)
+  // opens the chest and bends the spine backward.
+  const lean = pose.edgeLean * w;
+  const arch = pose.arch * w;
   if (hips) {
     hips.rotation.y = wind * 0.35 * w;
-    hips.rotation.z = 0;
+    hips.rotation.z = lean * 0.18;
   }
   if (spine) {
     spine.rotation.y = wind * 0.5 * w;
-    spine.rotation.x = (pose.crouch * 0.3 + pose.tuck * 0.25) * w;
-    spine.rotation.z = 0;
+    spine.rotation.x = (pose.crouch * 0.3 + pose.tuck * 0.25) * w - arch * 0.55;
+    spine.rotation.z = lean * 0.22;
   }
   if (chest) {
     chest.rotation.y = wind * 0.45 * w;
-    chest.rotation.x = pose.crouch * 0.18 * w;
+    chest.rotation.x = pose.crouch * 0.18 * w - arch * 0.35;
   }
   if (neck) {
     neck.rotation.y = (wind * 0.4 + pose.headLead) * w;
-    neck.rotation.x = (pose.headSpot - pose.tuck * 0.15) * w;
+    neck.rotation.x = (pose.headSpot - pose.tuck * 0.15) * w - arch * 0.2;
     // Tilt the head over the leading shoulder while spinning/spotting.
     neck.rotation.z = pose.headRoll * w;
   }
@@ -239,6 +275,49 @@ export const ARM_TUNING_BS: typeof ARM_TUNING = {
   ELBOW_AIR: 1.05,
   CATCH: 0.82,
 };
+
+/**
+ * Grab reach targets — live-tunable in the Trick Lab like ARM_TUNING.
+ * A grab overrides that arm's procedural swing (lerped by the grab amount):
+ * toe-side grabs reach down the FRONT of the body, heel-side wrap BEHIND.
+ */
+export const GRAB_TUNING = {
+  // upper.rotation.x convention on this rig: NEGATIVE = forward. A toe-edge
+  // grab reaches down the FRONT of the body; a heel-edge grab wraps BEHIND.
+  TOE_FWD: -1.15, // upper.x reach fwd/down for a toe-edge grab
+  TOE_DOWN: 0.72, // upper.z abduction (higher = arm hangs lower toward the board)
+  HEEL_BACK: 0.78, // upper.x reach back/down for a heel-edge grab
+  HEEL_DOWN: 1.0,
+  REACH_SWING: 0.55, // upper.y swing toward the nose/tail (× grabReach)
+  ELBOW: 0.25, // elbow bend while grabbing
+  FREE_UP: 0.35, // the NON-grabbing arm styles up/out for balance
+};
+
+type BoneNode = ReturnType<Humanoid['getNormalizedBoneNode']>;
+
+/** GRAB override for one arm: lerp it from wherever the procedural system put
+ *  it toward the reach target by the grab amount; the free arm styles up/out. */
+function applyGrabReach(
+  upper: BoneNode,
+  lower: BoneNode,
+  sign: number,
+  pose: RiderPose,
+  grabAmt: number,
+  otherGrab: number,
+) {
+  if (grabAmt > 0 && upper && lower) {
+    const G = GRAB_TUNING;
+    const toe = pose.grabSide >= 0;
+    upper.rotation.x = lerp(upper.rotation.x, toe ? G.TOE_FWD : G.HEEL_BACK, grabAmt);
+    upper.rotation.z = lerp(upper.rotation.z, sign * (toe ? G.TOE_DOWN : G.HEEL_DOWN), grabAmt);
+    upper.rotation.y = lerp(upper.rotation.y, sign * pose.grabReach * G.REACH_SWING, grabAmt);
+    lower.rotation.x = lerp(lower.rotation.x, -0.15, grabAmt);
+    lower.rotation.z = lerp(lower.rotation.z, sign * G.ELBOW, grabAmt);
+  } else if (otherGrab > 0 && upper) {
+    upper.rotation.z = lerp(upper.rotation.z, sign * (1.15 - GRAB_TUNING.FREE_UP), otherGrab);
+    upper.rotation.x = lerp(upper.rotation.x, -0.35, otherGrab * 0.7);
+  }
+}
 
 function applyArms(humanoid: Humanoid, pose: RiderPose, w: number) {
   // Rest (from T-pose): uz hangs the arms DOWN at the sides; ux ~0 = neutral
@@ -347,6 +426,16 @@ function applyArms(humanoid: Humanoid, pose: RiderPose, w: number) {
       lower.rotation.x = -(windup * 0.5 + whip * 0.7 + pose.tuck * 0.6 + spinSwing * 0.45) * w;
     }
     if (hand) hand.rotation.x = lerp(0.1, 0.1 + pose.tuck * 0.2 + spinSwing * 0.15, w);
+
+    // GRAB override — front hand = left arm (regular stance), rear = right.
+    applyGrabReach(
+      upper,
+      lower,
+      sign,
+      pose,
+      (side === 'left' ? pose.grabFront : pose.grabRear) * w,
+      (side === 'left' ? pose.grabRear : pose.grabFront) * w,
+    );
   }
 }
 
@@ -358,6 +447,8 @@ export function applyRiderPose(humanoid: Humanoid, pose: RiderPose, stanceWeight
     stanceWeight,
     pose.backLegLift * stanceWeight,
     pose.frontLegLift * stanceWeight,
+    pose.pokeBack * stanceWeight,
+    pose.pokeFront * stanceWeight,
   );
   applyTorsoAndHead(humanoid, pose, stanceWeight);
   applyArms(humanoid, pose, stanceWeight);

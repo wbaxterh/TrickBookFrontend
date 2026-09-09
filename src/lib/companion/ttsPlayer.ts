@@ -34,7 +34,7 @@ type QueueNode = ReturnType<AudioContext['createBufferQueueSource']>;
 // Must tolerate the gap between one sentence draining and Kith generating the
 // next sentence's audio — 500ms was too tight and ended multi-sentence replies
 // early (e.g. trick demos stopping after "wind up").
-const DRAIN_IDLE_GRACE_MS = 1200;
+const DRAIN_IDLE_GRACE_MS = 2000;
 
 function base64ToArrayBuffer(b64: string): ArrayBuffer {
   const binary = global.atob(b64);

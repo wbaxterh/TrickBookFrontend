@@ -18,12 +18,13 @@ interface Bot {
 
 interface CompanionWidgetProps {
   bot: Bot | null;
+  /** Primary action — opens the interactive 3D companion stage (voice) */
   onPress: () => void;
-  /** Optional: opens the companion's interactive 3D stage */
-  onView3D?: () => void;
+  /** Optional secondary action — opens the text chat */
+  onChat?: () => void;
 }
 
-export function CompanionWidget({ bot, onPress, onView3D }: CompanionWidgetProps) {
+export function CompanionWidget({ bot, onPress, onChat }: CompanionWidgetProps) {
   const { theme } = useThemeContext();
 
   if (!bot) return null;
@@ -65,18 +66,20 @@ export function CompanionWidget({ bot, onPress, onView3D }: CompanionWidgetProps
               </Text>
             </View>
 
-            {onView3D && (
+            {onChat && (
               <Pressable
-                onPress={onView3D}
+                onPress={onChat}
+                hitSlop={8}
                 style={[styles.stageButton, { backgroundColor: theme.surfaceElevated }]}
               >
-                <Ionicons name="cube-outline" size={16} color={theme.text} />
+                <Ionicons name="chatbubble-outline" size={16} color={theme.text} />
               </Pressable>
             )}
 
+            {/* Primary CTA — tapping the card drops into the 3D voice stage */}
             <View style={[styles.chatButton, { backgroundColor: brandColors.primary }]}>
-              <Ionicons name="chatbubble" size={14} color={brandColors.primaryText} />
-              <Text style={[styles.chatButtonText, { color: brandColors.primaryText }]}>Chat</Text>
+              <Ionicons name="mic" size={14} color={brandColors.primaryText} />
+              <Text style={[styles.chatButtonText, { color: brandColors.primaryText }]}>Talk</Text>
             </View>
           </View>
         </Card>
