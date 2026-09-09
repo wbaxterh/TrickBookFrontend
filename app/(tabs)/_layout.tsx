@@ -82,6 +82,21 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="riders"
+        options={{
+          title: 'Riders',
+          tabBarIcon: ({ focused, color, size }) => (
+            <TabBarIcon
+              focused={focused}
+              color={color}
+              size={size}
+              name="people-circle-outline"
+              focusedName="people-circle"
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="spots"
         options={{
           title: 'Spots',
