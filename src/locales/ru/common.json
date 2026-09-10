@@ -1,0 +1,40 @@
+{
+  "common": {
+    "cancel": "Отмена",
+    "ok": "ОК",
+    "save": "Сохранить",
+    "done": "Готово",
+    "back": "Назад",
+    "close": "Закрыть",
+    "retry": "Повторить",
+    "loading": "Загрузка…"
+  },
+  "tabs": {
+    "home": "Главная",
+    "trickbook": "TrickBook",
+    "spots": "Споты",
+    "homies": "Homies",
+    "media": "Медиа"
+  },
+  "settings": {
+    "title": "Настройки",
+    "account": "Аккаунт",
+    "notifications": "Уведомления",
+    "privacy": "Конфиденциальность",
+    "theme": "Тема (тёмная/светлая)",
+    "language": "Язык",
+    "helpSupport": "Помощь и поддержка",
+    "logOut": "Выйти",
+    "logOutConfirmTitle": "Выйти",
+    "logOutConfirmMessage": "Вы действительно хотите выйти?",
+    "version": "TrickBook v{{version}}"
+  },
+  "language": {
+    "title": "Язык",
+    "current": "Текущий язык",
+    "systemDefault": "Системный по умолчанию",
+    "systemDefaultDescription": "Использовать язык устройства",
+    "info": "Выберите язык интерфейса TrickBook. «Системный по умолчанию» следует настройкам устройства.",
+    "active": "Активен"
+  }
+}

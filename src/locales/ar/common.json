@@ -1,0 +1,40 @@
+{
+  "common": {
+    "cancel": "إلغاء",
+    "ok": "حسنًا",
+    "save": "حفظ",
+    "done": "تم",
+    "back": "رجوع",
+    "close": "إغلاق",
+    "retry": "إعادة المحاولة",
+    "loading": "جارٍ التحميل…"
+  },
+  "tabs": {
+    "home": "الرئيسية",
+    "trickbook": "TrickBook",
+    "spots": "الأماكن",
+    "homies": "Homies",
+    "media": "الوسائط"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "account": "الحساب",
+    "notifications": "الإشعارات",
+    "privacy": "الخصوصية",
+    "theme": "المظهر (داكن/فاتح)",
+    "language": "اللغة",
+    "helpSupport": "المساعدة والدعم",
+    "logOut": "تسجيل الخروج",
+    "logOutConfirmTitle": "تسجيل الخروج",
+    "logOutConfirmMessage": "هل أنت متأكد أنك تريد تسجيل الخروج؟",
+    "version": "TrickBook v{{version}}"
+  },
+  "language": {
+    "title": "اللغة",
+    "current": "اللغة الحالية",
+    "systemDefault": "الافتراضي للنظام",
+    "systemDefaultDescription": "استخدام لغة الجهاز",
+    "info": "اختر لغة واجهة TrickBook. يتبع \"الافتراضي للنظام\" إعدادات جهازك.",
+    "active": "مفعّل"
+  }
+}

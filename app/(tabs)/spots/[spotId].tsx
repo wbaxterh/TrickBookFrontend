@@ -4,38 +4,95 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import { Image as ExpoImage } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Dimensions,
-  Image,
+  Alert,
   Linking,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ShareToHomieModal } from '@/components/share';
-import { SpotMap, SpotReviewsList } from '@/components/spots';
-import { getSpotById, type Spot } from '@/lib/api/spots';
+import { AddToSpotListModal, SpotMap, SpotReviewsList } from '@/components/spots';
+import {
+  deleteSpot,
+  deleteSpotPhoto,
+  getSpotById,
+  isSpotSaved,
+  reportSpotPhoto,
+  type Spot,
+  type SpotPhoto,
+  saveSpot,
+  unsaveSpot,
+  updateSpot,
+  uploadSpotPhoto,
+} from '@/lib/api/spots';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { useAuthStore } from '@/lib/stores/authStore';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const SPOT_CATEGORIES: { id: Spot['category']; label: string }[] = [
+  { id: 'park', label: 'Park' },
+  { id: 'street', label: 'Street' },
+  { id: 'indoor', label: 'Indoor' },
+  { id: 'diy', label: 'DIY' },
+  { id: 'resort', label: 'Resort' },
+  { id: 'other', label: 'Other' },
+];
+
 const YELLOW = '#FCF150';
 const DARK = '#1a1a1a';
 
 export default function SpotDetailScreen() {
   const { spotId } = useLocalSearchParams<{ spotId: string }>();
-  const { theme, colors, isDark } = useThemeContext();
+  const { theme, isDark } = useThemeContext();
+  const { user } = useAuthStore();
   const [isFavorite, setIsFavorite] = useState(false);
   const [spot, setSpot] = useState<Spot | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [shareModalVisible, setShareModalVisible] = useState(false);
+
+  // Save state ("My Spots" saved bucket)
+  const [isSaved, setIsSaved] = useState(false);
+  const [savePending, setSavePending] = useState(false);
+  const [listModalVisible, setListModalVisible] = useState(false);
+
+  // Owner edit/delete state
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editCategory, setEditCategory] = useState<Spot['category']>('other');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  // Photo upload state (Google-Maps-style "add a photo" for any logged-in user)
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  // Is the current user the author/owner of this spot?
+  const currentUserId = user?.id || user?._id;
+  const isOwner = !!currentUserId && !!spot?.userId && spot.userId === currentUserId;
+  const isAdmin = user?.role === 'admin';
+  const isLoggedIn = !!currentUserId;
+
+  // Combined photo gallery: user photos first, then Google photos, else header image
+  const galleryPhotos = useMemo<SpotPhoto[]>(() => {
+    if (!spot) return [];
+    const photos: SpotPhoto[] = [...(spot.userPhotos ?? []), ...(spot.googlePhotos ?? [])];
+    if (photos.length === 0 && spot.imageURL) {
+      photos.push({ url: spot.imageURL });
+    }
+    return photos;
+  }, [spot]);
 
   // Fetch spot data from backend
   const loadSpot = useCallback(async () => {
@@ -60,6 +117,256 @@ export default function SpotDetailScreen() {
   useEffect(() => {
     loadSpot();
   }, [loadSpot]);
+
+  // Load the current saved state for this spot
+  useEffect(() => {
+    if (!spotId) return;
+    let cancelled = false;
+    isSpotSaved(spotId).then((saved) => {
+      if (!cancelled) setIsSaved(saved);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [spotId]);
+
+  // One-tap save toggle
+  const handleToggleSave = useCallback(async () => {
+    if (!spotId || savePending) return;
+    setSavePending(true);
+    const next = !isSaved;
+    // Optimistic update
+    setIsSaved(next);
+    const ok = next ? await saveSpot(spotId) : await unsaveSpot(spotId);
+    if (ok) {
+      if (next) Alert.alert('Saved', 'Saved to My Spots');
+    } else {
+      // Revert on failure
+      setIsSaved(!next);
+      Alert.alert('Error', next ? 'Failed to save spot' : 'Failed to remove spot');
+    }
+    setSavePending(false);
+  }, [spotId, isSaved, savePending]);
+
+  // Long-press opens the named-list picker
+  const handleOpenListPicker = useCallback(() => {
+    setListModalVisible(true);
+  }, []);
+
+  // Open the inline edit modal, prefilled from the loaded spot
+  const handleOpenEdit = useCallback(() => {
+    if (!spot) return;
+    setEditName(spot.name ?? '');
+    setEditDescription(spot.description ?? '');
+    setEditCategory(spot.category ?? 'other');
+    setEditModalVisible(true);
+  }, [spot]);
+
+  // Save inline edits
+  const handleSaveEdit = useCallback(async () => {
+    if (!spotId || !editName.trim() || savingEdit) return;
+    setSavingEdit(true);
+    const updated = await updateSpot(spotId, {
+      name: editName.trim(),
+      description: editDescription.trim(),
+      category: editCategory,
+    });
+    setSavingEdit(false);
+    if (updated) {
+      setSpot(updated);
+      setEditModalVisible(false);
+    } else {
+      Alert.alert('Error', 'Failed to update spot');
+    }
+  }, [spotId, editName, editDescription, editCategory, savingEdit]);
+
+  // Delete this spot (owner only), with confirmation
+  const handleDelete = useCallback(() => {
+    if (!spotId) return;
+    Alert.alert(
+      'Delete Spot',
+      'Are you sure you want to delete this spot? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            const ok = await deleteSpot(spotId);
+            setDeleting(false);
+            if (ok) {
+              router.back();
+            } else {
+              Alert.alert('Error', 'Failed to delete spot');
+            }
+          },
+        },
+      ],
+    );
+  }, [spotId]);
+
+  // Upload one or more picked photos to this spot, then refetch to refresh gallery.
+  const uploadPickedPhotos = useCallback(
+    async (assets: { uri: string; mimeType: string }[]) => {
+      if (!spotId || assets.length === 0) return;
+      setUploadingPhoto(true);
+      let failed = 0;
+      for (const asset of assets) {
+        const uploaded = await uploadSpotPhoto(spotId, asset.uri, asset.mimeType);
+        if (!uploaded) failed++;
+      }
+      // Refetch the spot so the new photos show up in the gallery.
+      const refreshed = await getSpotById(spotId);
+      if (refreshed) setSpot(refreshed);
+      setUploadingPhoto(false);
+      if (failed > 0) {
+        Alert.alert(
+          'Some photos failed',
+          `${failed} photo${failed > 1 ? 's' : ''} couldn't be uploaded. Please try again.`,
+        );
+      }
+    },
+    [spotId],
+  );
+
+  // Pick photos from the library and upload them.
+  const handleAddPhotoFromGallery = useCallback(async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow access to your photo library.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: true,
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets.length > 0) {
+      await uploadPickedPhotos(
+        result.assets.map((asset) => ({
+          uri: asset.uri,
+          mimeType: asset.mimeType || 'image/jpeg',
+        })),
+      );
+    }
+  }, [uploadPickedPhotos]);
+
+  // Capture a photo with the camera and upload it.
+  const handleAddPhotoFromCamera = useCallback(async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission Required', 'Please allow access to your camera.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      const asset = result.assets[0];
+      await uploadPickedPhotos([{ uri: asset.uri, mimeType: asset.mimeType || 'image/jpeg' }]);
+    }
+  }, [uploadPickedPhotos]);
+
+  // "Add Photo" affordance — any logged-in user. Offers Gallery or Camera.
+  const handleAddPhoto = useCallback(() => {
+    if (!isLoggedIn) {
+      Alert.alert('Sign In Required', 'Please sign in to add a photo to this spot.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign In', onPress: () => router.push('/(auth)/login') },
+      ]);
+      return;
+    }
+    if (uploadingPhoto) return;
+    Alert.alert('Add Photo', 'Add a photo to this spot', [
+      { text: 'Choose from Gallery', onPress: handleAddPhotoFromGallery },
+      { text: 'Take Photo', onPress: handleAddPhotoFromCamera },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  }, [isLoggedIn, uploadingPhoto, handleAddPhotoFromGallery, handleAddPhotoFromCamera]);
+
+  // Report a user photo, then thank the reporter.
+  const handleReportPhoto = useCallback(
+    (photoKey: string) => {
+      if (!spotId) return;
+      Alert.alert('Report Photo', 'Report this photo as inappropriate or incorrect?', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Report',
+          style: 'destructive',
+          onPress: async () => {
+            const ok = await reportSpotPhoto(spotId, photoKey);
+            if (ok) {
+              // A report may have crossed the auto-hide threshold — refresh so a
+              // now-hidden photo disappears.
+              const refreshed = await getSpotById(spotId);
+              if (refreshed) setSpot(refreshed);
+            }
+            Alert.alert(
+              ok ? 'Thanks' : 'Error',
+              ok ? "Thanks — we'll review this." : 'Failed to report photo. Please try again.',
+            );
+          },
+        },
+      ]);
+    },
+    [spotId],
+  );
+
+  // Delete a user photo (uploader/owner or admin), then refetch.
+  const handleDeletePhoto = useCallback(
+    (photoKey: string) => {
+      if (!spotId) return;
+      Alert.alert('Delete Photo', 'Delete this photo? This cannot be undone.', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const ok = await deleteSpotPhoto(spotId, photoKey);
+            if (ok) {
+              const refreshed = await getSpotById(spotId);
+              if (refreshed) setSpot(refreshed);
+            } else {
+              Alert.alert('Error', 'Failed to delete photo. Please try again.');
+            }
+          },
+        },
+      ]);
+    },
+    [spotId],
+  );
+
+  // Long-press / "..." on a user photo opens the report/delete menu.
+  const handlePhotoActions = useCallback(
+    (photo: SpotPhoto) => {
+      // Google photos have no key and are neither reportable nor deletable.
+      if (!photo.key) return;
+      const photoKey = photo.key;
+      const isOwnPhoto = !!currentUserId && photo.userId === currentUserId;
+      const canDelete = isAdmin || isOwnPhoto;
+      const buttons: {
+        text: string;
+        style?: 'default' | 'cancel' | 'destructive';
+        onPress?: () => void;
+      }[] = [];
+      // You can't report your own photo — you delete it instead.
+      if (!isOwnPhoto) {
+        buttons.push({ text: 'Report photo', onPress: () => handleReportPhoto(photoKey) });
+      }
+      if (canDelete) {
+        buttons.push({
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => handleDeletePhoto(photoKey),
+        });
+      }
+      buttons.push({ text: 'Cancel', style: 'cancel' });
+      Alert.alert('Photo', undefined, buttons);
+    },
+    [isAdmin, currentUserId, handleReportPhoto, handleDeletePhoto],
+  );
 
   // Parse tags into features array
   const getFeatures = (): string[] => {
@@ -152,8 +459,13 @@ export default function SpotDetailScreen() {
       >
         {/* Header Image */}
         <View style={styles.imageContainer}>
-          {spot.imageURL ? (
-            <Image source={{ uri: spot.imageURL }} style={styles.headerImage} resizeMode="cover" />
+          {galleryPhotos.length > 0 ? (
+            <ExpoImage
+              source={{ uri: galleryPhotos[0].url }}
+              style={styles.headerImage}
+              contentFit="cover"
+              transition={200}
+            />
           ) : (
             <View style={[styles.imagePlaceholder, { backgroundColor: theme.surface }]}>
               <Ionicons name={getCategoryIcon(category)} size={64} color={theme.textSecondary} />
@@ -170,6 +482,17 @@ export default function SpotDetailScreen() {
 
           {/* Action buttons */}
           <View style={styles.headerActions}>
+            <Pressable
+              style={styles.actionButton}
+              onPress={handleAddPhoto}
+              disabled={uploadingPhoto}
+            >
+              {uploadingPhoto ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="camera-outline" size={22} color="#FFFFFF" />
+              )}
+            </Pressable>
             <Pressable style={styles.actionButton} onPress={() => setIsFavorite(!isFavorite)}>
               <Ionicons
                 name={isFavorite ? 'heart' : 'heart-outline'}
@@ -191,8 +514,93 @@ export default function SpotDetailScreen() {
           </View>
         </View>
 
+        {/* Photo Gallery (user + Google photos) + "Add Photo" tile */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.gallery}
+          contentContainerStyle={styles.galleryContent}
+        >
+          {/* Skip index 0 — it's already shown as the large header image. */}
+          {galleryPhotos.slice(1).map((photo, index) => {
+            // Only user photos (which carry a `key`) can be reported/deleted.
+            const isUserPhoto = !!photo.key;
+            return (
+              <Pressable
+                key={photo.key ?? photo.url ?? `photo-${index}`}
+                onLongPress={isUserPhoto ? () => handlePhotoActions(photo) : undefined}
+                delayLongPress={300}
+              >
+                <ExpoImage
+                  source={{ uri: photo.url }}
+                  style={styles.galleryThumb}
+                  contentFit="cover"
+                  transition={200}
+                />
+                {isUserPhoto && (
+                  <Pressable
+                    style={styles.galleryMoreButton}
+                    onPress={() => handlePhotoActions(photo)}
+                    hitSlop={8}
+                  >
+                    <Ionicons name="ellipsis-horizontal" size={16} color="#FFFFFF" />
+                  </Pressable>
+                )}
+              </Pressable>
+            );
+          })}
+
+          {/* Add Photo tile — available to any logged-in user */}
+          <Pressable
+            style={[
+              styles.galleryAddTile,
+              { backgroundColor: theme.surface, borderColor: theme.border },
+            ]}
+            onPress={handleAddPhoto}
+            disabled={uploadingPhoto}
+          >
+            {uploadingPhoto ? (
+              <ActivityIndicator size="small" color={YELLOW} />
+            ) : (
+              <>
+                <Ionicons name="camera" size={22} color={YELLOW} />
+                <Text style={[styles.galleryAddText, { color: theme.textSecondary }]}>
+                  Add Photo
+                </Text>
+              </>
+            )}
+          </Pressable>
+        </ScrollView>
+
         {/* Content */}
         <View style={styles.content}>
+          {/* Owner Actions */}
+          {isOwner && (
+            <View style={styles.ownerActions}>
+              <Pressable
+                style={[styles.ownerButton, { backgroundColor: theme.surface }]}
+                onPress={handleOpenEdit}
+              >
+                <Ionicons name="create-outline" size={18} color={theme.text} />
+                <Text style={[styles.ownerButtonText, { color: theme.text }]}>Edit</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.ownerButton, { backgroundColor: theme.surface }]}
+                onPress={handleDelete}
+                disabled={deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator size="small" color="#FF6B6B" />
+                ) : (
+                  <>
+                    <Ionicons name="trash-outline" size={18} color="#FF6B6B" />
+                    <Text style={[styles.ownerButtonText, { color: '#FF6B6B' }]}>Delete</Text>
+                  </>
+                )}
+              </Pressable>
+            </View>
+          )}
+
           {/* Title & Rating Row */}
           <View style={styles.titleRow}>
             <View style={styles.titleContainer}>
@@ -404,12 +812,21 @@ export default function SpotDetailScreen() {
         </Pressable>
 
         <Pressable
-          style={[styles.addButton, { borderColor: theme.border }]}
-          onPress={() => {
-            // TODO: Add to spotlist
-          }}
+          style={[
+            styles.addButton,
+            { borderColor: isSaved ? YELLOW : theme.border },
+            isSaved && { backgroundColor: `${YELLOW}20` },
+          ]}
+          onPress={handleToggleSave}
+          onLongPress={handleOpenListPicker}
+          delayLongPress={300}
+          disabled={savePending}
         >
-          <Ionicons name="bookmark-outline" size={22} color={theme.text} />
+          <Ionicons
+            name={isSaved ? 'bookmark' : 'bookmark-outline'}
+            size={22}
+            color={isSaved ? YELLOW : theme.text}
+          />
         </Pressable>
       </View>
 
@@ -430,6 +847,108 @@ export default function SpotDetailScreen() {
           }}
         />
       )}
+
+      {/* Add to Spot List Modal (long-press on save) */}
+      {spot && (
+        <AddToSpotListModal
+          visible={listModalVisible}
+          spotId={spot._id}
+          spotName={spot.name}
+          onClose={() => setListModalVisible(false)}
+          onSuccess={() => {
+            // A saved-to-a-list spot also lives in "My Spots"; reflect saved state.
+            setIsSaved(true);
+          }}
+        />
+      )}
+
+      {/* Inline Edit Modal (owner only) */}
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <Pressable style={styles.editOverlay} onPress={() => setEditModalVisible(false)}>
+          <Pressable
+            style={[styles.editSheet, { backgroundColor: theme.surface }]}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.editHeader}>
+              <Text style={[styles.editTitle, { color: theme.text }]}>Edit Spot</Text>
+              <Pressable onPress={() => setEditModalVisible(false)}>
+                <Ionicons name="close" size={24} color={theme.text} />
+              </Pressable>
+            </View>
+
+            <Text style={[styles.editLabel, { color: theme.textSecondary }]}>Name</Text>
+            <TextInput
+              style={[
+                styles.editInput,
+                { backgroundColor: theme.background, color: theme.text, borderColor: theme.border },
+              ]}
+              value={editName}
+              onChangeText={setEditName}
+              placeholder="Spot name"
+              placeholderTextColor={theme.textSecondary}
+            />
+
+            <Text style={[styles.editLabel, { color: theme.textSecondary }]}>Description</Text>
+            <TextInput
+              style={[
+                styles.editInput,
+                styles.editTextarea,
+                { backgroundColor: theme.background, color: theme.text, borderColor: theme.border },
+              ]}
+              value={editDescription}
+              onChangeText={setEditDescription}
+              placeholder="Describe this spot..."
+              placeholderTextColor={theme.textSecondary}
+              multiline
+            />
+
+            <Text style={[styles.editLabel, { color: theme.textSecondary }]}>Category</Text>
+            <View style={styles.editCategoryRow}>
+              {SPOT_CATEGORIES.map((cat) => {
+                const selected = editCategory === cat.id;
+                return (
+                  <Pressable
+                    key={cat.id}
+                    style={[
+                      styles.editCategoryChip,
+                      { backgroundColor: theme.background, borderColor: theme.border },
+                      selected && { backgroundColor: YELLOW, borderColor: YELLOW },
+                    ]}
+                    onPress={() => setEditCategory(cat.id)}
+                  >
+                    <Text
+                      style={[styles.editCategoryText, { color: selected ? DARK : theme.text }]}
+                    >
+                      {cat.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <Pressable
+              style={[
+                styles.editSaveButton,
+                { backgroundColor: YELLOW },
+                (!editName.trim() || savingEdit) && styles.editSaveButtonDisabled,
+              ]}
+              onPress={handleSaveEdit}
+              disabled={!editName.trim() || savingEdit}
+            >
+              {savingEdit ? (
+                <ActivityIndicator size="small" color={DARK} />
+              ) : (
+                <Text style={styles.editSaveButtonText}>Save Changes</Text>
+              )}
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -533,10 +1052,140 @@ const styles = StyleSheet.create({
     color: DARK,
   },
 
+  // Photo Gallery
+  gallery: {
+    marginTop: 12,
+  },
+  galleryContent: {
+    paddingHorizontal: 20,
+    gap: 10,
+  },
+  galleryThumb: {
+    width: 110,
+    height: 80,
+    borderRadius: 12,
+  },
+  galleryMoreButton: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  galleryAddTile: {
+    width: 110,
+    height: 80,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+  },
+  galleryAddText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+
   // Content
   content: {
     paddingHorizontal: 20,
     paddingTop: 20,
+  },
+
+  // Owner Actions
+  ownerActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 20,
+  },
+  ownerButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    height: 44,
+    borderRadius: 12,
+  },
+  ownerButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+
+  // Edit Modal
+  editOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'flex-end',
+  },
+  editSheet: {
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 40,
+  },
+  editHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 16,
+  },
+  editTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  editLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    marginTop: 12,
+    marginBottom: 6,
+  },
+  editInput: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+  },
+  editTextarea: {
+    minHeight: 90,
+    textAlignVertical: 'top',
+  },
+  editCategoryRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  editCategoryChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  editCategoryText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  editSaveButton: {
+    height: 52,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 24,
+  },
+  editSaveButtonDisabled: {
+    opacity: 0.5,
+  },
+  editSaveButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: DARK,
   },
 
   // Title Row

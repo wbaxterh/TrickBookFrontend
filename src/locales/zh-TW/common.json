@@ -1,0 +1,40 @@
+{
+  "common": {
+    "cancel": "取消",
+    "ok": "確定",
+    "save": "儲存",
+    "done": "完成",
+    "back": "返回",
+    "close": "關閉",
+    "retry": "重試",
+    "loading": "載入中…"
+  },
+  "tabs": {
+    "home": "首頁",
+    "trickbook": "TrickBook",
+    "spots": "地點",
+    "homies": "Homies",
+    "media": "媒體"
+  },
+  "settings": {
+    "title": "設定",
+    "account": "帳號",
+    "notifications": "通知",
+    "privacy": "隱私權",
+    "theme": "主題（深色/淺色）",
+    "language": "語言",
+    "helpSupport": "說明與支援",
+    "logOut": "登出",
+    "logOutConfirmTitle": "登出",
+    "logOutConfirmMessage": "確定要登出嗎？",
+    "version": "TrickBook v{{version}}"
+  },
+  "language": {
+    "title": "語言",
+    "current": "目前語言",
+    "systemDefault": "系統預設",
+    "systemDefaultDescription": "使用裝置語言",
+    "info": "選擇 TrickBook 介面語言。「系統預設」會依照你的裝置設定。",
+    "active": "使用中"
+  }
+}

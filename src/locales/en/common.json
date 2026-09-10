@@ -1,0 +1,40 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "ok": "OK",
+    "save": "Save",
+    "done": "Done",
+    "back": "Back",
+    "close": "Close",
+    "retry": "Retry",
+    "loading": "Loading…"
+  },
+  "tabs": {
+    "home": "Home",
+    "trickbook": "TrickBook",
+    "spots": "Spots",
+    "homies": "Homies",
+    "media": "Media"
+  },
+  "settings": {
+    "title": "Settings",
+    "account": "Account",
+    "notifications": "Notifications",
+    "privacy": "Privacy",
+    "theme": "Theme (Dark/Light)",
+    "language": "Language",
+    "helpSupport": "Help & Support",
+    "logOut": "Log Out",
+    "logOutConfirmTitle": "Log Out",
+    "logOutConfirmMessage": "Are you sure you want to log out?",
+    "version": "TrickBook v{{version}}"
+  },
+  "language": {
+    "title": "Language",
+    "current": "Current language",
+    "systemDefault": "System default",
+    "systemDefaultDescription": "Follow your device language",
+    "info": "Choose the language for the TrickBook interface. \"System default\" follows your device settings.",
+    "active": "Active"
+  }
+}

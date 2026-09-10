@@ -4,27 +4,38 @@
  *
  * Layout:
  * - Header: Back arrow + "Settings" title
- * - List items: Account, Notifications, Privacy, Theme, Help & Support
+ * - List items: Account, Notifications, Privacy, Theme, Language, Help & Support
  * - Footer: Log Out button + version
  */
 
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { SettingsDivider, SettingsItem } from '@/components/ui';
+import { LANGUAGE_OPTIONS } from '@/lib/i18n/languages';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { useLanguageStore } from '@/lib/stores/languageStore';
 
 export default function SettingsScreen() {
-  const { theme, colors } = useThemeContext();
+  const { theme } = useThemeContext();
+  const { t } = useTranslation();
   const { logout } = useAuthStore();
+  const { preference } = useLanguageStore();
+
+  // Current language shown in its own language ("Español", "日本語", …)
+  const currentLanguage =
+    preference === 'system'
+      ? t('language.systemDefault')
+      : (LANGUAGE_OPTIONS.find((option) => option.code === preference)?.nativeName ?? preference);
 
   const handleLogout = () => {
-    Alert.alert('Log Out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('settings.logOutConfirmTitle'), t('settings.logOutConfirmMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
       {
-        text: 'Log Out',
+        text: t('settings.logOut'),
         style: 'destructive',
         onPress: async () => {
           await logout();
@@ -44,7 +55,7 @@ export default function SettingsScreen() {
       </View>
 
       {/* Title */}
-      <Text style={[styles.title, { color: theme.text }]}>Settings</Text>
+      <Text style={[styles.title, { color: theme.text }]}>{t('settings.title')}</Text>
 
       <ScrollView
         style={styles.scrollView}
@@ -55,7 +66,7 @@ export default function SettingsScreen() {
         <SettingsItem
           variant="navigation"
           icon="person-circle-outline"
-          label="Account"
+          label={t('settings.account')}
           onPress={() => router.push('/profile/account')}
         />
         <SettingsDivider />
@@ -64,7 +75,7 @@ export default function SettingsScreen() {
         <SettingsItem
           variant="navigation"
           icon="notifications-outline"
-          label="Notifications"
+          label={t('settings.notifications')}
           onPress={() => router.push('/profile/notifications')}
         />
         <SettingsDivider />
@@ -73,7 +84,7 @@ export default function SettingsScreen() {
         <SettingsItem
           variant="navigation"
           icon="lock-closed-outline"
-          label="Privacy"
+          label={t('settings.privacy')}
           onPress={() => router.push('/profile/privacy')}
         />
         <SettingsDivider />
@@ -82,8 +93,18 @@ export default function SettingsScreen() {
         <SettingsItem
           variant="navigation"
           icon="contrast-outline"
-          label="Theme (Dark/Light)"
+          label={t('settings.theme')}
           onPress={() => router.push('/profile/theme')}
+        />
+        <SettingsDivider />
+
+        {/* Language */}
+        <SettingsItem
+          variant="value"
+          icon="language-outline"
+          label={t('settings.language')}
+          value={currentLanguage}
+          onPress={() => router.push('/profile/language')}
         />
         <SettingsDivider />
 
@@ -91,7 +112,7 @@ export default function SettingsScreen() {
         <SettingsItem
           variant="navigation"
           icon="help-circle-outline"
-          label="Help & Support"
+          label={t('settings.helpSupport')}
           onPress={() => router.push('/profile/support')}
         />
         <SettingsDivider />
@@ -100,13 +121,15 @@ export default function SettingsScreen() {
         <SettingsItem
           variant="destructive"
           icon="log-out-outline"
-          label="Log Out"
+          label={t('settings.logOut')}
           onPress={handleLogout}
         />
 
         {/* Version */}
         <View style={styles.versionContainer}>
-          <Text style={[styles.versionText, { color: theme.textTertiary }]}>TrickBook v2.0.0</Text>
+          <Text style={[styles.versionText, { color: theme.textTertiary }]}>
+            {t('settings.version', { version: '2.0.0' })}
+          </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
