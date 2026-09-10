@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Kaori Trick Lab</title>
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; background: #16181d; color: #e8e8ea; font-family: system-ui, sans-serif; overflow: hidden; }
+      #app { display: flex; height: 100vh; }
+      #stage { flex: 1; position: relative; min-width: 0; }
+      #stage canvas { display: block; }
+      .hint { position: absolute; top: 10px; left: 12px; font-size: 12px; opacity: 0.55; pointer-events: none; }
+      #ref { width: 36%; max-width: 560px; display: flex; flex-direction: column; border-left: 1px solid #2a2d34; background: #101216; }
+      #ref .refbar { padding: 8px; display: flex; gap: 6px; align-items: center; }
+      #ref input { flex: 1; background: #1d2027; border: 1px solid #2a2d34; color: #e8e8ea; padding: 6px 8px; border-radius: 6px; }
+      #ref button { background: #FCF150; color: #1a1a1a; border: 0; padding: 6px 12px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+      #ref video { width: 100%; flex: 1; background: #000; object-fit: contain; }
+      #ref .reftip { padding: 6px 10px; font-size: 11px; opacity: 0.5; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="stage"><div class="hint">drag to orbit · scroll to zoom · tune in the panel →</div></div>
+      <div id="ref">
+        <div class="refbar">
+          <input id="refUrl" placeholder="paste a reference clip URL (.mp4) — or drop a file below" />
+          <button id="refLoad">load</button>
+        </div>
+        <video id="refVideo" controls loop muted playsinline></video>
+        <div class="reftip">Tip: scrub the clip and Kaori's timeline (t) side-by-side to match the real motion.</div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

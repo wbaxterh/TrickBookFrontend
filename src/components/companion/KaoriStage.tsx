@@ -555,7 +555,7 @@ function KaoriModel({
       driveFace(vrm, elapsed.current, voice.current);
       const st = demo.current;
       // Compose the whole-body orientation: YAW (stance + spin, about Y) THEN
-      // PITCH (flip, about her local board long-axis). q = qYaw * qPitch so the
+      // PITCH (flip, about her local toe-heel axis — end over end). q = qYaw * qPitch so the
       // flip axis rotates WITH her facing. Pure 360 → rootPitch=0 → qPitch=
       // identity → q is pure Y yaw, identical to before.
       _flipQYaw.setFromAxisAngle(_flipYAxis, st.rootYaw);
@@ -649,9 +649,14 @@ const _flipQ = new THREE.Quaternion();
 const _flipQYaw = new THREE.Quaternion();
 const _flipQPitch = new THREE.Quaternion();
 const _flipYAxis = new THREE.Vector3(0, 1, 0);
-// Flip axis = board's foot-to-foot line in her LOCAL frame (+X). If a flip
-// tumbles face-on at the apex instead of head-over-heels, flip this to (-1,0,0).
-const _flipPitchAxis = new THREE.Vector3(1, 0, 0);
+// Flip axis = toe-heel line in her LOCAL frame (+Z), horizontal and
+// PERPENDICULAR to the board. A wildcat/tamedog tumbles END OVER END — the
+// nose sweeps up and over while the tail dives (board pitches nose-over-tail
+// with her). The old axis (1,0,0) was the foot-to-foot line, which produced a
+// gymnast-style backflip over the heel edge with the board staying crossways —
+// wrong trick. If flips now tumble over the WRONG edge (toe vs heel plane),
+// flip this to (0,0,-1); tail-vs-nose direction is the totalFlip sign in TRICKS.
+const _flipPitchAxis = new THREE.Vector3(0, 0, 1);
 const _flipComOffset = new THREE.Vector3();
 /** Foot bone ≈ ankle; drop the deck this far below the midpoint so the soles
  *  sit on top of the board rather than through it. */

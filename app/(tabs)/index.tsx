@@ -262,18 +262,24 @@ export default function HomeScreen() {
         <View style={styles.sectionPadded}>
           <CompanionWidget
             bot={companion}
-            onPress={() => companion && router.push(`/(tabs)/homies/bot-chat/${companion._id}`)}
-            onView3D={
-              // 3D stage only exists for Kaori so far
-              companion &&
-              (companion.botCharacter ?? companion.name).toLowerCase().includes('kaori')
-                ? () =>
-                    router.push({
-                      pathname: '/(tabs)/homies/companion-stage/[botId]',
-                      params: { botId: companion._id, name: companion.name },
-                    })
-                : undefined
-            }
+            // Primary press drops straight into the 3D voice stage (Kaori only
+            // has a stage so far; other bots fall back to text chat).
+            onPress={() => {
+              if (!companion) return;
+              const hasStage = (companion.botCharacter ?? companion.name)
+                .toLowerCase()
+                .includes('kaori');
+              if (hasStage) {
+                router.push({
+                  pathname: '/(tabs)/homies/companion-stage/[botId]',
+                  params: { botId: companion._id, name: companion.name },
+                });
+              } else {
+                router.push(`/(tabs)/homies/bot-chat/${companion._id}`);
+              }
+            }}
+            // Secondary button always offers the text chat.
+            onChat={() => companion && router.push(`/(tabs)/homies/bot-chat/${companion._id}`)}
           />
         </View>
 

@@ -5,7 +5,7 @@
  */
 
 import { Ionicons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -47,6 +47,8 @@ interface BotMessage {
     data: any;
   };
   createdAt: string;
+  // Client-only greeting shown on open — never persisted to history.
+  _ephemeral?: boolean;
 }
 
 export default function BotChatScreen() {
@@ -87,6 +89,45 @@ export default function BotChatScreen() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Greet on open: each time the screen gains focus (and once we know it's
+  // Kaori), fetch a fresh homie greeting and show it as an EPHEMERAL bubble —
+  // it is never saved to history. Any prior ephemeral greeting is stripped so
+  // they don't stack.
+  const isKaori = ((bot?.botCharacter ?? bot?.name ?? '') as string)
+    .toLowerCase()
+    .includes('kaori');
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!botId || !isKaori) return;
+      let cancelled = false;
+      (async () => {
+        try {
+          const res = await apiClient.post<{ greeting?: string }>(
+            `/companion/profile/${botId}/greeting`,
+            {},
+          );
+          if (cancelled || !res?.greeting) return;
+          const greetingMsg: BotMessage = {
+            _id: `greeting-${Date.now()}`,
+            fromUserId: botId,
+            toUserId: userId || '',
+            message: res.greeting,
+            type: 'bot',
+            createdAt: new Date().toISOString(),
+            _ephemeral: true,
+          };
+          setMessages((prev) => [greetingMsg, ...prev.filter((m) => !m._ephemeral)]);
+        } catch {
+          // greeting is best-effort — never block the chat
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [botId, isKaori, userId]),
+  );
 
   // Send message
   const handleSend = async () => {

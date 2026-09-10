@@ -30,7 +30,11 @@ import { AudioContext, AudioManager } from 'react-native-audio-api';
 type QueueNode = ReturnType<AudioContext['createBufferQueueSource']>;
 
 /** Silence gap after the last queued buffer before we call the turn done. */
-const DRAIN_IDLE_GRACE_MS = 500;
+// End-of-reply is inferred when the audio queue stays empty for this long.
+// Must tolerate the gap between one sentence draining and Kith generating the
+// next sentence's audio — 500ms was too tight and ended multi-sentence replies
+// early (e.g. trick demos stopping after "wind up").
+const DRAIN_IDLE_GRACE_MS = 2000;
 
 function base64ToArrayBuffer(b64: string): ArrayBuffer {
   const binary = global.atob(b64);
@@ -79,6 +83,17 @@ export class TtsPlayer {
       clearTimeout(this.drainTimer);
       this.drainTimer = null;
     }
+  }
+
+  /**
+   * Signal that another assistant sentence has begun (Kith `turn_start`), so the
+   * reply is NOT over — cancel any pending end-of-reply drain timer even though
+   * this sentence's audio hasn't arrived yet. turn_start precedes the audio
+   * chunks, so this closes the window where a slow next-sentence would let the
+   * drain grace fire and end the reply early.
+   */
+  keepAlive() {
+    this.cancelDrainTimer();
   }
 
   private scheduleDrainIdle() {
