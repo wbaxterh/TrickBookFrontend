@@ -451,7 +451,7 @@ function flipPoseAt(t: number, dir: 1 | -1): RiderPose {
     spin: 0, // FLIP: no yaw — rootYaw stays STANCE_YAW*ease
     pitch,
     height,
-    crouch,
+    crouch: lerp(crouch, 1.42, grabRear),
     coil,
     tuck,
     balance,
@@ -636,6 +636,8 @@ function makeGrabAir(spec: GrabSpec): TrickTimeline {
     const airBell = air > 0 && land === 0 ? Math.sin(Math.PI * air) : 0;
     // Fast reach-in, held plateau, fast release.
     const g = clamp01(airBell * 1.7);
+    const grabbing = Math.max(spec.front ?? 0, spec.rear ?? 0) * g;
+    crouch = lerp(crouch, 1.42, grabbing);
     const tuck = (spec.tuck ?? 0.5) * airBell;
     const balance =
       land > 0
@@ -666,8 +668,8 @@ function makeGrabAir(spec: GrabSpec): TrickTimeline {
       grabSide: spec.side ?? 1,
       pokeFront: (spec.pokeFront ?? 0) * g,
       pokeBack: (spec.pokeBack ?? 0) * g,
-      frontLegLift: (spec.frontLegLift ?? 0) * airBell,
-      backLegLift: (spec.backLegLift ?? 0) * airBell,
+      frontLegLift: ((spec.frontLegLift ?? 0) * 0.45 + 0.2 * grabbing) * airBell,
+      backLegLift: ((spec.backLegLift ?? 0) * 0.45 + 0.2 * grabbing) * airBell,
       arch: (spec.arch ?? 0) * g,
     };
   };
@@ -921,7 +923,7 @@ export const TRICKS: Record<TrickId, TrickTimeline> = {
   // --- Grab airs (specs per the Trickipedia definitions) ---
   'straight-air': makeGrabAir({ tuck: 0.35, balance: 0.35 }),
   indy: makeGrabAir({ rear: 1, side: 1, reach: 0 }),
-  'indy-nosebone': makeGrabAir({ rear: 1, side: 1, reach: 0, pokeFront: 0.9, backLegLift: 0.45 }),
+  'indy-nosebone': makeGrabAir({ rear: 1, side: 1, reach: 0, pokeFront: 0.55, backLegLift: 0.45 }),
   weddle: makeGrabAir({ front: 1, side: 1, reach: 0 }),
   melon: makeGrabAir({ front: 1, side: -1, reach: 0 }),
   method: makeGrabAir({
@@ -937,8 +939,8 @@ export const TRICKS: Record<TrickId, TrickTimeline> = {
   'tail-grab': makeGrabAir({ rear: 1, side: 0.3, reach: 1, backLegLift: 0.55, pokeFront: 0.7 }),
   stalefish: makeGrabAir({ rear: 1, side: -1, reach: 0, backLegLift: 0.3 }),
   japan: makeGrabAir({ front: 1, side: 1, reach: 0, arch: 0.7, frontLegLift: 0.4, tuck: 0.65 }),
-  crail: makeGrabAir({ rear: 1, side: 1, reach: -0.9 }),
-  'roast-beef': makeGrabAir({ rear: 1, side: -1, reach: 0, tuck: 0.7, pokeFront: 0.7 }),
+  crail: makeGrabAir({ rear: 1, side: 1, reach: -0.4 }),
+  'roast-beef': makeGrabAir({ rear: 1, side: -1, reach: 0, tuck: 0.7, backLegLift: 0.35, arch: 0.3 }),
   'chicken-salad': makeGrabAir({
     rear: 1,
     side: -1,

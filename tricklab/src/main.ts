@@ -1,3 +1,4 @@
+import { grabContactDistances } from '../../src/components/companion/grabContact';
 /**
  * Kaori Trick Lab — a browser live-tuner for the procedural trick animations.
  *
@@ -260,6 +261,8 @@ function applyAt(t: number) {
   vrm.humanoid.update();
   vrm.scene.updateMatrixWorld(true);
   lockBoardToFeet();
+  const gaps = Object.values(grabContactDistances(vrm.humanoid, pose));
+  document.getElementById("contact")!.textContent = gaps.length ? `Held grab: wrist target gap ${Math.round(Math.max(...gaps)*1000)} mm` : "Grab contact: reach / release";
   board.updateMatrixWorld(true);
 }
 function frame() {
@@ -268,6 +271,7 @@ function frame() {
   const duration = currentDuration();
   if (state.playing) state.t = advanceTime(state.t, dt, duration, state.speed);
   if (showingBlender && returned && vrm) {
+    document.getElementById("contact")!.textContent = "Blender take — procedural contact check inactive";
     vrm.scene.position.set(0, 0, 0); vrm.scene.quaternion.identity();
     returned.action.paused = false; returned.action.enabled = true;
     returned.mixer.setTime(state.t * duration);
@@ -403,3 +407,24 @@ document.getElementById('loadBlender')!.onclick = async () => {
   } catch (e) { status(`No Blender take available for ${requested}. Export it from the workshop first. ${String(e)}`); }
 };
 document.getElementById('useProcedural')!.onclick = () => { showingBlender = false; status('Procedural motion selected.'); };
+
+document.getElementById('auditGrabs')!.onclick = async () => {
+  if (!vrm) return;
+  const prior={...state}; const wasBlender=showingBlender;showingBlender=false;state.playing=false;
+  const results=[];
+  try {
+    for(const [id,trick] of Object.entries(TRICKS)) {
+      const gaps:number[]=[];
+      state.trick=id;
+      for(let i=0;i<=100;i++) {
+        const t=i/100, pose=trick.poseAt(t*trick.duration);
+        if(pose.height <= .02 || Math.max(pose.grabFront,pose.grabRear)<.999)continue;
+        applyAt(t);gaps.push(...Object.values(grabContactDistances(vrm.humanoid,pose)));
+      }
+      if(gaps.length)results.push({trick:id,samples:gaps.length,maxGapMm:Math.round(Math.max(...gaps)*1000)});
+    }
+    const response=await fetch('/__lab/motion',{method:'POST',headers:{'Content-Type':'application/json','X-TrickLab':'motion-v1'},body:JSON.stringify({version:1,trick:'grab-contact-audit',samples:results})});
+    if(!response.ok)throw new Error(await response.text());
+    status(`Grab check: ${results.length} tricks; worst wrist gap ${Math.max(...results.map(r=>r.maxGapMm))} mm. Details saved to exports/grab-contact-audit.motion.json.`);
+  }catch(e){status(String(e));}finally{Object.assign(state,prior);showingBlender=wasBlender;}
+};

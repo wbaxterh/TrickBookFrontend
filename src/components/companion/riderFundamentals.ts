@@ -14,6 +14,7 @@
  * humanoid bones, character facing +Z, her left side on +X).
  */
 
+import { solveGrabContact } from './grabContact';
 import type { VRM } from '@pixiv/three-vrm';
 
 export type Humanoid = NonNullable<VRM['humanoid']>;
@@ -182,7 +183,7 @@ function applyLegs(
     if (upper) {
       // Thigh pitches forward (knee travels toward the toe side); a leg lift
       // raises the thigh a little so the knee comes up; a poke extends it.
-      upper.rotation.x = -crouch * THIGH_FLEX * (1 - poke * 0.7) - lift * 0.5 + poke * 0.12;
+      upper.rotation.x = Math.max(-1.65, -crouch * THIGH_FLEX * (1 - poke * 0.7) - lift * 0.5 + poke * 0.12);
       // Splay OUTWARD: her left leg sits on +X (she faces the camera). A poke
       // pushes the leg farther along the board line.
       const sideSign = side === 'left' ? 1 : -1;
@@ -190,9 +191,9 @@ function applyLegs(
     }
     // Shin folds back under the thigh — the human knee hinge; a lift folds it
     // more so that foot lifts off the board; a poke straightens it out.
-    if (lower) lower.rotation.x = crouch * SHIN_FLEX * (1 - poke) + lift * 1.3;
+    if (lower) lower.rotation.x = Math.min(2.7, crouch * SHIN_FLEX * (1 - poke) + lift * 1.3);
     // Keep the sole flat on the board (relaxed when the foot is lifted)
-    if (foot) foot.rotation.x = -crouch * (SHIN_FLEX - THIGH_FLEX) * (1 - poke) + lift * 0.4;
+    if (foot && upper && lower) foot.rotation.x = crouch > 1 ? -upper.rotation.x - lower.rotation.x : -crouch * (SHIN_FLEX - THIGH_FLEX) * (1 - poke) + lift * 0.4;
   }
 }
 
@@ -452,6 +453,7 @@ export function applyRiderPose(humanoid: Humanoid, pose: RiderPose, stanceWeight
   );
   applyTorsoAndHead(humanoid, pose, stanceWeight);
   applyArms(humanoid, pose, stanceWeight);
+  if (pose.height > 0.02) solveGrabContact(humanoid, pose, stanceWeight);
 }
 
 /** Zero out the bones the idle system never touches (legs, arm Y, neck roll/pitch). */

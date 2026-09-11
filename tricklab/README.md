@@ -40,3 +40,9 @@ Source matrices include root motion. The importer converts Y-up to Z-up, preserv
 ## Reference-informed indy study
 
 `blender-indy-study.py --workspace WORKSPACE` is a local workshop experiment. It expects `outputs/Kaori-Motion-Workshop.blend` and `work/blender-addon/unpacked` under that workspace and writes a separate `outputs/Kaori-Indy-Reference-Study.blend`. Run it through Blender with `--background --factory-startup --python` and pass script arguments after `--`. It preserves the original workshop and uses authored two-bone solutions, not extracted third-party motion. Its wrist-target validation does not validate finger contact or clothing collisions. Export this study through `blender-export.py` to review it in the browser. The experiment deliberately retains local workspace layout assumptions; it is not a general character-retargeting tool.
+
+## Shared grab contact correction
+
+Airborne grabs now deepen knee flexion, lift both legs, and solve a bounded torso lean plus a two-bone arm reach toward a board-relative wrist target. Limb lengths are preserved. This runs in the shared mobile pose engine used by the lab; it does not update already baked Blender takes. Grounded handplants are excluded. Nosebone/crail/roast-beef styling has been moderated to make the target reachable on Kaori.
+
+**Check all grabs** samples full-hold frames on the loaded character and saves `exports/grab-contact-audit.motion.json`. It measures normalized wrist-to-target distance, not finger wrapping, collision-free reach paths or mobile frame rate. The current Kaori check covers 16 airborne grab animations and 361 full-hold samples. Finger posing and per-trick artistic review remain necessary. Use **Procedural motion** to see the correction and export again when rebuilding Blender takes.
