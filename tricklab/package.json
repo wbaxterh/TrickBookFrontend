@@ -7,7 +7,7 @@
     "prepare:model": "node scripts/prepare-model.cjs",
     "predev": "npm run prepare:model",
     "prebuild": "npm run prepare:model",
-    "test": "node scripts/test.cjs",
+    "test": "node scripts/test.cjs && node scripts/test-rig.cjs",
     "dev": "vite",
     "build": "vite build"
   },

@@ -1,3 +1,5 @@
+import { grabProfile } from './grabProfiles';
+import { lockRiderBindings } from './riderConstraints';
 /**
  * Rider fundamentals — the reusable building blocks every board trick is
  * made of. Trick timelines (trickAnimations.ts) compose these:
@@ -97,6 +99,7 @@ export interface RiderPose {
   grabRear: number;
   grabReach: number;
   grabSide: number;
+  grabFit?: number;
   /** Leg POKE (bone): 0→1 straightens that knee and pushes that end of the
    *  board away — the opposite of a lift. Nosebone = front poke. */
   pokeFront: number;
@@ -429,7 +432,7 @@ function applyArms(humanoid: Humanoid, pose: RiderPose, w: number) {
     if (hand) hand.rotation.x = lerp(0.1, 0.1 + pose.tuck * 0.2 + spinSwing * 0.15, w);
 
     // GRAB override — front hand = left arm (regular stance), rear = right.
-    applyGrabReach(
+    if (pose.height <= .02 || (side === 'left' ? pose.grabFront : pose.grabRear) === 0) applyGrabReach(
       upper,
       lower,
       sign,
@@ -442,26 +445,46 @@ function applyArms(humanoid: Humanoid, pose: RiderPose, w: number) {
 
 /** Apply a full rider pose to the skeleton (legs scaled by stance weight). */
 export function applyRiderPose(humanoid: Humanoid, pose: RiderPose, stanceWeight: number) {
+  resetRiderBones(humanoid);
+  const grabAmount = Math.max(pose.grabFront, pose.grabRear);
+  // Through-leg reaches need the knee corridor open before the wrist enters it.
+  const bodyGrab = pose.grabFit === 9 ? Math.min(1, grabAmount * 1.5) : grabAmount;
+  const bodyPose = bodyGrab > grabAmount && grabAmount < 1
+    ? { ...pose, crouch: pose.crouch + (1.35 - pose.crouch) * (bodyGrab - grabAmount) / (1 - grabAmount) }
+    : pose;
   applyLegs(
     humanoid,
-    pose.crouch * stanceWeight,
+    bodyPose.crouch * stanceWeight,
     stanceWeight,
     pose.backLegLift * stanceWeight,
     pose.frontLegLift * stanceWeight,
     pose.pokeBack * stanceWeight,
     pose.pokeFront * stanceWeight,
   );
-  applyTorsoAndHead(humanoid, pose, stanceWeight);
+  applyTorsoAndHead(humanoid, bodyPose, stanceWeight);
+  lockRiderBindings(humanoid, stanceWeight, pose.height > .02 ? grabProfile(pose.grabFit).lift * bodyGrab : 0, grabProfile(pose.grabFit));
   applyArms(humanoid, pose, stanceWeight);
   if (pose.height > 0.02) solveGrabContact(humanoid, pose, stanceWeight);
 }
 
 /** Zero out the bones the idle system never touches (legs, arm Y, neck roll/pitch). */
 export function resetRiderBones(humanoid: Humanoid) {
+  const head = humanoid.getNormalizedBoneNode('head');
+  if (head) head.rotation.x = 0;
   applyLegs(humanoid, 0, 0);
   for (const side of ['left', 'right'] as const) {
     const upper = humanoid.getNormalizedBoneNode(`${side}UpperArm`);
     if (upper) upper.rotation.y = 0;
+    for (const part of ['UpperLeg', 'LowerLeg', 'Foot', 'UpperArm', 'LowerArm']) {
+      const bone = humanoid.getNormalizedBoneNode(`${side}${part}` as any);
+      if (bone) bone.rotation.set(0, 0, 0);
+    }
+    const hand = humanoid.getNormalizedBoneNode(`${side}Hand`);
+    if (hand) hand.rotation.set(0, 0, 0);
+    for (const digit of ['Index', 'Middle', 'Ring', 'Little']) for (const joint of ['Proximal', 'Intermediate', 'Distal']) {
+      const bone = humanoid.getNormalizedBoneNode(`${side}${digit}${joint}` as any);
+      if (bone) bone.rotation.set(0, 0, 0);
+    }
   }
   // The idle system re-drives neck yaw each frame but not roll/pitch — clear
   // any leftover head-over-shoulder tilt / spot from a trick.

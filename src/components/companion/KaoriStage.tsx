@@ -780,11 +780,11 @@ function TrickBoard({ demo }: { demo: React.MutableRefObject<TrickDemoState> }) 
         />
       </mesh>
       {/* Binding hints */}
-      <mesh position={[-0.24, 0.035, 0]}>
+      <mesh position={[-0.24, 0.035, 0]} rotation={[0, 0.18, 0]}>
         <boxGeometry args={[0.16, 0.04, 0.2]} />
         <meshStandardMaterial color="#101319" roughness={0.7} />
       </mesh>
-      <mesh position={[0.24, 0.035, 0]}>
+      <mesh position={[0.24, 0.035, 0]} rotation={[0, -0.18, 0]}>
         <boxGeometry args={[0.16, 0.04, 0.2]} />
         <meshStandardMaterial color="#101319" roughness={0.7} />
       </mesh>

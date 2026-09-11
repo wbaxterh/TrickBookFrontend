@@ -1,0 +1,758 @@
+{
+    "hips":  {
+                 "position":  [
+                                  0,
+                                  0.72230655,
+                                  0.00372410775
+                              ],
+                 "quaternion":  [
+                                    0,
+                                    0,
+                                    0,
+                                    1
+                                ],
+                 "parent":  null
+             },
+    "spine":  {
+                  "position":  [
+                                   -5.453571E-32,
+                                   0.044079636733046934,
+                                   0.010641631830552249
+                               ],
+                  "quaternion":  [
+                                     0,
+                                     0,
+                                     0,
+                                     1
+                                 ],
+                  "parent":  "hips"
+              },
+    "chest":  {
+                  "position":  [
+                                   1.8472121E-17,
+                                   0.09522431086016525,
+                                   0.002405525384216711
+                               ],
+                  "quaternion":  [
+                                     0,
+                                     0,
+                                     0,
+                                     1
+                                 ],
+                  "parent":  "spine"
+              },
+    "upperChest":  {
+                       "position":  [
+                                        -2.66626285E-17,
+                                        0.09163271569564613,
+                                        -0.012472289656870469
+                                    ],
+                       "quaternion":  [
+                                          0,
+                                          0,
+                                          0,
+                                          1
+                                      ],
+                       "parent":  "chest"
+                   },
+    "neck":  {
+                 "position":  [
+                                  -8.367668E-17,
+                                  0.11299561863886731,
+                                  -0.03276246447184718
+                              ],
+                 "quaternion":  [
+                                    0,
+                                    0,
+                                    0,
+                                    1
+                                ],
+                 "parent":  "upperChest"
+             },
+    "head":  {
+                 "position":  [
+                                  1.43158055E-10,
+                                  0.061586293102525946,
+                                  0.007724419965671452
+                              ],
+                 "quaternion":  [
+                                    0,
+                                    0,
+                                    0,
+                                    1
+                                ],
+                 "parent":  "neck"
+             },
+    "leftEye":  {
+                    "position":  [
+                                     0.01352920067908309,
+                                     0.052186231639268055,
+                                     0.018094391989118434
+                                 ],
+                    "quaternion":  [
+                                       0,
+                                       0,
+                                       0,
+                                       1
+                                   ],
+                    "parent":  "head"
+                },
+    "rightEye":  {
+                     "position":  [
+                                      -0.0135291968209184,
+                                      0.052186230317720295,
+                                      0.01809439443899016
+                                  ],
+                     "quaternion":  [
+                                        0,
+                                        0,
+                                        0,
+                                        1
+                                    ],
+                     "parent":  "head"
+                 },
+    "leftUpperLeg":  {
+                         "position":  [
+                                          0.06572045,
+                                          -0.033833263435005256,
+                                          -0.00310554709697685
+                                      ],
+                         "quaternion":  [
+                                            0,
+                                            0,
+                                            0,
+                                            1
+                                        ],
+                         "parent":  "hips"
+                     },
+    "leftLowerLeg":  {
+                         "position":  [
+                                          -1.4901161193847656E-08,
+                                          -0.2849127938837567,
+                                          -0.005962355257591039
+                                      ],
+                         "quaternion":  [
+                                            0,
+                                            0,
+                                            0,
+                                            1
+                                        ],
+                         "parent":  "leftUpperLeg"
+                     },
+    "leftFoot":  {
+                     "position":  [
+                                      0,
+                                      -0.33279213372773514,
+                                      -0.020098148877239687
+                                  ],
+                     "quaternion":  [
+                                        0,
+                                        0,
+                                        0,
+                                        1
+                                    ],
+                     "parent":  "leftLowerLeg"
+                 },
+    "leftToes":  {
+                     "position":  [
+                                      0,
+                                      -0.04209223810285849,
+                                      0.07388983617223949
+                                  ],
+                     "quaternion":  [
+                                        0,
+                                        0,
+                                        0,
+                                        1
+                                    ],
+                     "parent":  "leftFoot"
+                 },
+    "rightUpperLeg":  {
+                          "position":  [
+                                           -0.06572045,
+                                           -0.033833263435005256,
+                                           -0.00310554709697685
+                                       ],
+                          "quaternion":  [
+                                             0,
+                                             0,
+                                             0,
+                                             1
+                                         ],
+                          "parent":  "hips"
+                      },
+    "rightLowerLeg":  {
+                          "position":  [
+                                           1.4901161193847656E-08,
+                                           -0.2849127938837567,
+                                           -0.005962355257591039
+                                       ],
+                          "quaternion":  [
+                                             0,
+                                             0,
+                                             0,
+                                             1
+                                         ],
+                          "parent":  "rightUpperLeg"
+                      },
+    "rightFoot":  {
+                      "position":  [
+                                       0,
+                                       -0.33279213372773514,
+                                       -0.020098148877239687
+                                   ],
+                      "quaternion":  [
+                                         0,
+                                         0,
+                                         0,
+                                         1
+                                     ],
+                      "parent":  "rightLowerLeg"
+                  },
+    "rightToes":  {
+                      "position":  [
+                                       0,
+                                       -0.04209223810285849,
+                                       0.07388983617223949
+                                   ],
+                      "quaternion":  [
+                                         0,
+                                         0,
+                                         0,
+                                         1
+                                     ],
+                      "parent":  "rightFoot"
+                  },
+    "leftShoulder":  {
+                         "position":  [
+                                          0.0190760661,
+                                          0.0902732336801989,
+                                          -0.025598341163864707
+                                      ],
+                         "quaternion":  [
+                                            0,
+                                            0,
+                                            0,
+                                            1
+                                        ],
+                         "parent":  "upperChest"
+                     },
+    "leftUpperArm":  {
+                         "position":  [
+                                          0.06721214938144299,
+                                          -0.00959056485744747,
+                                          -2.511599251492358E-08
+                                      ],
+                         "quaternion":  [
+                                            0,
+                                            0,
+                                            0,
+                                            1
+                                        ],
+                         "parent":  "leftShoulder"
+                     },
+    "leftLowerArm":  {
+                         "position":  [
+                                          0.18544489967968902,
+                                          -7.5666108934058229E-09,
+                                          5.0331528736458075E-09
+                                      ],
+                         "quaternion":  [
+                                            0,
+                                            0,
+                                            0,
+                                            1
+                                        ],
+                         "parent":  "leftUpperArm"
+                     },
+    "leftHand":  {
+                     "position":  [
+                                      0.1785725996915038,
+                                      0.0000020206013744417106,
+                                      0.000011597897123516443
+                                  ],
+                     "quaternion":  [
+                                        0,
+                                        0,
+                                        0,
+                                        1
+                                    ],
+                     "parent":  "leftLowerArm"
+                 },
+    "rightShoulder":  {
+                          "position":  [
+                                           -0.0190760661,
+                                           0.0902732336801989,
+                                           -0.025598341163864707
+                                       ],
+                          "quaternion":  [
+                                             0,
+                                             0,
+                                             0,
+                                             1
+                                         ],
+                          "parent":  "upperChest"
+                      },
+    "rightUpperArm":  {
+                          "position":  [
+                                           -0.06721214938144299,
+                                           -0.00959056485744747,
+                                           -2.511599251492358E-08
+                                       ],
+                          "quaternion":  [
+                                             0,
+                                             0,
+                                             0,
+                                             1
+                                         ],
+                          "parent":  "rightShoulder"
+                      },
+    "rightLowerArm":  {
+                          "position":  [
+                                           -0.18544489967968902,
+                                           -7.5666108934058229E-09,
+                                           5.0331528736458075E-09
+                                       ],
+                          "quaternion":  [
+                                             0,
+                                             0,
+                                             0,
+                                             1
+                                         ],
+                          "parent":  "rightUpperArm"
+                      },
+    "rightHand":  {
+                      "position":  [
+                                       -0.1785725996915038,
+                                       0.0000020206013744417106,
+                                       0.000011597897123516443
+                                   ],
+                      "quaternion":  [
+                                         0,
+                                         0,
+                                         0,
+                                         1
+                                     ],
+                      "parent":  "rightLowerArm"
+                  },
+    "leftThumbMetacarpal":  {
+                                "position":  [
+                                                 0.0026947261335760753,
+                                                 -0.006974457870302819,
+                                                 0.012241474802543808
+                                             ],
+                                "quaternion":  [
+                                                   0,
+                                                   0,
+                                                   0,
+                                                   1
+                                               ],
+                                "parent":  "leftHand"
+                            },
+    "leftThumbProximal":  {
+                              "position":  [
+                                               0.027050959169936883,
+                                               -0.0014373225320611915,
+                                               0.02320672303297323
+                                           ],
+                              "quaternion":  [
+                                                 0,
+                                                 0,
+                                                 0,
+                                                 1
+                                             ],
+                              "parent":  "leftThumbMetacarpal"
+                          },
+    "leftThumbDistal":  {
+                            "position":  [
+                                             0.017202758141655283,
+                                             -0.0006842024442030858,
+                                             0.013595381317088866
+                                         ],
+                            "quaternion":  [
+                                               0,
+                                               0,
+                                               0,
+                                               1
+                                           ],
+                            "parent":  "leftThumbProximal"
+                        },
+    "leftIndexProximal":  {
+                              "position":  [
+                                               0.05007543978730378,
+                                               0.00514292366228597,
+                                               0.015073743332495594
+                                           ],
+                              "quaternion":  [
+                                                 0,
+                                                 0,
+                                                 0,
+                                                 1
+                                             ],
+                              "parent":  "leftHand"
+                          },
+    "leftIndexIntermediate":  {
+                                  "position":  [
+                                                   0.025436163665267686,
+                                                   1.1966061563839503E-07,
+                                                   -0.0004955310218952569
+                                               ],
+                                  "quaternion":  [
+                                                     0,
+                                                     0,
+                                                     0,
+                                                     1
+                                                 ],
+                                  "parent":  "leftIndexProximal"
+                              },
+    "leftIndexDistal":  {
+                            "position":  [
+                                             0.015646065071095783,
+                                             -0.0004123580131079052,
+                                             -0.0005681589533221383
+                                         ],
+                            "quaternion":  [
+                                               0,
+                                               0,
+                                               0,
+                                               1
+                                           ],
+                            "parent":  "leftIndexIntermediate"
+                        },
+    "leftMiddleProximal":  {
+                               "position":  [
+                                                0.05075761659972333,
+                                                0.005143043578088369,
+                                                0.0015697072903453936
+                                            ],
+                               "quaternion":  [
+                                                  0,
+                                                  0,
+                                                  0,
+                                                  1
+                                              ],
+                               "parent":  "leftHand"
+                           },
+    "leftMiddleIntermediate":  {
+                                   "position":  [
+                                                    0.028338015051052934,
+                                                    -9.4512708770366771E-10,
+                                                    1.5070667842148611E-08
+                                                ],
+                                   "quaternion":  [
+                                                      0,
+                                                      0,
+                                                      0,
+                                                      1
+                                                  ],
+                                   "parent":  "leftMiddleProximal"
+                               },
+    "leftMiddleDistal":  {
+                             "position":  [
+                                              0.017482399969803386,
+                                              -5.8307048078631851E-10,
+                                              -1.4796589113685865E-08
+                                          ],
+                             "quaternion":  [
+                                                0,
+                                                0,
+                                                0,
+                                                1
+                                            ],
+                             "parent":  "leftMiddleIntermediate"
+                         },
+    "leftRingProximal":  {
+                             "position":  [
+                                              0.05017939191279741,
+                                              0.005143044093314453,
+                                              -0.010420026320517618
+                                          ],
+                             "quaternion":  [
+                                                0,
+                                                0,
+                                                0,
+                                                1
+                                            ],
+                             "parent":  "leftHand"
+                         },
+    "leftRingIntermediate":  {
+                                 "position":  [
+                                                  0.026287257654595164,
+                                                  -8.7672979987019062E-10,
+                                                  1.5723947838219843E-10
+                                              ],
+                                 "quaternion":  [
+                                                    0,
+                                                    0,
+                                                    0,
+                                                    1
+                                                ],
+                                 "parent":  "leftRingProximal"
+                             },
+    "leftRingDistal":  {
+                           "position":  [
+                                            0.01517039537379683,
+                                            -5.05960828789398E-10,
+                                            -1.4810418565158745E-08
+                                        ],
+                           "quaternion":  [
+                                              0,
+                                              0,
+                                              0,
+                                              1
+                                          ],
+                           "parent":  "leftRingIntermediate"
+                       },
+    "leftLittleProximal":  {
+                               "position":  [
+                                                0.046724439830806264,
+                                                0.005142925323003311,
+                                                -0.02237336184765358
+                                            ],
+                               "quaternion":  [
+                                                  0,
+                                                  0,
+                                                  0,
+                                                  1
+                                              ],
+                               "parent":  "leftHand"
+                           },
+    "leftLittleIntermediate":  {
+                                   "position":  [
+                                                    0.024044841458465804,
+                                                    1.1840732438983537E-07,
+                                                    7.5944062219446273E-09
+                                                ],
+                                   "quaternion":  [
+                                                      0,
+                                                      0,
+                                                      0,
+                                                      1
+                                                  ],
+                                   "parent":  "leftLittleProximal"
+                               },
+    "leftLittleDistal":  {
+                             "position":  [
+                                              0.013857901076063883,
+                                              -4.6218717741908222E-10,
+                                              8.289222086510506E-11
+                                          ],
+                             "quaternion":  [
+                                                0,
+                                                0,
+                                                0,
+                                                1
+                                            ],
+                             "parent":  "leftLittleIntermediate"
+                         },
+    "rightThumbMetacarpal":  {
+                                 "position":  [
+                                                  -0.0026947261335760753,
+                                                  -0.006974457870302819,
+                                                  0.012241474802543808
+                                              ],
+                                 "quaternion":  [
+                                                    0,
+                                                    0,
+                                                    0,
+                                                    1
+                                                ],
+                                 "parent":  "rightHand"
+                             },
+    "rightThumbProximal":  {
+                               "position":  [
+                                                -0.027050959169936883,
+                                                -0.0014373225320611915,
+                                                0.02320672303297323
+                                            ],
+                               "quaternion":  [
+                                                  0,
+                                                  0,
+                                                  0,
+                                                  1
+                                              ],
+                               "parent":  "rightThumbMetacarpal"
+                           },
+    "rightThumbDistal":  {
+                             "position":  [
+                                              -0.017202758141655283,
+                                              -0.0006842024442030858,
+                                              0.013595381317088866
+                                          ],
+                             "quaternion":  [
+                                                0,
+                                                0,
+                                                0,
+                                                1
+                                            ],
+                             "parent":  "rightThumbProximal"
+                         },
+    "rightIndexProximal":  {
+                               "position":  [
+                                                -0.05007543978730378,
+                                                0.00514292366228597,
+                                                0.015073743332495594
+                                            ],
+                               "quaternion":  [
+                                                  0,
+                                                  0,
+                                                  0,
+                                                  1
+                                              ],
+                               "parent":  "rightHand"
+                           },
+    "rightIndexIntermediate":  {
+                                   "position":  [
+                                                    -0.025436163665267686,
+                                                    1.1966061563839503E-07,
+                                                    -0.0004955310218952569
+                                                ],
+                                   "quaternion":  [
+                                                      0,
+                                                      0,
+                                                      0,
+                                                      1
+                                                  ],
+                                   "parent":  "rightIndexProximal"
+                               },
+    "rightIndexDistal":  {
+                             "position":  [
+                                              -0.015646065071095783,
+                                              -0.0004123580131079052,
+                                              -0.0005681589533221383
+                                          ],
+                             "quaternion":  [
+                                                0,
+                                                0,
+                                                0,
+                                                1
+                                            ],
+                             "parent":  "rightIndexIntermediate"
+                         },
+    "rightMiddleProximal":  {
+                                "position":  [
+                                                 -0.05075761659972333,
+                                                 0.005143043578088369,
+                                                 0.0015697072903453936
+                                             ],
+                                "quaternion":  [
+                                                   0,
+                                                   0,
+                                                   0,
+                                                   1
+                                               ],
+                                "parent":  "rightHand"
+                            },
+    "rightMiddleIntermediate":  {
+                                    "position":  [
+                                                     -0.028338015051052934,
+                                                     -9.4512708770366771E-10,
+                                                     1.5070667842148611E-08
+                                                 ],
+                                    "quaternion":  [
+                                                       0,
+                                                       0,
+                                                       0,
+                                                       1
+                                                   ],
+                                    "parent":  "rightMiddleProximal"
+                                },
+    "rightMiddleDistal":  {
+                              "position":  [
+                                               -0.017482399969803386,
+                                               -5.8307048078631851E-10,
+                                               -1.4796589113685865E-08
+                                           ],
+                              "quaternion":  [
+                                                 0,
+                                                 0,
+                                                 0,
+                                                 1
+                                             ],
+                              "parent":  "rightMiddleIntermediate"
+                          },
+    "rightRingProximal":  {
+                              "position":  [
+                                               -0.05017939191279741,
+                                               0.005143044093314453,
+                                               -0.010420026320517618
+                                           ],
+                              "quaternion":  [
+                                                 0,
+                                                 0,
+                                                 0,
+                                                 1
+                                             ],
+                              "parent":  "rightHand"
+                          },
+    "rightRingIntermediate":  {
+                                  "position":  [
+                                                   -0.026287257654595164,
+                                                   -8.7672979987019062E-10,
+                                                   1.5723947838219843E-10
+                                               ],
+                                  "quaternion":  [
+                                                     0,
+                                                     0,
+                                                     0,
+                                                     1
+                                                 ],
+                                  "parent":  "rightRingProximal"
+                              },
+    "rightRingDistal":  {
+                            "position":  [
+                                             -0.01517039537379683,
+                                             -5.05960828789398E-10,
+                                             -1.4810418565158745E-08
+                                         ],
+                            "quaternion":  [
+                                               0,
+                                               0,
+                                               0,
+                                               1
+                                           ],
+                            "parent":  "rightRingIntermediate"
+                        },
+    "rightLittleProximal":  {
+                                "position":  [
+                                                 -0.046724439830806264,
+                                                 0.005142925323003311,
+                                                 -0.02237336184765358
+                                             ],
+                                "quaternion":  [
+                                                   0,
+                                                   0,
+                                                   0,
+                                                   1
+                                               ],
+                                "parent":  "rightHand"
+                            },
+    "rightLittleIntermediate":  {
+                                    "position":  [
+                                                     -0.024044841458465804,
+                                                     1.1840732438983537E-07,
+                                                     7.5944062219446273E-09
+                                                 ],
+                                    "quaternion":  [
+                                                       0,
+                                                       0,
+                                                       0,
+                                                       1
+                                                   ],
+                                    "parent":  "rightLittleProximal"
+                                },
+    "rightLittleDistal":  {
+                              "position":  [
+                                               -0.013857901076063883,
+                                               -4.6218717741908222E-10,
+                                               8.289222086510506E-11
+                                           ],
+                              "quaternion":  [
+                                                 0,
+                                                 0,
+                                                 0,
+                                                 1
+                                             ],
+                              "parent":  "rightLittleIntermediate"
+                          }
+}

@@ -1,4 +1,4 @@
-import { grabContactDistances } from '../../src/components/companion/grabContact';
+import { grabContactDistances, riderClearance } from '../../src/components/companion/grabContact';
 /**
  * Kaori Trick Lab — a browser live-tuner for the procedural trick animations.
  *
@@ -59,6 +59,7 @@ scene.add(new THREE.GridHelper(6, 12, 0x3a3f48, 0x2a2e35));
 // ---- load Kaori's VRM ----
 let vrm: VRM | null = null;
 let restBones: Record<string, number[]> = {};
+let normalizedRest: any = {};
 let returned: { mixer: THREE.AnimationMixer; action: THREE.AnimationAction; duration: number; board: Array<{ time: number; matrix: number[] }> } | null = null;
 let showingBlender = false;
 function currentDuration() { return showingBlender && returned ? returned.duration : TRICKS[state.trick as keyof typeof TRICKS].duration; }
@@ -73,6 +74,11 @@ loader.load(
     scene.add(vrm.scene);
     vrm.scene.updateMatrixWorld(true);
     restBones = boneMatrices();
+    const names = Object.keys(vrm.humanoid.humanBones);
+    normalizedRest = Object.fromEntries(names.map(name => {
+      const node = vrm!.humanoid.getNormalizedBoneNode(name as any)!;
+      return [name, { position: node.position.toArray(), quaternion: node.quaternion.toArray(), parent: names.find(n => vrm!.humanoid.getNormalizedBoneNode(n as any) === node.parent) ?? null }];
+    }));
     status('Kaori ready. Choose a trick, then scrub or export it to Blender.');
   },
   undefined,
@@ -93,6 +99,7 @@ for (const bx of [0.24, -0.24]) {
     new THREE.MeshStandardMaterial({ color: 0x141414 }),
   );
   bind.position.set(bx, 0.035, 0);
+  bind.rotation.y = bx > 0 ? -0.18 : 0.18;
   board.add(bind);
 }
 board.visible = false;
@@ -210,7 +217,7 @@ const styleBS = gui.addFolder('Style — BACKSIDE tweak (STYLE_BS)');
 for (const [k, mn, mx] of STYLE_KEYS)
   styleBS.add(STYLE_BS as unknown as Record<string, number>, k, mn, mx, 0.01).listen();
 
-const grabGUI = gui.addFolder('Grab reach');
+const grabGUI = gui.addFolder('Handplants / free arm');
 for (const key of Object.keys(GRAB_TUNING)) grabGUI.add(GRAB_TUNING, key, -3, 3, 0.01).listen();
 for (const folder of gui.folders) folder.close();
 
@@ -262,7 +269,10 @@ function applyAt(t: number) {
   vrm.scene.updateMatrixWorld(true);
   lockBoardToFeet();
   const gaps = Object.values(grabContactDistances(vrm.humanoid, pose));
+  const fit=riderClearance(vrm.humanoid,pose);
+  fit.bindingErrorMm=Math.abs(_lp.distanceTo(_rp)-.48)*1000;
   document.getElementById("contact")!.textContent = gaps.length ? `Held grab: wrist target gap ${Math.round(Math.max(...gaps)*1000)} mm` : "Grab contact: reach / release";
+  document.getElementById("contact")!.textContent += ` | Binding spacing error ${fit.bindingErrorMm.toFixed(1)} mm | Arm clearance ${fit.armClearanceMm?.toFixed(0) ?? "—"} mm`;
   board.updateMatrixWorld(true);
 }
 function frame() {
@@ -298,11 +308,11 @@ function frame() {
 }
 frame();
 
-window.addEventListener('resize', () => {
+new ResizeObserver(() => {
   renderer.setSize(stage.clientWidth, stage.clientHeight);
   camera.aspect = stage.clientWidth / stage.clientHeight;
   camera.updateProjectionMatrix();
-});
+}).observe(stage);
 
 function status(message: string) { document.getElementById('status')!.textContent = message; }
 const groups = { ARM_TUNING, ARM_TUNING_BS, HEAD_TUNING, HEAD_TUNING_BS, STYLE_BS, GRAB_TUNING };
@@ -348,8 +358,8 @@ for (const [id, sign] of [['previousFrame', -1], ['nextFrame', 1]] as const) {
   document.getElementById(id)!.onclick = () => { state.playing = false; state.t = THREE.MathUtils.clamp(state.t + sign / (30 * currentDuration()), 0, 1); };
 }
 document.querySelectorAll<HTMLButtonElement>('[data-time]').forEach(b => { b.onclick = () => { state.t = Number(b.dataset.time); state.playing = false; }; });
-document.getElementById('frontCamera')!.onclick = () => { camera.position.set(0, 1.15, 5.2); controls.update(); };
-document.getElementById('sideCamera')!.onclick = () => { camera.position.set(5.2, 1.15, 0); controls.update(); };
+document.getElementById('frontCamera')!.onclick = () => { camera.position.set(-2.6, 1.3, 1.5); controls.target.set(0, .7, 0); controls.update(); };
+document.getElementById('sideCamera')!.onclick = () => { camera.position.set(1.8, 1.3, 2.6); controls.target.set(0, .7, 0); controls.update(); };
 let localVideo: string | null = null;
 (document.getElementById('refFile') as HTMLInputElement).onchange = e => {
   const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return;
@@ -379,9 +389,9 @@ document.getElementById('exportMotion')!.onclick = async () => {
     const samples = [];
     for (let frame = 0; frame <= count; frame++) {
       const time = Math.min(frame / 30, duration); applyAt(time / duration);
-      samples.push({ time, bones: boneMatrices(), board: board.matrixWorld.toArray() });
+      samples.push({ time, normalizedBones: Object.fromEntries(Object.keys(restBones).map(name => [name, vrm!.humanoid.getNormalizedBoneNode(name as any)!.matrixWorld.toArray()])), bones: boneMatrices(), board: board.matrixWorld.toArray() });
     }
-    const response = await fetch('/__lab/motion', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-TrickLab': 'motion-v1' }, body: JSON.stringify({ version: 1, trick: state.trick, fps: 30, duration, space: 'three-world-column-major-y-up', restBones, samples, preset: preset() }) });
+    const response = await fetch('/__lab/motion', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-TrickLab': 'motion-v1' }, body: JSON.stringify({ version: 1, trick: state.trick, fps: 30, duration, space: 'three-world-column-major-y-up', restBones, normalizedRest, samples, preset: preset() }) });
     if (!response.ok) throw new Error(await response.text());
     const saved = await response.json(); status(`Saved ${saved.file}. Ready to import in Blender.`);
   } catch (e) { status(`Export failed: ${String(e)}`); }
@@ -410,21 +420,42 @@ document.getElementById('useProcedural')!.onclick = () => { showingBlender = fal
 
 document.getElementById('auditGrabs')!.onclick = async () => {
   if (!vrm) return;
-  const prior={...state}; const wasBlender=showingBlender;showingBlender=false;state.playing=false;
-  const results=[];
+  const prior={...state}, wasBlender=showingBlender;
+  showingBlender=false;state.playing=false;
+  const results=[];let bindingErrorMm=0;
   try {
     for(const [id,trick] of Object.entries(TRICKS)) {
-      const gaps:number[]=[];
+      const gaps:number[]=[], fits:ReturnType<typeof riderClearance>[]=[];
       state.trick=id;
-      for(let i=0;i<=100;i++) {
-        const t=i/100, pose=trick.poseAt(t*trick.duration);
-        if(pose.height <= .02 || Math.max(pose.grabFront,pose.grabRear)<.999)continue;
-        applyAt(t);gaps.push(...Object.values(grabContactDistances(vrm.humanoid,pose)));
+      for(let i=0;i<=400;i++) {
+        const t=i/400,pose=trick.poseAt(t*trick.duration);
+        if(pose.height<=.02 || Math.max(pose.grabFront,pose.grabRear)<.1)continue;
+        applyAt(t);
+        // Check the rendered/raw feet too, not only the normalized rig.
+        bindingErrorMm=Math.max(bindingErrorMm,Math.abs(_lp.distanceTo(_rp)-.48)*1000);
+        fits.push(riderClearance(vrm.humanoid,pose));
+        gaps.push(...Object.values(grabContactDistances(vrm.humanoid,pose)));
       }
-      if(gaps.length)results.push({trick:id,samples:gaps.length,maxGapMm:Math.round(Math.max(...gaps)*1000)});
+      if(gaps.length)results.push({trick:id,samples:fits.length,heldSamples:gaps.length,maxGapMm:Math.max(...gaps)*1000,minArmClearanceMm:Math.min(...fits.map(f=>f.armClearanceMm??Infinity))});
     }
-    const response=await fetch('/__lab/motion',{method:'POST',headers:{'Content-Type':'application/json','X-TrickLab':'motion-v1'},body:JSON.stringify({version:1,trick:'grab-contact-audit',samples:results})});
+    const response=await fetch('/__lab/motion',{method:'POST',headers:{'Content-Type':'application/json','X-TrickLab':'motion-v1'},body:JSON.stringify({version:1,trick:'grab-contact-audit',poses:results.reduce((n,r)=>n+r.samples,0),maxRenderedBindingErrorMm:bindingErrorMm,samples:results})});
     if(!response.ok)throw new Error(await response.text());
-    status(`Grab check: ${results.length} tricks; worst wrist gap ${Math.max(...results.map(r=>r.maxGapMm))} mm. Details saved to exports/grab-contact-audit.motion.json.`);
-  }catch(e){status(String(e));}finally{Object.assign(state,prior);showingBlender=wasBlender;}
+    const gap=Math.max(...results.map(r=>r.maxGapMm)),clearance=Math.min(...results.map(r=>r.minArmClearanceMm));
+    status(`${results.length} grabs checked through reach, hold and release. Worst wrist gap ${gap.toFixed(1)} mm; leg-capsule clearance ${clearance.toFixed(1)} mm; rendered binding error ${bindingErrorMm.toFixed(3)} mm. Capsule checks are a guide; inspect clothing and fingers visually.`);
+  }catch(e){status(String(e));}finally{Object.assign(state,prior);showingBlender=wasBlender;applyAt(state.t);}
+};
+document.getElementById("detailCamera")!.onclick=()=>{camera.position.set(-1.8,1.05,1.5);controls.target.set(0,.65,0);controls.update();};
+document.getElementById('savePose')!.onclick = async () => {
+  state.playing = false;
+  renderer.render(scene, camera);
+  const trick = `${state.trick}-pose-${Math.round(state.t * 10000)}`;
+  const response = await fetch('/__lab/motion', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-TrickLab': 'motion-v1' },
+    body: JSON.stringify({version: 1, trick, samples: [{phase: state.t, camera: camera.position.toArray(), png: renderer.domElement.toDataURL('image/png')}]}),
+  });
+  status(response.ok ? `Pose image saved in exports/${trick}.motion.json.` : 'Pose image could not be saved.');
+};
+document.getElementById('toggleReference')!.onclick = () => {
+  const hidden=document.getElementById('workspace')!.classList.toggle('reviewOnly');
+  document.getElementById('toggleReference')!.textContent=hidden?'Show reference':'Hide reference';
 };
