@@ -13,10 +13,13 @@ import GUI from 'lil-gui';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { advanceTime, validatePreset } from './workflow';
+import { VRMAnimationLoaderPlugin, createVRMAnimationClip } from '@pixiv/three-vrm-animation';
 
 import {
   ARM_TUNING,
   ARM_TUNING_BS,
+  GRAB_TUNING,
   applyRiderPose,
   resetRiderBones,
   STANCE_YAW,
@@ -26,6 +29,7 @@ import {
   HEAD_TUNING_BS,
   STYLE_BS,
   TRICKS,
+  riderRootAt,
 } from '../../src/components/companion/trickAnimations';
 
 // ---- three.js scene ----
@@ -39,7 +43,7 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x20242c);
 
 const camera = new THREE.PerspectiveCamera(30, stage.clientWidth / stage.clientHeight, 0.1, 100);
-camera.position.set(0, 1.15, 3.4);
+camera.position.set(0, 1.15, 5.2);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, 1.0, 0);
@@ -53,6 +57,10 @@ scene.add(new THREE.GridHelper(6, 12, 0x3a3f48, 0x2a2e35));
 
 // ---- load Kaori's VRM ----
 let vrm: VRM | null = null;
+let restBones: Record<string, number[]> = {};
+let returned: { mixer: THREE.AnimationMixer; action: THREE.AnimationAction; duration: number; board: Array<{ time: number; matrix: number[] }> } | null = null;
+let showingBlender = false;
+function currentDuration() { return showingBlender && returned ? returned.duration : TRICKS[state.trick as keyof typeof TRICKS].duration; }
 const loader = new GLTFLoader();
 loader.register((parser) => new VRMLoaderPlugin(parser));
 loader.load(
@@ -62,9 +70,12 @@ loader.load(
     VRMUtils.removeUnnecessaryVertices(gltf.scene);
     VRMUtils.combineSkeletons(gltf.scene);
     scene.add(vrm.scene);
+    vrm.scene.updateMatrixWorld(true);
+    restBones = boneMatrices();
+    status('Kaori ready. Choose a trick, then scrub or export it to Blender.');
   },
   undefined,
-  (err) => console.error('VRM load failed:', err),
+  (err) => { console.error(err); status('Could not load Kaori. Run npm run prepare:model and reload.'); },
 );
 
 // ---- snowboard, locked to her feet (like KaoriStage) so the leg tweaks read ----
@@ -118,7 +129,7 @@ function lockBoardToFeet() {
 
 // ---- controls / state ----
 // speed ≈ 1/duration plays a trick near real-time; the scrubber t is normalized.
-const state = { trick: Object.keys(TRICKS)[0], t: 0, playing: true, speed: 0.25 };
+const state = { trick: 'ollie', t: 0, playing: true, speed: 1, referenceSync: true, referenceOffset: 0, referenceSpan: 4.2 };
 // Dev hook: lets the console / automation scrub the lab precisely.
 (window as unknown as { __lab: typeof state }).__lab = state;
 (window as unknown as { __TRICKS: typeof TRICKS }).__TRICKS = TRICKS;
@@ -133,13 +144,8 @@ const state = { trick: Object.keys(TRICKS)[0], t: 0, playing: true, speed: 0.25 
 (window as unknown as { __controls: typeof controls }).__controls = controls;
 (window as unknown as { __vrmReady: () => boolean }).__vrmReady = () => vrm !== null;
 
-const gui = new GUI({ title: 'Kaori Trick Lab' });
+const gui = new GUI({ title: 'Motion tuning', container: document.getElementById('tuning')! });
 (window as unknown as { __gui: typeof gui }).__gui = gui;
-gui.add(state, 'trick', Object.keys(TRICKS)).name('trick');
-gui.add(state, 't', 0, 1, 0.001).name('t (scrub)').listen();
-gui.add(state, 'playing').name('▶ play');
-gui.add(state, 'speed', 0.05, 1.5, 0.05).name('speed');
-
 const ARM_KEYS = [
   'LIFT_AIR',
   'WRAP_AIR',
@@ -203,24 +209,9 @@ const styleBS = gui.addFolder('Style — BACKSIDE tweak (STYLE_BS)');
 for (const [k, mn, mx] of STYLE_KEYS)
   styleBS.add(STYLE_BS as unknown as Record<string, number>, k, mn, mx, 0.01).listen();
 
-gui
-  .add(
-    {
-      exportTuning: () => {
-        const out =
-          `ARM_TUNING = ${JSON.stringify(ARM_TUNING, null, 2)}\n\n` +
-          `ARM_TUNING_BS = ${JSON.stringify(ARM_TUNING_BS, null, 2)}\n\n` +
-          `HEAD_TUNING = ${JSON.stringify(HEAD_TUNING, null, 2)}\n\n` +
-          `HEAD_TUNING_BS = ${JSON.stringify(HEAD_TUNING_BS, null, 2)}\n\n` +
-          `STYLE_BS = ${JSON.stringify(STYLE_BS, null, 2)}`;
-        navigator.clipboard?.writeText(out).catch(() => {});
-        console.log(out);
-        alert('Arm + head tuning (front & back) copied to clipboard + logged.');
-      },
-    },
-    'exportTuning',
-  )
-  .name('⇩ export tuning');
+const grabGUI = gui.addFolder('Grab reach');
+for (const key of Object.keys(GRAB_TUNING)) grabGUI.add(GRAB_TUNING, key, -3, 3, 0.01).listen();
+for (const folder of gui.folders) folder.close();
 
 // ---- reference video ----
 const refVideo = document.getElementById('refVideo') as HTMLVideoElement;
@@ -252,39 +243,53 @@ const yAxis = new THREE.Vector3(0, 1, 0);
 // _flipPitchAxis or the lab verifies a different trick than the app performs.
 const flipAxis = new THREE.Vector3(0, 0, 1);
 
+function applyAt(t: number) {
+  if (!vrm) return;
+  const trick = TRICKS[state.trick as keyof typeof TRICKS];
+  const pose = trick.poseAt(t * trick.duration);
+  vrm.humanoid.resetNormalizedPose();
+  resetRiderBones(vrm.humanoid);
+  applyRiderPose(vrm.humanoid, pose, 1);
+  const root = riderRootAt(pose, trick);
+  const q = new THREE.Quaternion().setFromAxisAngle(yAxis, root.rootYaw)
+    .multiply(new THREE.Quaternion().setFromAxisAngle(flipAxis, root.rootPitch));
+  vrm.scene.quaternion.copy(q);
+  const offset = new THREE.Vector3(0, COM_Y, 0).applyQuaternion(q);
+  vrm.scene.position.set(-offset.x, COM_Y + root.rootY - offset.y, -offset.z);
+  // Deterministic body sampling; hair physics must not depend on scrub history.
+  vrm.humanoid.update();
+  vrm.scene.updateMatrixWorld(true);
+  lockBoardToFeet();
+  board.updateMatrixWorld(true);
+}
 function frame() {
   requestAnimationFrame(frame);
-  const dt = clock.getDelta();
-  if (state.playing) state.t = (state.t + dt * state.speed) % 1;
-
-  if (vrm) {
-    const trick = (TRICKS as Record<string, (typeof TRICKS)[keyof typeof TRICKS]>)[state.trick];
-    // poseAt is parameterized in SECONDS over the trick's `duration`; the
-    // scrubber is normalized 0..1, so map it into the trick's real time domain.
-    // (This is why the trick previously "only showed the wind-up" — we were
-    // sampling the first 1s of a multi-second trick.)
-    const pose = trick.poseAt(state.t * trick.duration);
-
-    resetRiderBones(vrm.humanoid);
-    applyRiderPose(vrm.humanoid, pose, 1);
-
-    // Whole-body yaw (spin) * pitch (flip), pivoted at the CoM so a flip
-    // somersaults about the hips rather than the feet.
-    const yaw =
-      STANCE_YAW +
-      ((trick as { yawOffset?: number }).yawOffset || 0) +
-      (trick.totalSpin || 0) * pose.spin;
-    const pitch = ((trick as { totalFlip?: number }).totalFlip || 0) * pose.pitch;
-    const q = new THREE.Quaternion()
-      .setFromAxisAngle(yAxis, yaw)
-      .multiply(new THREE.Quaternion().setFromAxisAngle(flipAxis, pitch));
-    vrm.scene.quaternion.copy(q);
-    const comOffset = new THREE.Vector3(0, COM_Y, 0).applyQuaternion(q);
-    vrm.scene.position.set(-comOffset.x, COM_Y + (pose.height || 0) - comOffset.y, -comOffset.z);
-
-    vrm.update(dt);
-    lockBoardToFeet();
+  const dt = Math.min(clock.getDelta(), 0.1);
+  const duration = currentDuration();
+  if (state.playing) state.t = advanceTime(state.t, dt, duration, state.speed);
+  if (showingBlender && returned && vrm) {
+    vrm.scene.position.set(0, 0, 0); vrm.scene.quaternion.identity();
+    returned.action.paused = false; returned.action.enabled = true;
+    returned.mixer.setTime(state.t * duration);
+    vrm.humanoid.update(); vrm.scene.updateMatrixWorld(true);
+    const samples = returned.board;
+    const at = Math.min(samples.length - 1, state.t * duration * 30);
+    const a = samples[Math.floor(at)], b = samples[Math.min(samples.length - 1, Math.ceil(at))];
+    const pa = new THREE.Vector3(), qa = new THREE.Quaternion(), sa = new THREE.Vector3();
+    const pb = new THREE.Vector3(), qb = new THREE.Quaternion(), sb = new THREE.Vector3();
+    new THREE.Matrix4().fromArray(a.matrix).decompose(pa, qa, sa);
+    new THREE.Matrix4().fromArray(b.matrix).decompose(pb, qb, sb);
+    board.position.copy(pa).lerp(pb, at % 1); board.quaternion.copy(qa).slerp(qb, at % 1); board.scale.copy(sa).lerp(sb, at % 1); board.visible = true;
+  } else applyAt(state.t);
+  if (state.referenceSync && Number.isFinite(refVideo.duration)) {
+    refVideo.pause();
+    const target = Math.max(0, Math.min(refVideo.duration, state.referenceOffset + state.t * state.referenceSpan));
+    if (Math.abs(refVideo.currentTime-target) > 0.035) refVideo.currentTime = target;
   }
+  const scrub = document.getElementById('scrub') as HTMLInputElement;
+  scrub.value = String(state.t);
+  document.getElementById('time')!.textContent = (state.t * duration).toFixed(2) + ' / ' + duration.toFixed(2) + ' s';
+  document.getElementById('play')!.textContent = state.playing ? 'Pause' : 'Play';
   renderer.render(scene, camera);
 }
 frame();
@@ -294,3 +299,107 @@ window.addEventListener('resize', () => {
   camera.aspect = stage.clientWidth / stage.clientHeight;
   camera.updateProjectionMatrix();
 });
+
+function status(message: string) { document.getElementById('status')!.textContent = message; }
+const groups = { ARM_TUNING, ARM_TUNING_BS, HEAD_TUNING, HEAD_TUNING_BS, STYLE_BS, GRAB_TUNING };
+const defaults = JSON.parse(JSON.stringify(groups));
+function preset() { return { version: 1, trick: state.trick, tuning: JSON.parse(JSON.stringify(groups)) }; }
+function loadPreset(value: unknown) {
+  const p = validatePreset(value, groups, Object.keys(TRICKS));
+  for (const [name, values] of Object.entries(groups)) Object.assign(values, p.tuning[name]);
+  state.trick = p.trick; state.t = 0; state.playing = false;
+  showingBlender = false;
+  (document.getElementById('trickSelect') as HTMLSelectElement).value = state.trick;
+  gui.controllersRecursive().forEach(c => c.updateDisplay());
+}
+gui.onFinishChange(() => {
+  try { localStorage.setItem('kaori-tricklab-v1', JSON.stringify(preset())); status('Draft saved in this browser. Download a preset to keep a portable copy.'); }
+  catch { status('Browser storage unavailable. Download a preset to save your changes.'); }
+});
+function download(name: string, value: unknown) {
+  const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' }));
+  const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+document.getElementById('savePreset')!.onclick = () => {
+  try { validatePreset(preset(), groups, Object.keys(TRICKS)); download(`${state.trick}.preset.json`, preset()); status('Preset download started.'); }
+  catch (e) { status(String(e)); }
+};
+document.getElementById('resetPreset')!.onclick = () => {
+  loadPreset({ version: 1, trick: state.trick, tuning: defaults });
+  try { localStorage.removeItem('kaori-tricklab-v1'); } catch {}
+  status('Default tuning restored.');
+};
+(document.getElementById('presetFile') as HTMLInputElement).onchange = async (event) => {
+  const file = (event.target as HTMLInputElement).files?.[0]; if (!file) return;
+  try { loadPreset(JSON.parse(await file.text())); status(`Loaded ${file.name}`); } catch (e) { status(String(e)); }
+};
+const trickSelect = document.getElementById('trickSelect') as HTMLSelectElement;
+for (const id of Object.keys(TRICKS)) { const option = document.createElement('option'); option.value = id; option.textContent = id.replaceAll('-', ' '); trickSelect.add(option); }
+trickSelect.value = state.trick;
+trickSelect.onchange = () => { state.trick = trickSelect.value; state.t = 0; showingBlender = false; };
+document.getElementById('play')!.onclick = () => { state.playing = !state.playing; };
+(document.getElementById('scrub') as HTMLInputElement).oninput = e => { state.t = Number((e.target as HTMLInputElement).value); state.playing = false; };
+(document.getElementById('speed') as HTMLSelectElement).onchange = e => { state.speed = Number((e.target as HTMLSelectElement).value); };
+for (const [id, sign] of [['previousFrame', -1], ['nextFrame', 1]] as const) {
+  document.getElementById(id)!.onclick = () => { state.playing = false; state.t = THREE.MathUtils.clamp(state.t + sign / (30 * currentDuration()), 0, 1); };
+}
+document.querySelectorAll<HTMLButtonElement>('[data-time]').forEach(b => { b.onclick = () => { state.t = Number(b.dataset.time); state.playing = false; }; });
+document.getElementById('frontCamera')!.onclick = () => { camera.position.set(0, 1.15, 5.2); controls.update(); };
+document.getElementById('sideCamera')!.onclick = () => { camera.position.set(5.2, 1.15, 0); controls.update(); };
+let localVideo: string | null = null;
+(document.getElementById('refFile') as HTMLInputElement).onchange = e => {
+  const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return;
+  if (localVideo) URL.revokeObjectURL(localVideo);
+  localVideo = URL.createObjectURL(file); refVideo.src = localVideo;
+};
+(document.getElementById('sync') as HTMLInputElement).onchange = e => { state.referenceSync = (e.target as HTMLInputElement).checked; };
+(document.getElementById('offset') as HTMLInputElement).oninput = e => { state.referenceOffset = Math.max(0, Number((e.target as HTMLInputElement).value) || 0); };
+(document.getElementById('span') as HTMLInputElement).oninput = e => { state.referenceSpan = Math.max(0.1, Number((e.target as HTMLInputElement).value) || 0.1); };
+refVideo.onerror = () => status('Reference video could not load. Try a local video file or a direct MP4 URL.');
+try { const stored = localStorage.getItem('kaori-tricklab-v1'); if (stored) loadPreset(JSON.parse(stored)); } catch { status('Saved draft was incompatible; using defaults.'); }
+
+function boneMatrices() {
+  const result: Record<string, number[]> = {};
+  if (vrm) for (const [name, bone] of Object.entries(vrm.humanoid.humanBones)) result[name] = bone.node.matrixWorld.toArray();
+  return result;
+}
+document.getElementById('exportMotion')!.onclick = async () => {
+  if (showingBlender) { status('Switch to procedural motion before sampling a new source take.'); return; }
+  if (!vrm) { status('Wait for Kaori to load.'); return; }
+  const prior = { t: state.t, playing: state.playing };
+  state.playing = false;
+  try {
+    validatePreset(preset(), groups, Object.keys(TRICKS));
+    const duration = TRICKS[state.trick as keyof typeof TRICKS].duration;
+    const count = Math.ceil(duration * 30);
+    const samples = [];
+    for (let frame = 0; frame <= count; frame++) {
+      const time = Math.min(frame / 30, duration); applyAt(time / duration);
+      samples.push({ time, bones: boneMatrices(), board: board.matrixWorld.toArray() });
+    }
+    const response = await fetch('/__lab/motion', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-TrickLab': 'motion-v1' }, body: JSON.stringify({ version: 1, trick: state.trick, fps: 30, duration, space: 'three-world-column-major-y-up', restBones, samples, preset: preset() }) });
+    if (!response.ok) throw new Error(await response.text());
+    const saved = await response.json(); status(`Saved ${saved.file}. Ready to import in Blender.`);
+  } catch (e) { status(`Export failed: ${String(e)}`); }
+  finally { Object.assign(state, prior); applyAt(state.t); }
+};
+
+document.getElementById('loadBlender')!.onclick = async () => {
+  if (!vrm) return;
+  const requested = state.trick;
+  try {
+    const loader = new GLTFLoader(); loader.register(parser => new VRMAnimationLoaderPlugin(parser));
+    const [gltf, response] = await Promise.all([loader.loadAsync(`/returns/${requested}.vrma?v=${Date.now()}`), fetch(`/returns/${requested}.board.json?v=${Date.now()}`)]);
+    if (!response.ok) throw new Error('Missing board export');
+    const data = await response.json();
+    if (state.trick !== requested) return;
+    const clip = createVRMAnimationClip(gltf.userData.vrmAnimations[0], vrm);
+    returned?.mixer.stopAllAction();
+    const mixer = new THREE.AnimationMixer(vrm.scene);
+    const action = mixer.clipAction(clip); action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true; action.play();
+    returned = { mixer, action, duration: clip.duration, board: data.samples };
+    showingBlender = true; state.t = 0; state.playing = false;
+    status(`Blender take loaded: ${requested}. Scrub to compare. Tuning sliders affect procedural mode only.`);
+  } catch (e) { status(`No Blender take available for ${requested}. Export it from the workshop first. ${String(e)}`); }
+};
+document.getElementById('useProcedural')!.onclick = () => { showingBlender = false; status('Procedural motion selected.'); };

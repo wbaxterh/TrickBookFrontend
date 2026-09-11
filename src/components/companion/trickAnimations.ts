@@ -1087,6 +1087,14 @@ export function startAction(state: TrickDemoState, action: Exclude<DemoAction, '
  * Advance the demo by dt. Returns false once the session has ended and
  * the stance has fully blended out (caller resumes idle animation).
  */
+export function riderRootAt(pose: RiderPose, timeline: TrickTimeline, stanceEase = 1) {
+  return {
+    rootYaw: (STANCE_YAW + (timeline.yawOffset ?? 0)) * stanceEase + timeline.totalSpin * pose.spin,
+    rootPitch: (timeline.totalFlip ?? 0) * pose.pitch * stanceEase,
+    rootY: pose.height - hipDropFor(pose.crouch * stanceEase),
+  };
+}
+
 export function driveDemo(vrm: VRM, state: TrickDemoState, dt: number): boolean {
   // Board/stance presence is DECOUPLED from the exact `session` flag. Kith
   // infers end-of-reply from a ~500ms audio-drain grace, which can flip
@@ -1129,7 +1137,6 @@ export function driveDemo(vrm: VRM, state: TrickDemoState, dt: number): boolean 
   // blend-out after the session ends stays in the riding stance (no REST snap).
   const pose = actionPose(state);
   const stanceEase = easeInOut(clamp01(state.stance));
-  const effectiveCrouch = pose.crouch * stanceEase;
 
   const humanoid = vrm.humanoid;
   if (humanoid) {
@@ -1137,15 +1144,15 @@ export function driveDemo(vrm: VRM, state: TrickDemoState, dt: number): boolean 
   }
 
   const timeline = TRICKS[state.trick];
-  state.rootYaw =
-    (STANCE_YAW + (timeline.yawOffset ?? 0)) * stanceEase + timeline.totalSpin * pose.spin;
+  const root = riderRootAt(pose, timeline, stanceEase);
+  state.rootYaw = root.rootYaw;
   // Flip pitch: signed totalFlip carried by pose.pitch, gated by stanceEase so a
   // partial strap-in never half-flips her. 0 for all spins (totalFlip omitted),
   // and spins keep pitch=0 / flips keep spin=0, so the two channels never fight.
-  state.rootPitch = (timeline.totalFlip ?? 0) * pose.pitch * stanceEase;
+  state.rootPitch = root.rootPitch;
   // Hips sink with the knee fold so the feet stay planted on the board (for a
   // flip this is the CoM/hip height on the jump arc that KaoriStage pivots around).
-  state.rootY = pose.height - hipDropFor(effectiveCrouch);
+  state.rootY = root.rootY;
   state.boardY = pose.height;
   state.boardOpacity = stanceEase;
   state.boardTilt = pose.boardTilt * stanceEase;

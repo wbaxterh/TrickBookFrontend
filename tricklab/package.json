@@ -4,11 +4,16 @@
   "type": "module",
   "description": "Browser live-tuner for Kaori's procedural snowboard trick animations. Shares the exact pose engine (src/components/companion) with the app so tuned values drop straight in.",
   "scripts": {
+    "prepare:model": "node scripts/prepare-model.cjs",
+    "predev": "npm run prepare:model",
+    "prebuild": "npm run prepare:model",
+    "test": "node scripts/test.cjs",
     "dev": "vite",
     "build": "vite build"
   },
   "dependencies": {
     "@pixiv/three-vrm": "3.5.2",
+    "@pixiv/three-vrm-animation": "3.5.2",
     "lil-gui": "^0.19.2",
     "three": "0.170.0"
   },
