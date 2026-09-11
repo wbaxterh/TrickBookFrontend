@@ -22,6 +22,7 @@ export default function HomiesLayout() {
     >
       <Stack.Screen name="index" />
       <Stack.Screen name="conversations" />
+      <Stack.Screen name="new-chat" options={{ presentation: 'modal' }} />
       <Stack.Screen name="[userId]" />
       <Stack.Screen name="chat/[conversationId]" />
       <Stack.Screen name="bot-chat/[botId]" />

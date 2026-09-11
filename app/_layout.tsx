@@ -18,6 +18,7 @@ import {
   syncLocalReminders,
 } from '@/lib/notifications';
 import { ThemeProvider } from '@/lib/providers/ThemeProvider';
+import { closeSocket, ensureSocket } from '@/lib/realtime/socket';
 import { useAuthStore } from '@/lib/stores/authStore';
 import { useLanguageStore } from '@/lib/stores/languageStore';
 // Initialize i18n before first render (detects device locale, falls back to en)
@@ -89,6 +90,16 @@ function AuthGate({ children }: { children: React.ReactNode }) {
       .loadStoredAuth()
       .finally(() => setHasCheckedAuth(true));
   }, []);
+
+  // Keep the realtime messaging socket alive while authenticated; close on logout.
+  const authToken = useAuthStore((s) => s.token);
+  useEffect(() => {
+    if (authToken) {
+      ensureSocket(authToken);
+    } else {
+      closeSocket();
+    }
+  }, [authToken]);
 
   // Re-validate auth when app returns to foreground (iOS kills JS context on memory pressure)
   useEffect(() => {

@@ -38,7 +38,6 @@ import {
 } from '@/lib/api/homies';
 import { getOrCreateConversation } from '@/lib/api/messages';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
-import { useAuthStore } from '@/lib/stores/authStore';
 
 const YELLOW = '#FCF150';
 const DARK = '#1a1a1a';
@@ -59,8 +58,7 @@ const SPORT_EMOJIS: Record<string, string> = {
 };
 
 export default function HomiesScreen() {
-  const { theme, colors, isDark } = useThemeContext();
-  const { user } = useAuthStore();
+  const { theme } = useThemeContext();
 
   // Tab state — honor a `?tab=` deep-link (e.g. from a homie-request notification tap)
   const params = useLocalSearchParams<{ tab?: string }>();
@@ -246,12 +244,41 @@ export default function HomiesScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={[styles.headerTitle, { color: theme.text }]}>Homies</Text>
-        <Pressable
-          style={[styles.messageButton, { backgroundColor: theme.surface }]}
-          onPress={() => router.push('/(tabs)/homies/conversations')}
-        >
-          <Ionicons name="chatbubble-outline" size={22} color={theme.text} />
-        </Pressable>
+        <View style={styles.headerActions}>
+          <Pressable
+            style={[styles.messageButton, { backgroundColor: theme.surface }]}
+            onPress={() => router.push('/(tabs)/homies/new-chat')}
+          >
+            <Ionicons name="create-outline" size={22} color={theme.text} />
+          </Pressable>
+          <Pressable
+            style={[styles.messageButton, { backgroundColor: theme.surface }]}
+            onPress={() => router.push('/(tabs)/homies/conversations')}
+          >
+            <Ionicons name="chatbubble-outline" size={22} color={theme.text} />
+          </Pressable>
+        </View>
+      </View>
+
+      {/* Search — pinned to the top */}
+      <View style={styles.searchContainer}>
+        <View style={[styles.searchBar, { backgroundColor: theme.surface }]}>
+          <Ionicons name="search" size={20} color={theme.textSecondary} />
+          <TextInput
+            style={[styles.searchInput, { color: theme.text }]}
+            placeholder={
+              activeTab === 'find' ? 'Search riders...' : 'Search homies & companions...'
+            }
+            placeholderTextColor={theme.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+          />
+          {searchQuery.length > 0 && (
+            <Pressable onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={20} color={theme.textSecondary} />
+            </Pressable>
+          )}
+        </View>
       </View>
 
       {/* Tab Toggle */}
@@ -289,27 +316,6 @@ export default function HomiesScreen() {
             Requests{receivedRequests.length > 0 ? ` (${receivedRequests.length})` : ''}
           </Text>
         </Pressable>
-      </View>
-
-      {/* Search */}
-      <View style={styles.searchContainer}>
-        <View style={[styles.searchBar, { backgroundColor: theme.surface }]}>
-          <Ionicons name="search" size={20} color={theme.textSecondary} />
-          <TextInput
-            style={[styles.searchInput, { color: theme.text }]}
-            placeholder={
-              activeTab === 'find' ? 'Search riders...' : 'Search homies & companions...'
-            }
-            placeholderTextColor={theme.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <Pressable onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={20} color={theme.textSecondary} />
-            </Pressable>
-          )}
-        </View>
       </View>
 
       {/* Content */}
@@ -673,6 +679,10 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: '700',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 10,
   },
   messageButton: {
     width: 44,

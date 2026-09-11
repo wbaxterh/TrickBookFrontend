@@ -8,6 +8,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { resolveAssetUrl } from '@/lib/utils';
 import { DIFFICULTY_COLORS, type Trick, type TrickDifficulty } from '@/types/trickbook';
 
 interface TrickCardProps {
@@ -19,7 +20,9 @@ interface TrickCardProps {
 export function TrickCard({ trick, onPress, onAddToList }: TrickCardProps) {
   const { theme, colors } = useThemeContext();
 
-  const thumbnailUri = trick.images?.[0];
+  // Resolve to an absolute URL — some tricks store website-relative image
+  // paths (e.g. "/images/trickipedia/bmx-180.jpg") that RN <Image> can't load.
+  const thumbnailUri = resolveAssetUrl(trick.images?.find((u) => u?.trim()));
   const hasVideo = !!trick.videoUrl;
   const difficultyColor =
     DIFFICULTY_COLORS[trick.difficulty as TrickDifficulty] || theme.textSecondary;

@@ -5,6 +5,7 @@
 
 import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { API_CONFIG } from '@/constants/api';
 
 /**
  * Combines class names using clsx and tailwind-merge
@@ -12,6 +13,24 @@ import { twMerge } from 'tailwind-merge';
  */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
+}
+
+/**
+ * Resolve an asset reference to an absolute URL the app can load.
+ *
+ * Shared trick/spot data sometimes stores website-relative paths (e.g.
+ * "/images/trickipedia/bmx-180.jpg") that resolve against the website origin
+ * on the web, but React Native's <Image> silently fails on relative URIs and
+ * needs an absolute one. Absolute (http/https/data) URLs pass through
+ * unchanged; root-relative paths are prefixed with the website origin.
+ */
+export function resolveAssetUrl(uri?: string | null): string | undefined {
+  if (!uri) return undefined;
+  const trimmed = uri.trim();
+  if (!trimmed) return undefined;
+  if (/^(https?:|data:)/i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith('/')) return `${API_CONFIG.assetBaseUrl}${trimmed}`;
+  return trimmed;
 }
 
 /**

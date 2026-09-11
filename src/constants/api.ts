@@ -6,8 +6,12 @@
 // Environment-based API URL
 const isDevelopment = __DEV__;
 
-// Use your computer's local IP for physical devices (localhost only works on simulators)
-const DEV_API_HOST = '192.168.1.242';
+// Dev backend host for physical devices (localhost only works on simulators).
+// Defaults to this Mac's Bonjour/mDNS name so it never goes stale when the LAN
+// IP changes — it resolves to whatever IP the machine currently has, on any
+// network. Override with EXPO_PUBLIC_DEV_API_HOST if mDNS is unavailable
+// (e.g. some Android setups) — set it to the machine's current LAN IP.
+const DEV_API_HOST = process.env.EXPO_PUBLIC_DEV_API_HOST || 'Wess-MacBook-Pro.local';
 
 export const API_CONFIG = {
   // Base URLs
@@ -17,6 +21,12 @@ export const API_CONFIG = {
 
   // Kith voice sidecar — streams Kaori's TTS audio + emotion events (3D stage)
   kithWsUrl: isDevelopment ? `ws://${DEV_API_HOST}:3040/ws` : 'wss://api.thetrickbook.com/kith/ws',
+
+  // Website origin for static assets stored as relative paths in shared data
+  // (e.g. trick images like "/images/trickipedia/bmx-180.jpg"). The web app
+  // resolves these against its own origin; the mobile app must make them
+  // absolute. These assets live on the published site in every environment.
+  assetBaseUrl: 'https://thetrickbook.com',
 
   // Bunny.net CDN for video streaming
   bunnyCdnHostname: 'vz-9b8a66dd-b7b.b-cdn.net',
