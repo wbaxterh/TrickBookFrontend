@@ -130,6 +130,20 @@ function CouchView({ theme, colors, onSwitchTab }: CouchViewProps) {
       .sort((a, b) => b.videos.length - a.videos.length);
   }, [recentVideos]);
 
+  // Rotate the hero across the whole catalog instead of always showing the one
+  // DB-flagged featured video. Pick a random film that has a poster (and
+  // ideally a description) each time the Couch loads; fall back to the curated
+  // featured, then to any recent video.
+  const heroVideo = useMemo(() => {
+    const withPoster = recentVideos.filter((v) => getThumbnailUrl(v));
+    const rich = withPoster.filter((v) => v.description);
+    const pool = rich.length > 0 ? rich : withPoster;
+    if (pool.length > 0) {
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+    return featured ?? recentVideos[0] ?? null;
+  }, [recentVideos, featured]);
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
@@ -148,7 +162,7 @@ function CouchView({ theme, colors, onSwitchTab }: CouchViewProps) {
     );
   }
 
-  const hasContent = featured || collections.length > 0 || recentVideos.length > 0;
+  const hasContent = heroVideo || collections.length > 0 || recentVideos.length > 0;
 
   return (
     <ScrollView
@@ -188,7 +202,7 @@ function CouchView({ theme, colors, onSwitchTab }: CouchViewProps) {
       {hasContent ? (
         <>
           {/* Hero Featured */}
-          {featured && <HeroSection video={featured} colors={colors} />}
+          {heroVideo && <HeroSection video={heroVideo} colors={colors} />}
 
           {/* Recent Videos Row */}
           {recentVideos.length > 0 && (
