@@ -58,7 +58,11 @@
     }
   },
   "submit": {
-    "production": {},
+    "production": {
+      "ios": {
+        "ascAppId": "6446022788"
+      }
+    },
     "playstore": {
       "android": {
         "serviceAccountKeyPath": "../../secrets/trickbook-0fd5cf54c409.json",
