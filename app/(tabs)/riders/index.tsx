@@ -37,7 +37,16 @@ function initials(name: string): string {
     .join('');
 }
 
-export default function RidersDirectory() {
+export default function RidersScreen() {
+  return <RidersDirectory />;
+}
+
+/**
+ * The Riders directory body. Rendered standalone by the (hidden) /riders route
+ * and embedded inside the Homies tab's "Riders" segment (embedded skips the
+ * outer SafeAreaView + page header so it sits under the Homies chrome).
+ */
+export function RidersDirectory({ embedded = false }: { embedded?: boolean }) {
   const { theme } = useThemeContext();
   const [query, setQuery] = useState('');
   const [sport, setSport] = useState('');
@@ -135,14 +144,22 @@ export default function RidersDirectory() {
     [pros, theme],
   );
 
+  const Container = embedded ? View : SafeAreaView;
+  const containerProps = embedded ? {} : { edges: ['top'] as const };
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Riders</Text>
-        <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
-          The people progressing action sports on TrickBook.
-        </Text>
-      </View>
+    <Container
+      style={[styles.container, { backgroundColor: theme.background }]}
+      {...containerProps}
+    >
+      {embedded ? null : (
+        <View style={styles.header}>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Riders</Text>
+          <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
+            The people progressing action sports on TrickBook.
+          </Text>
+        </View>
+      )}
 
       <View style={[styles.searchBar, { backgroundColor: theme.surface }]}>
         <Ionicons name="search" size={18} color={theme.textSecondary} />
@@ -268,7 +285,7 @@ export default function RidersDirectory() {
           }
         />
       )}
-    </SafeAreaView>
+    </Container>
   );
 }
 

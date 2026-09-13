@@ -101,7 +101,9 @@ function CouchView({ theme, colors, onSwitchTab }: CouchViewProps) {
       const [featuredData, collectionsData, videosData] = await Promise.all([
         getFeatured(),
         getCollections(),
-        getVideos({ limit: 20 }),
+        // Pull a large batch so the whole catalog can be browsed. Collections
+        // are largely empty, so we group these by sport into rows below.
+        getVideos({ limit: 100, sort: 'releaseYear' }),
       ]);
       setFeatured(featuredData);
       setCollections(collectionsData);
@@ -111,6 +113,22 @@ function CouchView({ theme, colors, onSwitchTab }: CouchViewProps) {
       setLoading(false);
     }
   }, []);
+
+  // Group the catalog into per-sport rows (largest first) so all videos are
+  // browsable even when curated collections don't exist yet.
+  const sportRows = useMemo(() => {
+    const groups = new Map<string, CouchVideo[]>();
+    for (const video of recentVideos) {
+      const sport = video.sportTypes?.[0] ?? 'Other';
+      const list = groups.get(sport) ?? [];
+      list.push(video);
+      groups.set(sport, list);
+    }
+    return Array.from(groups.entries())
+      .map(([sport, videos]) => ({ sport, videos }))
+      .filter((row) => row.videos.length >= 2)
+      .sort((a, b) => b.videos.length - a.videos.length);
+  }, [recentVideos]);
 
   useEffect(() => {
     fetchData();
@@ -173,11 +191,18 @@ function CouchView({ theme, colors, onSwitchTab }: CouchViewProps) {
           {featured && <HeroSection video={featured} colors={colors} />}
 
           {/* Recent Videos Row */}
-          {recentVideos.length > 0 && <MediaRow title="Recently Added" videos={recentVideos} />}
+          {recentVideos.length > 0 && (
+            <MediaRow title="Recently Added" videos={recentVideos.slice(0, 20)} />
+          )}
 
-          {/* Collections as Rows */}
+          {/* Curated collections, when they exist */}
           {collections.map((collection) => (
             <CollectionRow key={collection._id} collection={collection} />
+          ))}
+
+          {/* The full catalog, organized by sport */}
+          {sportRows.map((row) => (
+            <MediaRow key={row.sport} title={formatSportLabel(row.sport)} videos={row.videos} />
           ))}
         </>
       ) : (
@@ -294,6 +319,24 @@ function CollectionRow({ collection }: { collection: CouchCollection }) {
 }
 
 // Video Poster Component
+// The Couch stores surfing as `surf`; present sports with friendly labels.
+const SPORT_LABELS: Record<string, string> = {
+  snowboarding: 'Snowboarding',
+  skateboarding: 'Skateboarding',
+  surf: 'Surfing',
+  surfing: 'Surfing',
+  bmx: 'BMX',
+  mtb: 'Mountain Biking',
+  scooter: 'Scooter',
+  rollerblading: 'Rollerblading',
+  wakeboarding: 'Wakeboarding',
+  skiing: 'Skiing',
+};
+
+function formatSportLabel(sport: string): string {
+  return SPORT_LABELS[sport.toLowerCase()] ?? sport.charAt(0).toUpperCase() + sport.slice(1);
+}
+
 function VideoPoster({ video }: { video: CouchVideo }) {
   const posterUri = getThumbnailUrl(video);
 

@@ -83,21 +83,8 @@ export default function TabsLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="riders"
-        options={{
-          title: 'Riders',
-          tabBarIcon: ({ focused, color, size }) => (
-            <TabBarIcon
-              focused={focused}
-              color={color}
-              size={size}
-              name="people-circle-outline"
-              focusedName="people-circle"
-            />
-          ),
-        }}
-      />
+      {/* Riders lives inside the Homies tab (People · Riders segment) */}
+      <Tabs.Screen name="riders" options={{ href: null }} />
       <Tabs.Screen
         name="spots"
         options={{
@@ -113,21 +100,8 @@ export default function TabsLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="events"
-        options={{
-          title: 'Events',
-          tabBarIcon: ({ focused, color, size }) => (
-            <TabBarIcon
-              focused={focused}
-              color={color}
-              size={size}
-              name="calendar-outline"
-              focusedName="calendar"
-            />
-          ),
-        }}
-      />
+      {/* Events lives inside the Spots tab (Spots · Events segment) */}
+      <Tabs.Screen name="events" options={{ href: null }} />
       <Tabs.Screen
         name="homies"
         options={{

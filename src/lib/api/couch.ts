@@ -147,6 +147,21 @@ export async function getFeatured(): Promise<CouchVideo | null> {
   }
 }
 
+/** Search the film catalog by title/rider/producer (public). */
+export async function searchFilms(query: string, limit = 6): Promise<CouchVideo[]> {
+  try {
+    const params = new URLSearchParams({ q: query, limit: String(limit) });
+    const response = await apiClient.get<{ films?: CouchVideo[] } | CouchVideo[]>(
+      `/couch/films?${params.toString()}`,
+      { skipAuth: true },
+    );
+    if (Array.isArray(response)) return response;
+    return response.films ?? [];
+  } catch (_error) {
+    return [];
+  }
+}
+
 /**
  * Get all collections (with videos populated)
  */
