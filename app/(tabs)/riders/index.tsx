@@ -98,7 +98,16 @@ export function RidersDirectory({ embedded = false }: { embedded?: boolean }) {
     () =>
       pros.length > 0 ? (
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Pros</Text>
+          <Pressable
+            style={styles.sectionHeader}
+            onPress={() => router.push('/(tabs)/riders/pros')}
+          >
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Pros</Text>
+            <View style={styles.seeAll}>
+              <Text style={[styles.seeAllText, { color: theme.textSecondary }]}>See all</Text>
+              <Ionicons name="chevron-forward" size={15} color={theme.textSecondary} />
+            </View>
+          </Pressable>
           <FlatList
             horizontal
             data={pros}
@@ -310,7 +319,16 @@ const styles = StyleSheet.create({
   chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
   chipText: { fontSize: 13, fontWeight: '600' },
   section: { marginTop: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', paddingHorizontal: 16, marginBottom: 8 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  sectionTitle: { fontSize: 18, fontWeight: '700' },
+  seeAll: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  seeAllText: { fontSize: 14, fontWeight: '600' },
   shelfContent: { paddingHorizontal: 16, gap: 12 },
   proCard: { width: 120, borderRadius: 14, padding: 12, alignItems: 'center' },
   proAvatar: {
