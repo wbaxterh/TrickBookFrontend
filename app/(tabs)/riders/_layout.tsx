@@ -21,6 +21,7 @@ export default function RidersLayout() {
       }}
     >
       <Stack.Screen name="index" />
+      <Stack.Screen name="pros" />
       <Stack.Screen name="[slug]" />
     </Stack>
   );

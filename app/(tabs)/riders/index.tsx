@@ -37,7 +37,16 @@ function initials(name: string): string {
     .join('');
 }
 
-export default function RidersDirectory() {
+export default function RidersScreen() {
+  return <RidersDirectory />;
+}
+
+/**
+ * The Riders directory body. Rendered standalone by the (hidden) /riders route
+ * and embedded inside the Homies tab's "Riders" segment (embedded skips the
+ * outer SafeAreaView + page header so it sits under the Homies chrome).
+ */
+export function RidersDirectory({ embedded = false }: { embedded?: boolean }) {
   const { theme } = useThemeContext();
   const [query, setQuery] = useState('');
   const [sport, setSport] = useState('');
@@ -89,7 +98,16 @@ export default function RidersDirectory() {
     () =>
       pros.length > 0 ? (
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Pros</Text>
+          <Pressable
+            style={styles.sectionHeader}
+            onPress={() => router.push('/(tabs)/riders/pros')}
+          >
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Pros</Text>
+            <View style={styles.seeAll}>
+              <Text style={[styles.seeAllText, { color: theme.textSecondary }]}>See all</Text>
+              <Ionicons name="chevron-forward" size={15} color={theme.textSecondary} />
+            </View>
+          </Pressable>
           <FlatList
             horizontal
             data={pros}
@@ -135,14 +153,22 @@ export default function RidersDirectory() {
     [pros, theme],
   );
 
+  const Container = embedded ? View : SafeAreaView;
+  const containerProps = embedded ? {} : { edges: ['top'] as const };
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Riders</Text>
-        <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
-          The people progressing action sports on TrickBook.
-        </Text>
-      </View>
+    <Container
+      style={[styles.container, { backgroundColor: theme.background }]}
+      {...containerProps}
+    >
+      {embedded ? null : (
+        <View style={styles.header}>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Riders</Text>
+          <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
+            The people progressing action sports on TrickBook.
+          </Text>
+        </View>
+      )}
 
       <View style={[styles.searchBar, { backgroundColor: theme.surface }]}>
         <Ionicons name="search" size={18} color={theme.textSecondary} />
@@ -268,7 +294,7 @@ export default function RidersDirectory() {
           }
         />
       )}
-    </SafeAreaView>
+    </Container>
   );
 }
 
@@ -293,7 +319,16 @@ const styles = StyleSheet.create({
   chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
   chipText: { fontSize: 13, fontWeight: '600' },
   section: { marginTop: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: '700', paddingHorizontal: 16, marginBottom: 8 },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  sectionTitle: { fontSize: 18, fontWeight: '700' },
+  seeAll: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  seeAllText: { fontSize: 14, fontWeight: '600' },
   shelfContent: { paddingHorizontal: 16, gap: 12 },
   proCard: { width: 120, borderRadius: 14, padding: 12, alignItems: 'center' },
   proAvatar: {

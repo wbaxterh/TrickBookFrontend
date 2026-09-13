@@ -101,7 +101,9 @@ function CouchView({ theme, colors, onSwitchTab }: CouchViewProps) {
       const [featuredData, collectionsData, videosData] = await Promise.all([
         getFeatured(),
         getCollections(),
-        getVideos({ limit: 20 }),
+        // Pull a large batch so the whole catalog can be browsed. Collections
+        // are largely empty, so we group these by sport into rows below.
+        getVideos({ limit: 100, sort: 'releaseYear' }),
       ]);
       setFeatured(featuredData);
       setCollections(collectionsData);
@@ -111,6 +113,36 @@ function CouchView({ theme, colors, onSwitchTab }: CouchViewProps) {
       setLoading(false);
     }
   }, []);
+
+  // Group the catalog into per-sport rows (largest first) so all videos are
+  // browsable even when curated collections don't exist yet.
+  const sportRows = useMemo(() => {
+    const groups = new Map<string, CouchVideo[]>();
+    for (const video of recentVideos) {
+      const sport = video.sportTypes?.[0] ?? 'Other';
+      const list = groups.get(sport) ?? [];
+      list.push(video);
+      groups.set(sport, list);
+    }
+    return Array.from(groups.entries())
+      .map(([sport, videos]) => ({ sport, videos }))
+      .filter((row) => row.videos.length >= 2)
+      .sort((a, b) => b.videos.length - a.videos.length);
+  }, [recentVideos]);
+
+  // Rotate the hero across the whole catalog instead of always showing the one
+  // DB-flagged featured video. Pick a random film that has a poster (and
+  // ideally a description) each time the Couch loads; fall back to the curated
+  // featured, then to any recent video.
+  const heroVideo = useMemo(() => {
+    const withPoster = recentVideos.filter((v) => getThumbnailUrl(v));
+    const rich = withPoster.filter((v) => v.description);
+    const pool = rich.length > 0 ? rich : withPoster;
+    if (pool.length > 0) {
+      return pool[Math.floor(Math.random() * pool.length)];
+    }
+    return featured ?? recentVideos[0] ?? null;
+  }, [recentVideos, featured]);
 
   useEffect(() => {
     fetchData();
@@ -130,7 +162,7 @@ function CouchView({ theme, colors, onSwitchTab }: CouchViewProps) {
     );
   }
 
-  const hasContent = featured || collections.length > 0 || recentVideos.length > 0;
+  const hasContent = heroVideo || collections.length > 0 || recentVideos.length > 0;
 
   return (
     <ScrollView
@@ -170,14 +202,21 @@ function CouchView({ theme, colors, onSwitchTab }: CouchViewProps) {
       {hasContent ? (
         <>
           {/* Hero Featured */}
-          {featured && <HeroSection video={featured} colors={colors} />}
+          {heroVideo && <HeroSection video={heroVideo} colors={colors} />}
 
           {/* Recent Videos Row */}
-          {recentVideos.length > 0 && <MediaRow title="Recently Added" videos={recentVideos} />}
+          {recentVideos.length > 0 && (
+            <MediaRow title="Recently Added" videos={recentVideos.slice(0, 20)} />
+          )}
 
-          {/* Collections as Rows */}
+          {/* Curated collections, when they exist */}
           {collections.map((collection) => (
             <CollectionRow key={collection._id} collection={collection} />
+          ))}
+
+          {/* The full catalog, organized by sport */}
+          {sportRows.map((row) => (
+            <MediaRow key={row.sport} title={formatSportLabel(row.sport)} videos={row.videos} />
           ))}
         </>
       ) : (
@@ -294,6 +333,24 @@ function CollectionRow({ collection }: { collection: CouchCollection }) {
 }
 
 // Video Poster Component
+// The Couch stores surfing as `surf`; present sports with friendly labels.
+const SPORT_LABELS: Record<string, string> = {
+  snowboarding: 'Snowboarding',
+  skateboarding: 'Skateboarding',
+  surf: 'Surfing',
+  surfing: 'Surfing',
+  bmx: 'BMX',
+  mtb: 'Mountain Biking',
+  scooter: 'Scooter',
+  rollerblading: 'Rollerblading',
+  wakeboarding: 'Wakeboarding',
+  skiing: 'Skiing',
+};
+
+function formatSportLabel(sport: string): string {
+  return SPORT_LABELS[sport.toLowerCase()] ?? sport.charAt(0).toUpperCase() + sport.slice(1);
+}
+
 function VideoPoster({ video }: { video: CouchVideo }) {
   const posterUri = getThumbnailUrl(video);
 

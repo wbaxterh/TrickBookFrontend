@@ -117,7 +117,9 @@ export default {
       googleServicesFile: process.env.GOOGLE_SERVICES_JSON || '../../secrets/google-services.json',
       adaptiveIcon: {
         foregroundImage: './assets/images/adaptive-icon.png',
-        backgroundColor: '#121212',
+        // Brand yellow — matches the icon art's background so the adaptive
+        // mask crops seamlessly instead of showing a dark edge.
+        backgroundColor: '#FCF150',
       },
       config: {
         googleMaps: {

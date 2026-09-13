@@ -21,10 +21,12 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ActionCard, ActivityCard, CompanionWidget, FeedCTA, GoalCard } from '@/components/home';
+import { GlobalSearch } from '@/components/search/GlobalSearch';
 import { Avatar, Card, CountBadge, IconButton, SectionHeader } from '@/components/ui';
 import { colors as brandColors } from '@/constants/colors';
 import { apiClient } from '@/lib/api/client';
@@ -83,6 +85,8 @@ export default function HomeScreen() {
   const [companion, setCompanion] = useState<Bot | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searching = searchQuery.trim().length > 0;
 
   // Fetch data on mount
   const fetchData = useCallback(async () => {
@@ -236,185 +240,214 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Primary Action Cards */}
-        <View style={styles.actionsRow}>
-          <ActionCard
-            icon="add-circle"
-            label="Add Trick"
-            sublabel="Track progress"
-            onPress={() => router.push('/(tabs)/trickbook')}
+        {/* Global search — one box across tricks, spots, riders, events, films */}
+        <View style={styles.searchBar}>
+          <Ionicons name="search" size={20} color={theme.textSecondary} />
+          <TextInput
+            style={[styles.searchInput, { color: theme.text }]}
+            placeholder="Search TrickBook"
+            placeholderTextColor={theme.textSecondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            returnKeyType="search"
           />
-          <ActionCard
-            icon="book"
-            label="Trickipedia"
-            sublabel="Learn new tricks"
-            onPress={() => router.push('/(tabs)/trickbook')}
-          />
-          <ActionCard
-            icon="location"
-            label="Find a Spot"
-            sublabel="Explore nearby"
-            onPress={() => router.push('/(tabs)/spots')}
-          />
+          {searchQuery.length > 0 && (
+            <Pressable onPress={() => setSearchQuery('')} hitSlop={8}>
+              <Ionicons name="close-circle" size={20} color={theme.textSecondary} />
+            </Pressable>
+          )}
         </View>
 
-        {/* Companion Widget */}
-        <View style={styles.sectionPadded}>
-          <CompanionWidget
-            bot={companion}
-            // Primary press drops straight into the 3D voice stage (Kaori only
-            // has a stage so far; other bots fall back to text chat).
-            onPress={() => {
-              if (!companion) return;
-              const hasStage = (companion.botCharacter ?? companion.name)
-                .toLowerCase()
-                .includes('kaori');
-              if (hasStage) {
-                router.push({
-                  pathname: '/(tabs)/homies/companion-stage/[botId]',
-                  params: { botId: companion._id, name: companion.name },
-                });
-              } else {
-                router.push(`/(tabs)/homies/bot-chat/${companion._id}`);
-              }
-            }}
-            // Secondary button always offers the text chat.
-            onChat={() => companion && router.push(`/(tabs)/homies/bot-chat/${companion._id}`)}
-          />
-        </View>
+        {searching ? (
+          <GlobalSearch query={searchQuery} />
+        ) : (
+          <>
+            {/* Primary Action Cards */}
+            <View style={styles.actionsRow}>
+              <ActionCard
+                icon="add-circle"
+                label="Add Trick"
+                sublabel="Track progress"
+                onPress={() => router.push('/(tabs)/trickbook')}
+              />
+              <ActionCard
+                icon="book"
+                label="Trickipedia"
+                sublabel="Learn new tricks"
+                onPress={() => router.push('/(tabs)/trickbook')}
+              />
+              <ActionCard
+                icon="location"
+                label="Find a Spot"
+                sublabel="Explore nearby"
+                onPress={() => router.push('/(tabs)/spots')}
+              />
+            </View>
 
-        {/* Current Goals - Horizontal Scroll */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderPadded}>
-            <SectionHeader
-              title="Current Goals"
-              action={{
-                label: 'View All',
-                onPress: () =>
-                  router.push({ pathname: '/(tabs)/trickbook', params: { tab: 'mylists' } }),
-              }}
-            />
-          </View>
+            {/* Companion Widget */}
+            <View style={styles.sectionPadded}>
+              <CompanionWidget
+                bot={companion}
+                // Primary press drops straight into the 3D voice stage (Kaori only
+                // has a stage so far; other bots fall back to text chat).
+                onPress={() => {
+                  if (!companion) return;
+                  const hasStage = (companion.botCharacter ?? companion.name)
+                    .toLowerCase()
+                    .includes('kaori');
+                  if (hasStage) {
+                    router.push({
+                      pathname: '/(tabs)/homies/companion-stage/[botId]',
+                      params: { botId: companion._id, name: companion.name },
+                    });
+                  } else {
+                    router.push(`/(tabs)/homies/bot-chat/${companion._id}`);
+                  }
+                }}
+                // Secondary button always offers the text chat.
+                onChat={() => companion && router.push(`/(tabs)/homies/bot-chat/${companion._id}`)}
+              />
+            </View>
 
-          {currentGoals.length > 0 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.goalsScroll}
-            >
-              {currentGoals.map((goal) => (
-                <GoalCard
-                  key={goal.id}
-                  trickName={goal.name}
-                  status={goal.status}
-                  progress={goal.progress}
-                  onUpdate={() => {
-                    router.push(`/(tabs)/trickbook/list/${goal.listId}`);
+            {/* Current Goals - Horizontal Scroll */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeaderPadded}>
+                <SectionHeader
+                  title="Current Goals"
+                  action={{
+                    label: 'View All',
+                    onPress: () =>
+                      router.push({ pathname: '/(tabs)/trickbook', params: { tab: 'mylists' } }),
                   }}
                 />
-              ))}
-            </ScrollView>
-          ) : (
-            <View style={styles.sectionPadded}>
-              <Card padding="lg">
-                <View style={styles.emptyState}>
-                  <Ionicons name="list-outline" size={40} color={theme.textSecondary} />
-                  <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                    No tricks tracked yet. Start adding tricks to your TrickBook!
-                  </Text>
-                  <Pressable
-                    style={[styles.emptyButton, { backgroundColor: colors.primary }]}
-                    onPress={() => router.push('/(tabs)/trickbook')}
-                  >
-                    <Text style={styles.emptyButtonText}>Open TrickBook</Text>
-                  </Pressable>
+              </View>
+
+              {currentGoals.length > 0 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.goalsScroll}
+                >
+                  {currentGoals.map((goal) => (
+                    <GoalCard
+                      key={goal.id}
+                      trickName={goal.name}
+                      status={goal.status}
+                      progress={goal.progress}
+                      onUpdate={() => {
+                        router.push(`/(tabs)/trickbook/list/${goal.listId}`);
+                      }}
+                    />
+                  ))}
+                </ScrollView>
+              ) : (
+                <View style={styles.sectionPadded}>
+                  <Card padding="lg">
+                    <View style={styles.emptyState}>
+                      <Ionicons name="list-outline" size={40} color={theme.textSecondary} />
+                      <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                        No tricks tracked yet. Start adding tricks to your TrickBook!
+                      </Text>
+                      <Pressable
+                        style={[styles.emptyButton, { backgroundColor: colors.primary }]}
+                        onPress={() => router.push('/(tabs)/trickbook')}
+                      >
+                        <Text style={styles.emptyButtonText}>Open TrickBook</Text>
+                      </Pressable>
+                    </View>
+                  </Card>
                 </View>
-              </Card>
+              )}
             </View>
-          )}
-        </View>
 
-        {/* Feed CTA */}
-        <View style={styles.sectionPadded}>
-          <FeedCTA onPress={() => router.push('/(tabs)/media?tab=feed')} />
-        </View>
-
-        {/* Homie Activity - Horizontal Scroll */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeaderPadded}>
-            <SectionHeader
-              title="Homie Activity"
-              action={{
-                label: 'See All',
-                onPress: () => router.push('/(tabs)/homies'),
-              }}
-            />
-          </View>
-
-          {homieActivity.length > 0 ? (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.activityScroll}
-            >
-              {homieActivity.map((activity, index) => {
-                const activityType =
-                  activity.type === 'post' ? 'added' : activity.type === 'spot' ? 'spot' : 'added';
-                const subject =
-                  activity.data?.caption || activity.data?.name || activity.action || 'content';
-
-                return (
-                  <ActivityCard
-                    key={`${activity.data?._id || index}-${index}`}
-                    user={{
-                      id: (activity as any).userId || '',
-                      name: activity.userName || 'Homie',
-                      imageUri: activity.userImage,
-                    }}
-                    activityType={activityType}
-                    subject={subject}
-                    timestamp={activity.createdAt}
-                    onPress={() => {
-                      if (activity.type === 'post' && activity.data?._id) {
-                        router.push(`/(tabs)/media/post/${activity.data._id}`);
-                      } else if (activity.type === 'spot' && activity.data?._id) {
-                        router.push(`/(tabs)/spots/${activity.data._id}`);
-                      }
-                    }}
-                  />
-                );
-              })}
-            </ScrollView>
-          ) : homies.length > 0 ? (
+            {/* Feed CTA */}
             <View style={styles.sectionPadded}>
-              <Card padding="lg">
-                <View style={styles.emptyState}>
-                  <Ionicons name="time-outline" size={40} color={theme.textSecondary} />
-                  <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                    No recent activity from your homies
-                  </Text>
-                </View>
-              </Card>
+              <FeedCTA onPress={() => router.push('/(tabs)/media?tab=feed')} />
             </View>
-          ) : (
-            <View style={styles.sectionPadded}>
-              <Card padding="lg">
-                <View style={styles.emptyState}>
-                  <Ionicons name="people-outline" size={40} color={theme.textSecondary} />
-                  <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                    Connect with homies to see their activity here
-                  </Text>
-                  <Pressable
-                    style={[styles.emptyButton, { backgroundColor: colors.primary }]}
-                    onPress={() => router.push('/(tabs)/homies')}
-                  >
-                    <Text style={styles.emptyButtonText}>Find Homies</Text>
-                  </Pressable>
+
+            {/* Homie Activity - Horizontal Scroll */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeaderPadded}>
+                <SectionHeader
+                  title="Homie Activity"
+                  action={{
+                    label: 'See All',
+                    onPress: () => router.push('/(tabs)/homies'),
+                  }}
+                />
+              </View>
+
+              {homieActivity.length > 0 ? (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.activityScroll}
+                >
+                  {homieActivity.map((activity, index) => {
+                    const activityType =
+                      activity.type === 'post'
+                        ? 'added'
+                        : activity.type === 'spot'
+                          ? 'spot'
+                          : 'added';
+                    const subject =
+                      activity.data?.caption || activity.data?.name || activity.action || 'content';
+
+                    return (
+                      <ActivityCard
+                        key={`${activity.data?._id || index}-${index}`}
+                        user={{
+                          id: (activity as any).userId || '',
+                          name: activity.userName || 'Homie',
+                          imageUri: activity.userImage,
+                        }}
+                        activityType={activityType}
+                        subject={subject}
+                        timestamp={activity.createdAt}
+                        onPress={() => {
+                          if (activity.type === 'post' && activity.data?._id) {
+                            router.push(`/(tabs)/media/post/${activity.data._id}`);
+                          } else if (activity.type === 'spot' && activity.data?._id) {
+                            router.push(`/(tabs)/spots/${activity.data._id}`);
+                          }
+                        }}
+                      />
+                    );
+                  })}
+                </ScrollView>
+              ) : homies.length > 0 ? (
+                <View style={styles.sectionPadded}>
+                  <Card padding="lg">
+                    <View style={styles.emptyState}>
+                      <Ionicons name="time-outline" size={40} color={theme.textSecondary} />
+                      <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                        No recent activity from your homies
+                      </Text>
+                    </View>
+                  </Card>
                 </View>
-              </Card>
+              ) : (
+                <View style={styles.sectionPadded}>
+                  <Card padding="lg">
+                    <View style={styles.emptyState}>
+                      <Ionicons name="people-outline" size={40} color={theme.textSecondary} />
+                      <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                        Connect with homies to see their activity here
+                      </Text>
+                      <Pressable
+                        style={[styles.emptyButton, { backgroundColor: colors.primary }]}
+                        onPress={() => router.push('/(tabs)/homies')}
+                      >
+                        <Text style={styles.emptyButtonText}>Find Homies</Text>
+                      </Pressable>
+                    </View>
+                  </Card>
+                </View>
+              )}
             </View>
-          )}
-        </View>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -466,6 +499,17 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '700',
   },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(127,127,127,0.12)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    marginBottom: 20,
+  },
+  searchInput: { flex: 1, fontSize: 16 },
   actionsRow: {
     flexDirection: 'row',
     paddingHorizontal: 20,

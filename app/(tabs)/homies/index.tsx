@@ -38,11 +38,12 @@ import {
 } from '@/lib/api/homies';
 import { getOrCreateConversation } from '@/lib/api/messages';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
+import { RidersDirectory } from '../riders';
 
 const YELLOW = '#FCF150';
 const DARK = '#1a1a1a';
 
-type TabType = 'homies' | 'find' | 'requests';
+type TabType = 'homies' | 'find' | 'riders' | 'requests';
 
 // Sport emojis mapping
 const SPORT_EMOJIS: Record<string, string> = {
@@ -62,16 +63,19 @@ export default function HomiesScreen() {
 
   // Tab state — honor a `?tab=` deep-link (e.g. from a homie-request notification tap)
   const params = useLocalSearchParams<{ tab?: string }>();
-  const initialTab: TabType =
-    params.tab === 'requests' || params.tab === 'find' ? (params.tab as TabType) : 'homies';
+  const VALID_TABS: TabType[] = ['homies', 'find', 'riders', 'requests'];
+  const initialTab: TabType = VALID_TABS.includes(params.tab as TabType)
+    ? (params.tab as TabType)
+    : 'homies';
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [searchQuery, setSearchQuery] = useState('');
 
   // If the screen is already mounted when the deep-link fires, switch tabs.
   useEffect(() => {
-    if (params.tab === 'requests' || params.tab === 'find' || params.tab === 'homies') {
+    if (VALID_TABS.includes(params.tab as TabType)) {
       setActiveTab(params.tab as TabType);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.tab]);
 
   // Data state
@@ -260,26 +264,28 @@ export default function HomiesScreen() {
         </View>
       </View>
 
-      {/* Search — pinned to the top */}
-      <View style={styles.searchContainer}>
-        <View style={[styles.searchBar, { backgroundColor: theme.surface }]}>
-          <Ionicons name="search" size={20} color={theme.textSecondary} />
-          <TextInput
-            style={[styles.searchInput, { color: theme.text }]}
-            placeholder={
-              activeTab === 'find' ? 'Search riders...' : 'Search homies & companions...'
-            }
-            placeholderTextColor={theme.textSecondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          {searchQuery.length > 0 && (
-            <Pressable onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={20} color={theme.textSecondary} />
-            </Pressable>
-          )}
+      {/* Search — pinned to the top. The Riders segment brings its own search. */}
+      {activeTab !== 'riders' && (
+        <View style={styles.searchContainer}>
+          <View style={[styles.searchBar, { backgroundColor: theme.surface }]}>
+            <Ionicons name="search" size={20} color={theme.textSecondary} />
+            <TextInput
+              style={[styles.searchInput, { color: theme.text }]}
+              placeholder={
+                activeTab === 'find' ? 'Search riders...' : 'Search homies & companions...'
+              }
+              placeholderTextColor={theme.textSecondary}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <Pressable onPress={() => setSearchQuery('')}>
+                <Ionicons name="close-circle" size={20} color={theme.textSecondary} />
+              </Pressable>
+            )}
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Tab Toggle */}
       <View style={[styles.tabContainer, { backgroundColor: theme.surface }]}>
@@ -290,7 +296,7 @@ export default function HomiesScreen() {
           <Text
             style={[styles.tabText, { color: activeTab === 'homies' ? DARK : theme.textSecondary }]}
           >
-            My Homies
+            Homies
           </Text>
         </Pressable>
         <Pressable
@@ -301,6 +307,16 @@ export default function HomiesScreen() {
             style={[styles.tabText, { color: activeTab === 'find' ? DARK : theme.textSecondary }]}
           >
             Find
+          </Text>
+        </Pressable>
+        <Pressable
+          style={[styles.tab, activeTab === 'riders' && { backgroundColor: YELLOW }]}
+          onPress={() => setActiveTab('riders')}
+        >
+          <Text
+            style={[styles.tabText, { color: activeTab === 'riders' ? DARK : theme.textSecondary }]}
+          >
+            Riders
           </Text>
         </Pressable>
         <Pressable
@@ -318,8 +334,11 @@ export default function HomiesScreen() {
         </Pressable>
       </View>
 
-      {/* Content */}
-      {loading ? (
+      {/* Content — Riders self-manages its own loading/data, so it sits
+          outside the homies-data loading gate. */}
+      {activeTab === 'riders' ? (
+        <RidersDirectory embedded />
+      ) : loading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={YELLOW} />
         </View>

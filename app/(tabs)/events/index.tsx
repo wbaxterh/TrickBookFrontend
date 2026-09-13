@@ -101,7 +101,16 @@ function EventCard({
   );
 }
 
-export default function EventsDiscovery() {
+export default function EventsScreen() {
+  return <EventsDiscovery />;
+}
+
+/**
+ * The Events discovery body. Rendered standalone by the (hidden) /events route
+ * and embedded inside the Spots tab's "Events" segment (embedded skips the
+ * outer SafeAreaView + page header so it sits under the Spots chrome).
+ */
+export function EventsDiscovery({ embedded = false }: { embedded?: boolean }) {
   const { theme } = useThemeContext();
   const [query, setQuery] = useState('');
   const [sport, setSport] = useState('');
@@ -148,14 +157,22 @@ export default function EventsDiscovery() {
     }
   }, [cursor, loading, loadingMore, query, sport, date]);
 
+  const Container = embedded ? View : SafeAreaView;
+  const containerProps = embedded ? {} : { edges: ['top'] as const };
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Events</Text>
-        <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
-          Contests, premieres, and sessions across action sports.
-        </Text>
-      </View>
+    <Container
+      style={[styles.container, { backgroundColor: theme.background }]}
+      {...containerProps}
+    >
+      {embedded ? null : (
+        <View style={styles.header}>
+          <Text style={[styles.headerTitle, { color: theme.text }]}>Events</Text>
+          <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
+            Contests, premieres, and sessions across action sports.
+          </Text>
+        </View>
+      )}
 
       <View style={[styles.searchBar, { backgroundColor: theme.surface }]}>
         <Ionicons name="search" size={18} color={theme.textSecondary} />
@@ -260,7 +277,7 @@ export default function EventsDiscovery() {
           }
         />
       )}
-    </SafeAreaView>
+    </Container>
   );
 }
 

@@ -51,6 +51,7 @@ import { projectToScreenXY } from '@/lib/mapProjection';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
 import type { CreateSpotListInput, SpotList } from '@/types/spots';
+import { EventsDiscovery } from '../events';
 
 /**
  * Theme colors - see /src/constants/colors.ts for full policy
@@ -102,6 +103,8 @@ export default function SpotsScreen() {
 
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('allSpots');
+  // Spots tab hosts two sections: the spots map/lists and the Events archive.
+  const [section, setSection] = useState<'spots' | 'events'>('spots');
 
   // All Spots state
   const [viewMode, setViewMode] = useState<ViewMode>('map');
@@ -561,874 +564,934 @@ export default function SpotsScreen() {
         </View>
       )}
 
-      {/* Tab Toggle — hidden in fullscreen map. */}
+      {/* Section Toggle: Spots ⇄ Events — hidden in fullscreen map. */}
       {!isMapFullscreen && (
         <View style={[styles.tabContainer, { backgroundColor: theme.surface }]}>
           <Pressable
-            style={[styles.tab, activeTab === 'allSpots' && { backgroundColor: YELLOW }]}
-            onPress={() => setActiveTab('allSpots')}
+            style={[styles.tab, section === 'spots' && { backgroundColor: YELLOW }]}
+            onPress={() => setSection('spots')}
           >
             <Text
-              style={[
-                styles.tabText,
-                { color: activeTab === 'allSpots' ? DARK : theme.textSecondary },
-              ]}
+              style={[styles.tabText, { color: section === 'spots' ? DARK : theme.textSecondary }]}
             >
-              All Spots
+              Spots
             </Text>
           </Pressable>
           <Pressable
-            style={[styles.tab, activeTab === 'mySpots' && { backgroundColor: YELLOW }]}
-            onPress={() => setActiveTab('mySpots')}
+            style={[styles.tab, section === 'events' && { backgroundColor: YELLOW }]}
+            onPress={() => setSection('events')}
           >
             <Text
-              style={[
-                styles.tabText,
-                { color: activeTab === 'mySpots' ? DARK : theme.textSecondary },
-              ]}
+              style={[styles.tabText, { color: section === 'events' ? DARK : theme.textSecondary }]}
             >
-              My Spots
+              Events
             </Text>
           </Pressable>
         </View>
       )}
 
-      {activeTab === 'allSpots' ? (
+      {section === 'events' ? (
+        <EventsDiscovery embedded />
+      ) : (
         <>
-          {/* Search Bar — list view only. Map view has its own in-map search
-              (the magnifying-glass map control), so this top bar is redundant there. */}
-          {viewMode === 'list' && (
-            <View style={styles.searchContainer}>
-              <View style={[styles.searchBar, { backgroundColor: theme.surface }]}>
-                <Ionicons name="search" size={20} color={theme.textSecondary} />
-                <TextInput
-                  style={[styles.searchInput, { color: theme.text }]}
-                  placeholder="Search spots..."
-                  placeholderTextColor={theme.textSecondary}
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
-                {searchQuery.length > 0 && (
-                  <Pressable onPress={() => setSearchQuery('')}>
-                    <Ionicons name="close-circle" size={20} color={theme.textSecondary} />
-                  </Pressable>
-                )}
-              </View>
-            </View>
-          )}
-
-          {/* View Toggle & Categories — hidden in fullscreen map. */}
+          {/* Tab Toggle — hidden in fullscreen map. */}
           {!isMapFullscreen && (
-            <View style={styles.filtersRow}>
-              {/* View Toggle */}
-              <View style={[styles.viewToggle, { backgroundColor: theme.surface }]}>
-                <Pressable
-                  style={[
-                    styles.viewToggleButton,
-                    viewMode === 'map' && styles.viewToggleActive,
-                    viewMode === 'map' && { backgroundColor: YELLOW },
-                  ]}
-                  onPress={() => setViewMode('map')}
-                >
-                  <Ionicons
-                    name="map"
-                    size={18}
-                    color={viewMode === 'map' ? DARK : theme.textSecondary}
-                  />
-                </Pressable>
-                <Pressable
-                  style={[
-                    styles.viewToggleButton,
-                    viewMode === 'list' && styles.viewToggleActive,
-                    viewMode === 'list' && { backgroundColor: YELLOW },
-                  ]}
-                  onPress={() => setViewMode('list')}
-                >
-                  <Ionicons
-                    name="list"
-                    size={18}
-                    color={viewMode === 'list' ? DARK : theme.textSecondary}
-                  />
-                </Pressable>
-              </View>
-
-              {/* Category Pills */}
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoriesScroll}
+            <View style={[styles.tabContainer, { backgroundColor: theme.surface }]}>
+              <Pressable
+                style={[styles.tab, activeTab === 'allSpots' && { backgroundColor: YELLOW }]}
+                onPress={() => setActiveTab('allSpots')}
               >
-                {spotCategories.map((cat) => (
-                  <Pressable
-                    key={cat.id}
-                    style={[
-                      styles.categoryPill,
-                      { backgroundColor: selectedCategory === cat.id ? YELLOW : theme.surface },
-                    ]}
-                    onPress={() => setSelectedCategory(cat.id)}
-                  >
-                    <Ionicons
-                      name={cat.icon as any}
-                      size={16}
-                      color={selectedCategory === cat.id ? DARK : theme.textSecondary}
-                    />
-                    <Text
-                      style={[
-                        styles.categoryText,
-                        { color: selectedCategory === cat.id ? DARK : theme.text },
-                      ]}
-                    >
-                      {cat.name}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
-          {/* Content */}
-          {loading && !refreshing ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={YELLOW} />
-            </View>
-          ) : viewMode === 'map' ? (
-            // Map View with all spots (clustered, viewport-loaded)
-            <View
-              style={[styles.mapContainer, isMapFullscreen && styles.mapContainerFullscreen]}
-              onLayout={(e) => setMapLayout(e.nativeEvent.layout)}
-            >
-              <MapView
-                ref={mapRef}
-                style={styles.map}
-                provider={PROVIDER_GOOGLE}
-                customMapStyle={isDark ? darkMapStyle : []}
-                showsUserLocation
-                showsMyLocationButton={false}
-                initialRegion={
-                  userLocation
-                    ? {
-                        latitude: userLocation.latitude,
-                        longitude: userLocation.longitude,
-                        latitudeDelta: 0.3,
-                        longitudeDelta: 0.3,
-                      }
-                    : {
-                        latitude: 40.7128,
-                        longitude: -74.006,
-                        latitudeDelta: 2,
-                        longitudeDelta: 2,
-                      }
-                }
-                onPress={() => setSelectedSpot(null)}
-                onMapReady={() => setMapReady(true)}
-                onRegionChange={(r) => setProjectionRegion(r)}
-                onRegionChangeComplete={handleRegionChangeComplete}
-              />
-
-              {/* Custom markers overlaid on top of the map. react-native-maps
-                  <Marker> crashes AIRGoogleMap under the New Architecture, so we
-                  project each coordinate to a screen point and render plain RN
-                  Views. box-none lets map pan/zoom pass through except on markers. */}
-              {mapReady && mapLayout.width > 0 && (
-                <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
-                  {clusters.map((item) => {
-                    const pt = projectToScreenXY(
-                      item.latitude,
-                      item.longitude,
-                      projectionRegion,
-                      mapLayout,
-                    );
-                    if (!pt) return null;
-                    // NEVER unmount an off-screen marker while panning — that
-                    // desyncs Fabric's touch registry and hard-crashes on the New
-                    // Architecture (RN #53303). Keep it mounted but hidden and
-                    // non-interactive instead.
-                    const hidden = !pt.onScreen;
-
-                    if (item.type === 'cluster') {
-                      return (
-                        <Pressable
-                          key={item.id}
-                          pointerEvents={hidden ? 'none' : 'auto'}
-                          style={[
-                            styles.overlayMarker,
-                            {
-                              left: pt.x,
-                              top: pt.y,
-                              opacity: hidden ? 0 : 1,
-                              transform: [{ translateX: -20 }, { translateY: -20 }],
-                            },
-                          ]}
-                          onPress={() => {
-                            // Defer the camera animation past this touch's end so
-                            // re-projection/re-clustering can't move or unmount the
-                            // pressed marker while UIKit is still finalizing it.
-                            const target = getClusterExpansionRegion(
-                              item.clusterId as number,
-                              item.latitude,
-                              item.longitude,
-                            );
-                            requestAnimationFrame(() =>
-                              mapRef.current?.animateToRegion(target, 300),
-                            );
-                          }}
-                        >
-                          <View style={styles.clusterBubble}>
-                            <Text style={styles.clusterText}>{item.count}</Text>
-                          </View>
-                        </Pressable>
-                      );
-                    }
-
-                    const selected = selectedSpot?._id === item.pin?._id;
-                    const pin = item.pin;
-                    return (
-                      <Pressable
-                        key={item.id}
-                        pointerEvents={hidden ? 'none' : 'auto'}
-                        style={[
-                          styles.overlayMarker,
-                          {
-                            left: pt.x,
-                            top: pt.y,
-                            opacity: hidden ? 0 : 1,
-                            transform: [{ translateX: -20 }, { translateY: -47 }],
-                          },
-                        ]}
-                        onPress={() => {
-                          const lat = item.latitude;
-                          const lng = item.longitude;
-                          requestAnimationFrame(() => {
-                            setSelectedSpot(pin as unknown as Spot);
-                            mapRef.current?.animateToRegion(
-                              {
-                                latitude: lat,
-                                longitude: lng,
-                                latitudeDelta: 0.05,
-                                longitudeDelta: 0.05,
-                              },
-                              300,
-                            );
-                          });
-                        }}
-                      >
-                        <View style={styles.markerContainer}>
-                          <View
-                            style={[
-                              styles.marker,
-                              {
-                                backgroundColor: YELLOW,
-                                borderColor: selected ? DARK : '#B8A800',
-                                borderWidth: selected ? 3 : 2,
-                                transform: [{ scale: selected ? 1.2 : 1 }],
-                              },
-                            ]}
-                          >
-                            <Ionicons name="location" size={18} color={DARK} />
-                          </View>
-                          <View style={[styles.markerPoint, { borderTopColor: YELLOW }]} />
-                        </View>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              )}
-
-              {/* Map Controls — nudged below the status bar when fullscreen so
-                  the top control clears the notch/safe area. */}
-              <View style={[styles.mapControls, isMapFullscreen && { top: insets.top + 12 }]}>
-                {/* Filter — reachable in fullscreen since the header is hidden. */}
-                <Pressable
-                  style={[styles.mapControlButton, { backgroundColor: YELLOW }]}
-                  onPress={() => setFilterModalVisible(true)}
-                >
-                  <Ionicons name="options-outline" size={20} color={DARK} />
-                </Pressable>
-
-                {/* Center on user button */}
-                <Pressable
-                  style={[styles.mapControlButton, { backgroundColor: YELLOW }]}
-                  onPress={() => {
-                    if (userLocation) {
-                      mapRef.current?.animateToRegion(
-                        {
-                          ...userLocation,
-                          latitudeDelta: 0.1,
-                          longitudeDelta: 0.1,
-                        },
-                        500,
-                      );
-                    }
-                  }}
-                >
-                  <Ionicons name="navigate" size={20} color={DARK} />
-                </Pressable>
-
-                {/* Search places & spots (Google-Maps style). Replaces the +/-
-                    zoom buttons — pinch-to-zoom covers zooming. */}
-                <Pressable
-                  style={[styles.mapControlButton, { backgroundColor: YELLOW }]}
-                  onPress={openMapSearch}
-                >
-                  <Ionicons name="search" size={20} color={DARK} />
-                </Pressable>
-
-                {/* Toggle full-screen map */}
-                <Pressable
-                  style={[styles.mapControlButton, { backgroundColor: YELLOW }]}
-                  onPress={() => setIsMapFullscreen((v) => !v)}
-                >
-                  <Ionicons name={isMapFullscreen ? 'contract' : 'expand'} size={18} color={DARK} />
-                </Pressable>
-              </View>
-
-              {/* Selected-spot card — shown ONLY when a pin is tapped. Tapping
-                  the map clears the selection (onPress on MapView) and hides it;
-                  tapping another pin swaps in that spot. Lifted above the bottom
-                  safe area when fullscreen (no tab bar padding then). */}
-              {selectedSpot && (
-                <View
+                <Text
                   style={[
-                    styles.mapSpotsContainer,
-                    isMapFullscreen && { paddingBottom: insets.bottom + 16 },
+                    styles.tabText,
+                    { color: activeTab === 'allSpots' ? DARK : theme.textSecondary },
                   ]}
                 >
-                  <SpotMapCard
-                    spot={selectedSpot}
-                    theme={theme}
-                    saved={savedSpotIds.has(selectedSpot._id)}
-                    onPress={() => router.push(`/(tabs)/spots/${selectedSpot._id}`)}
-                    onToggleSave={() => handleToggleSave(selectedSpot)}
-                    onOpenListPicker={() => handleOpenListPicker(selectedSpot)}
-                  />
-                </View>
-              )}
+                  All Spots
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.tab, activeTab === 'mySpots' && { backgroundColor: YELLOW }]}
+                onPress={() => setActiveTab('mySpots')}
+              >
+                <Text
+                  style={[
+                    styles.tabText,
+                    { color: activeTab === 'mySpots' ? DARK : theme.textSecondary },
+                  ]}
+                >
+                  My Spots
+                </Text>
+              </Pressable>
             </View>
-          ) : (
-            // List View
-            <FlatList
-              data={spots}
-              keyExtractor={(item) => item._id}
-              contentContainerStyle={styles.listContent}
-              showsVerticalScrollIndicator={false}
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={YELLOW} />
-              }
-              ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="location-outline" size={48} color={theme.textSecondary} />
-                  <Text style={[styles.emptyTitle, { color: theme.text }]}>No spots found</Text>
-                  <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                    Try adjusting your search or filters
-                  </Text>
-                </View>
-              }
-              renderItem={({ item }) => (
-                <SpotListCard
-                  spot={item}
-                  theme={theme}
-                  onPress={() => router.push(`/(tabs)/spots/${item._id}`)}
-                />
-              )}
-            />
           )}
 
-          {/* Filter Modal (Sport + Category) */}
-          <Modal
-            visible={filterModalVisible}
-            transparent
-            animationType="slide"
-            onRequestClose={() => setFilterModalVisible(false)}
-          >
-            <Pressable style={styles.modalOverlay} onPress={() => setFilterModalVisible(false)}>
-              <Pressable style={[styles.modalContent, { backgroundColor: theme.surface }]}>
-                <View style={styles.modalHeader}>
-                  <Text style={[styles.modalTitle, { color: theme.text }]}>Filter Spots</Text>
-                  <Pressable onPress={() => setFilterModalVisible(false)}>
-                    <Ionicons name="close" size={24} color={theme.text} />
-                  </Pressable>
+          {activeTab === 'allSpots' ? (
+            <>
+              {/* Search Bar — list view only. Map view has its own in-map search
+              (the magnifying-glass map control), so this top bar is redundant there. */}
+              {viewMode === 'list' && (
+                <View style={styles.searchContainer}>
+                  <View style={[styles.searchBar, { backgroundColor: theme.surface }]}>
+                    <Ionicons name="search" size={20} color={theme.textSecondary} />
+                    <TextInput
+                      style={[styles.searchInput, { color: theme.text }]}
+                      placeholder="Search spots..."
+                      placeholderTextColor={theme.textSecondary}
+                      value={searchQuery}
+                      onChangeText={setSearchQuery}
+                    />
+                    {searchQuery.length > 0 && (
+                      <Pressable onPress={() => setSearchQuery('')}>
+                        <Ionicons name="close-circle" size={20} color={theme.textSecondary} />
+                      </Pressable>
+                    )}
+                  </View>
                 </View>
+              )}
 
-                <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
-                  {/* Sport Filter */}
-                  <Text style={[styles.filterSectionTitle, { color: theme.text }]}>Sport Type</Text>
-                  {sportTypes.map((sport) => (
+              {/* View Toggle & Categories — hidden in fullscreen map. */}
+              {!isMapFullscreen && (
+                <View style={styles.filtersRow}>
+                  {/* View Toggle */}
+                  <View style={[styles.viewToggle, { backgroundColor: theme.surface }]}>
                     <Pressable
-                      key={sport.value}
                       style={[
-                        styles.sportOption,
-                        selectedSport === sport.value && { backgroundColor: `${YELLOW}20` },
+                        styles.viewToggleButton,
+                        viewMode === 'map' && styles.viewToggleActive,
+                        viewMode === 'map' && { backgroundColor: YELLOW },
                       ]}
-                      onPress={() => setSelectedSport(sport.value)}
+                      onPress={() => setViewMode('map')}
                     >
-                      <View style={styles.sportOptionLeft}>
-                        <View
-                          style={[
-                            styles.sportIconContainer,
-                            {
-                              backgroundColor:
-                                selectedSport === sport.value
-                                  ? YELLOW
-                                  : isDark
-                                    ? '#2a2a2a'
-                                    : '#f0f0f0',
-                            },
-                          ]}
-                        >
-                          <Ionicons
-                            name={(SPORT_ICONS[sport.value] as any) || 'globe'}
-                            size={18}
-                            color={selectedSport === sport.value ? DARK : theme.textSecondary}
-                          />
-                        </View>
-                        <Text
-                          style={[
-                            styles.sportOptionText,
-                            {
-                              color: theme.text,
-                              fontWeight: selectedSport === sport.value ? '600' : '500',
-                            },
-                          ]}
-                        >
-                          {sport.label}
-                        </Text>
-                      </View>
-                      {selectedSport === sport.value && (
-                        <Ionicons name="checkmark-circle" size={22} color={YELLOW} />
-                      )}
+                      <Ionicons
+                        name="map"
+                        size={18}
+                        color={viewMode === 'map' ? DARK : theme.textSecondary}
+                      />
                     </Pressable>
-                  ))}
-
-                  {/* Category Filter */}
-                  <Text style={[styles.filterSectionTitle, { color: theme.text, marginTop: 20 }]}>
-                    Category
-                  </Text>
-                  {spotCategories.map((cat) => (
                     <Pressable
-                      key={cat.id}
                       style={[
-                        styles.sportOption,
-                        selectedCategory === cat.id && { backgroundColor: `${YELLOW}20` },
+                        styles.viewToggleButton,
+                        viewMode === 'list' && styles.viewToggleActive,
+                        viewMode === 'list' && { backgroundColor: YELLOW },
                       ]}
-                      onPress={() => setSelectedCategory(cat.id)}
+                      onPress={() => setViewMode('list')}
                     >
-                      <View style={styles.sportOptionLeft}>
-                        <View
-                          style={[
-                            styles.sportIconContainer,
-                            {
-                              backgroundColor:
-                                selectedCategory === cat.id
-                                  ? YELLOW
-                                  : isDark
-                                    ? '#2a2a2a'
-                                    : '#f0f0f0',
-                            },
-                          ]}
-                        >
-                          <Ionicons
-                            name={cat.icon as any}
-                            size={18}
-                            color={selectedCategory === cat.id ? DARK : theme.textSecondary}
-                          />
-                        </View>
+                      <Ionicons
+                        name="list"
+                        size={18}
+                        color={viewMode === 'list' ? DARK : theme.textSecondary}
+                      />
+                    </Pressable>
+                  </View>
+
+                  {/* Category Pills */}
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.categoriesScroll}
+                  >
+                    {spotCategories.map((cat) => (
+                      <Pressable
+                        key={cat.id}
+                        style={[
+                          styles.categoryPill,
+                          { backgroundColor: selectedCategory === cat.id ? YELLOW : theme.surface },
+                        ]}
+                        onPress={() => setSelectedCategory(cat.id)}
+                      >
+                        <Ionicons
+                          name={cat.icon as any}
+                          size={16}
+                          color={selectedCategory === cat.id ? DARK : theme.textSecondary}
+                        />
                         <Text
                           style={[
-                            styles.sportOptionText,
-                            {
-                              color: theme.text,
-                              fontWeight: selectedCategory === cat.id ? '600' : '500',
-                            },
+                            styles.categoryText,
+                            { color: selectedCategory === cat.id ? DARK : theme.text },
                           ]}
                         >
                           {cat.name}
                         </Text>
-                      </View>
-                      {selectedCategory === cat.id && (
-                        <Ionicons name="checkmark-circle" size={22} color={YELLOW} />
-                      )}
-                    </Pressable>
-                  ))}
-
-                  {/* Apply Button */}
-                  <Pressable
-                    style={[styles.applyFilterButton, { backgroundColor: YELLOW }]}
-                    onPress={() => setFilterModalVisible(false)}
-                  >
-                    <Text style={styles.applyFilterButtonText}>Apply Filters</Text>
-                  </Pressable>
-                </ScrollView>
-              </Pressable>
-            </Pressable>
-          </Modal>
-        </>
-      ) : (
-        // My Spots Tab
-        <>
-          {/* Sub-view toggle: flat Spots (authored + saved) vs. Collections. */}
-          <View style={styles.mySpotsSwitch}>
-            <Pressable
-              style={[
-                styles.mySpotsSwitchButton,
-                mySpotsView === 'spots' && { backgroundColor: `${YELLOW}25` },
-              ]}
-              onPress={() => setMySpotsView('spots')}
-            >
-              <Ionicons
-                name="location"
-                size={16}
-                color={mySpotsView === 'spots' ? (isDark ? YELLOW : DARK) : theme.textSecondary}
-              />
-              <Text
-                style={[
-                  styles.mySpotsSwitchText,
-                  {
-                    color: mySpotsView === 'spots' ? (isDark ? YELLOW : DARK) : theme.textSecondary,
-                  },
-                ]}
-              >
-                Spots
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[
-                styles.mySpotsSwitchButton,
-                mySpotsView === 'collections' && { backgroundColor: `${YELLOW}25` },
-              ]}
-              onPress={() => setMySpotsView('collections')}
-            >
-              <Ionicons
-                name="albums-outline"
-                size={16}
-                color={
-                  mySpotsView === 'collections' ? (isDark ? YELLOW : DARK) : theme.textSecondary
-                }
-              />
-              <Text
-                style={[
-                  styles.mySpotsSwitchText,
-                  {
-                    color:
-                      mySpotsView === 'collections'
-                        ? isDark
-                          ? YELLOW
-                          : DARK
-                        : theme.textSecondary,
-                  },
-                ]}
-              >
-                Collections
-              </Text>
-            </Pressable>
-          </View>
-
-          {mySpotsView === 'spots' ? (
-            mySpotsLoading && !mySpotsRefreshing ? (
-              <View style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color={YELLOW} />
-              </View>
-            ) : (
-              <FlatList
-                data={mySpots}
-                keyExtractor={(item) => item._id}
-                contentContainerStyle={styles.listContent}
-                showsVerticalScrollIndicator={false}
-                refreshControl={
-                  <RefreshControl
-                    refreshing={mySpotsRefreshing}
-                    onRefresh={onMySpotsRefresh}
-                    tintColor={YELLOW}
-                  />
-                }
-                ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
-                ListEmptyComponent={
-                  <View style={styles.emptyContainer}>
-                    <Ionicons name="location-outline" size={48} color={theme.textSecondary} />
-                    <Text style={[styles.emptyTitle, { color: theme.text }]}>No spots yet</Text>
-                    <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                      You haven't added or saved any spots yet
-                    </Text>
-                  </View>
-                }
-                renderItem={({ item }) => (
-                  <SpotListCard
-                    spot={item}
-                    theme={theme}
-                    badge={item.mineOrSaved}
-                    onPress={() => router.push(`/(tabs)/spots/${item._id}`)}
-                  />
-                )}
-              />
-            )
-          ) : listsLoading && !listsRefreshing ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={YELLOW} />
-            </View>
-          ) : (
-            <FlatList
-              data={myLists}
-              keyExtractor={(item) => item._id}
-              contentContainerStyle={styles.myListsContent}
-              showsVerticalScrollIndicator={false}
-              refreshControl={
-                <RefreshControl
-                  refreshing={listsRefreshing}
-                  onRefresh={onListsRefresh}
-                  tintColor={YELLOW}
-                />
-              }
-              ListHeaderComponent={
-                <Pressable
-                  style={[styles.createListButton, { backgroundColor: theme.surface }]}
-                  onPress={() => setCreateModalVisible(true)}
-                >
-                  <View style={[styles.createListIcon, { backgroundColor: `${YELLOW}25` }]}>
-                    <Ionicons name="add" size={24} color={YELLOW} />
-                  </View>
-                  <Text style={[styles.createListText, { color: theme.text }]}>
-                    Create New List
-                  </Text>
-                  <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-                </Pressable>
-              }
-              ListEmptyComponent={
-                <View style={styles.emptyContainer}>
-                  <Ionicons name="bookmark-outline" size={48} color={theme.textSecondary} />
-                  <Text style={[styles.emptyTitle, { color: theme.text }]}>No spot lists yet</Text>
-                  <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                    Create a list to save and organize your favorite spots
-                  </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
                 </View>
-              }
-              renderItem={({ item }) => (
-                <SpotListCardComponent
-                  list={item}
-                  onPress={() => router.push(`/(tabs)/spots/list/${item._id}`)}
+              )}
+
+              {/* Content */}
+              {loading && !refreshing ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={YELLOW} />
+                </View>
+              ) : viewMode === 'map' ? (
+                // Map View with all spots (clustered, viewport-loaded)
+                <View
+                  style={[styles.mapContainer, isMapFullscreen && styles.mapContainerFullscreen]}
+                  onLayout={(e) => setMapLayout(e.nativeEvent.layout)}
+                >
+                  <MapView
+                    ref={mapRef}
+                    style={styles.map}
+                    provider={PROVIDER_GOOGLE}
+                    customMapStyle={isDark ? darkMapStyle : []}
+                    showsUserLocation
+                    showsMyLocationButton={false}
+                    initialRegion={
+                      userLocation
+                        ? {
+                            latitude: userLocation.latitude,
+                            longitude: userLocation.longitude,
+                            latitudeDelta: 0.3,
+                            longitudeDelta: 0.3,
+                          }
+                        : {
+                            latitude: 40.7128,
+                            longitude: -74.006,
+                            latitudeDelta: 2,
+                            longitudeDelta: 2,
+                          }
+                    }
+                    onPress={() => setSelectedSpot(null)}
+                    onMapReady={() => setMapReady(true)}
+                    onRegionChange={(r) => setProjectionRegion(r)}
+                    onRegionChangeComplete={handleRegionChangeComplete}
+                  />
+
+                  {/* Custom markers overlaid on top of the map. react-native-maps
+                  <Marker> crashes AIRGoogleMap under the New Architecture, so we
+                  project each coordinate to a screen point and render plain RN
+                  Views. box-none lets map pan/zoom pass through except on markers. */}
+                  {mapReady && mapLayout.width > 0 && (
+                    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+                      {clusters.map((item) => {
+                        const pt = projectToScreenXY(
+                          item.latitude,
+                          item.longitude,
+                          projectionRegion,
+                          mapLayout,
+                        );
+                        if (!pt) return null;
+                        // NEVER unmount an off-screen marker while panning — that
+                        // desyncs Fabric's touch registry and hard-crashes on the New
+                        // Architecture (RN #53303). Keep it mounted but hidden and
+                        // non-interactive instead.
+                        const hidden = !pt.onScreen;
+
+                        if (item.type === 'cluster') {
+                          return (
+                            <Pressable
+                              key={item.id}
+                              pointerEvents={hidden ? 'none' : 'auto'}
+                              style={[
+                                styles.overlayMarker,
+                                {
+                                  left: pt.x,
+                                  top: pt.y,
+                                  opacity: hidden ? 0 : 1,
+                                  transform: [{ translateX: -20 }, { translateY: -20 }],
+                                },
+                              ]}
+                              onPress={() => {
+                                // Defer the camera animation past this touch's end so
+                                // re-projection/re-clustering can't move or unmount the
+                                // pressed marker while UIKit is still finalizing it.
+                                const target = getClusterExpansionRegion(
+                                  item.clusterId as number,
+                                  item.latitude,
+                                  item.longitude,
+                                );
+                                requestAnimationFrame(() =>
+                                  mapRef.current?.animateToRegion(target, 300),
+                                );
+                              }}
+                            >
+                              <View style={styles.clusterBubble}>
+                                <Text style={styles.clusterText}>{item.count}</Text>
+                              </View>
+                            </Pressable>
+                          );
+                        }
+
+                        const selected = selectedSpot?._id === item.pin?._id;
+                        const pin = item.pin;
+                        return (
+                          <Pressable
+                            key={item.id}
+                            pointerEvents={hidden ? 'none' : 'auto'}
+                            style={[
+                              styles.overlayMarker,
+                              {
+                                left: pt.x,
+                                top: pt.y,
+                                opacity: hidden ? 0 : 1,
+                                transform: [{ translateX: -20 }, { translateY: -47 }],
+                              },
+                            ]}
+                            onPress={() => {
+                              const lat = item.latitude;
+                              const lng = item.longitude;
+                              requestAnimationFrame(() => {
+                                setSelectedSpot(pin as unknown as Spot);
+                                mapRef.current?.animateToRegion(
+                                  {
+                                    latitude: lat,
+                                    longitude: lng,
+                                    latitudeDelta: 0.05,
+                                    longitudeDelta: 0.05,
+                                  },
+                                  300,
+                                );
+                              });
+                            }}
+                          >
+                            <View style={styles.markerContainer}>
+                              <View
+                                style={[
+                                  styles.marker,
+                                  {
+                                    backgroundColor: YELLOW,
+                                    borderColor: selected ? DARK : '#B8A800',
+                                    borderWidth: selected ? 3 : 2,
+                                    transform: [{ scale: selected ? 1.2 : 1 }],
+                                  },
+                                ]}
+                              >
+                                <Ionicons name="location" size={18} color={DARK} />
+                              </View>
+                              <View style={[styles.markerPoint, { borderTopColor: YELLOW }]} />
+                            </View>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  )}
+
+                  {/* Map Controls — nudged below the status bar when fullscreen so
+                  the top control clears the notch/safe area. */}
+                  <View style={[styles.mapControls, isMapFullscreen && { top: insets.top + 12 }]}>
+                    {/* Filter — reachable in fullscreen since the header is hidden. */}
+                    <Pressable
+                      style={[styles.mapControlButton, { backgroundColor: YELLOW }]}
+                      onPress={() => setFilterModalVisible(true)}
+                    >
+                      <Ionicons name="options-outline" size={20} color={DARK} />
+                    </Pressable>
+
+                    {/* Center on user button */}
+                    <Pressable
+                      style={[styles.mapControlButton, { backgroundColor: YELLOW }]}
+                      onPress={() => {
+                        if (userLocation) {
+                          mapRef.current?.animateToRegion(
+                            {
+                              ...userLocation,
+                              latitudeDelta: 0.1,
+                              longitudeDelta: 0.1,
+                            },
+                            500,
+                          );
+                        }
+                      }}
+                    >
+                      <Ionicons name="navigate" size={20} color={DARK} />
+                    </Pressable>
+
+                    {/* Search places & spots (Google-Maps style). Replaces the +/-
+                    zoom buttons — pinch-to-zoom covers zooming. */}
+                    <Pressable
+                      style={[styles.mapControlButton, { backgroundColor: YELLOW }]}
+                      onPress={openMapSearch}
+                    >
+                      <Ionicons name="search" size={20} color={DARK} />
+                    </Pressable>
+
+                    {/* Toggle full-screen map */}
+                    <Pressable
+                      style={[styles.mapControlButton, { backgroundColor: YELLOW }]}
+                      onPress={() => setIsMapFullscreen((v) => !v)}
+                    >
+                      <Ionicons
+                        name={isMapFullscreen ? 'contract' : 'expand'}
+                        size={18}
+                        color={DARK}
+                      />
+                    </Pressable>
+                  </View>
+
+                  {/* Selected-spot card — shown ONLY when a pin is tapped. Tapping
+                  the map clears the selection (onPress on MapView) and hides it;
+                  tapping another pin swaps in that spot. Lifted above the bottom
+                  safe area when fullscreen (no tab bar padding then). */}
+                  {selectedSpot && (
+                    <View
+                      style={[
+                        styles.mapSpotsContainer,
+                        isMapFullscreen && { paddingBottom: insets.bottom + 16 },
+                      ]}
+                    >
+                      <SpotMapCard
+                        spot={selectedSpot}
+                        theme={theme}
+                        saved={savedSpotIds.has(selectedSpot._id)}
+                        onPress={() => router.push(`/(tabs)/spots/${selectedSpot._id}`)}
+                        onToggleSave={() => handleToggleSave(selectedSpot)}
+                        onOpenListPicker={() => handleOpenListPicker(selectedSpot)}
+                      />
+                    </View>
+                  )}
+                </View>
+              ) : (
+                // List View
+                <FlatList
+                  data={spots}
+                  keyExtractor={(item) => item._id}
+                  contentContainerStyle={styles.listContent}
+                  showsVerticalScrollIndicator={false}
+                  refreshControl={
+                    <RefreshControl
+                      refreshing={refreshing}
+                      onRefresh={onRefresh}
+                      tintColor={YELLOW}
+                    />
+                  }
+                  ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
+                  ListEmptyComponent={
+                    <View style={styles.emptyContainer}>
+                      <Ionicons name="location-outline" size={48} color={theme.textSecondary} />
+                      <Text style={[styles.emptyTitle, { color: theme.text }]}>No spots found</Text>
+                      <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+                        Try adjusting your search or filters
+                      </Text>
+                    </View>
+                  }
+                  renderItem={({ item }) => (
+                    <SpotListCard
+                      spot={item}
+                      theme={theme}
+                      onPress={() => router.push(`/(tabs)/spots/${item._id}`)}
+                    />
+                  )}
                 />
               )}
-            />
-          )}
 
-          {/* Create List Modal */}
-          <Modal
-            visible={createModalVisible}
-            transparent
-            animationType="slide"
-            onRequestClose={() => setCreateModalVisible(false)}
-          >
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              style={{ flex: 1 }}
-            >
-              <Pressable style={styles.modalOverlay} onPress={handleCreateModalBackdropPress}>
-                <Pressable
-                  style={[styles.modalContent, { backgroundColor: theme.surface }]}
-                  onPress={(e) => e.stopPropagation()}
-                >
-                  <View style={styles.modalHeader}>
-                    <Text style={[styles.modalTitle, { color: theme.text }]}>Create Spot List</Text>
-                    <Pressable onPress={() => setCreateModalVisible(false)}>
-                      <Ionicons name="close" size={24} color={theme.text} />
-                    </Pressable>
-                  </View>
-
-                  <ScrollView keyboardShouldPersistTaps="handled">
-                    <View style={styles.createModalBody}>
-                      <Text style={[styles.inputLabel, { color: theme.text }]}>List Name</Text>
-                      <TextInput
-                        style={[
-                          styles.createInput,
-                          {
-                            backgroundColor: theme.background,
-                            color: theme.text,
-                            borderColor: theme.border,
-                          },
-                        ]}
-                        placeholder="e.g., My Favorite Skate Spots"
-                        placeholderTextColor={theme.textSecondary}
-                        value={newListName}
-                        onChangeText={setNewListName}
-                        autoFocus
-                      />
-
-                      <Text style={[styles.inputLabel, { color: theme.text, marginTop: 16 }]}>
-                        Description (optional)
-                      </Text>
-                      <TextInput
-                        style={[
-                          styles.createInput,
-                          styles.createInputMultiline,
-                          {
-                            backgroundColor: theme.background,
-                            color: theme.text,
-                            borderColor: theme.border,
-                          },
-                        ]}
-                        placeholder="Add a description for this list..."
-                        placeholderTextColor={theme.textSecondary}
-                        value={newListDescription}
-                        onChangeText={setNewListDescription}
-                        multiline
-                        numberOfLines={3}
-                      />
-
-                      <Pressable
-                        style={[
-                          styles.createSubmitButton,
-                          { backgroundColor: YELLOW },
-                          (!newListName.trim() || creating) && styles.createSubmitButtonDisabled,
-                        ]}
-                        onPress={handleCreateList}
-                        disabled={!newListName.trim() || creating}
-                      >
-                        {creating ? (
-                          <ActivityIndicator size="small" color={DARK} />
-                        ) : (
-                          <Text style={styles.createSubmitButtonText}>Create List</Text>
-                        )}
+              {/* Filter Modal (Sport + Category) */}
+              <Modal
+                visible={filterModalVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setFilterModalVisible(false)}
+              >
+                <Pressable style={styles.modalOverlay} onPress={() => setFilterModalVisible(false)}>
+                  <Pressable style={[styles.modalContent, { backgroundColor: theme.surface }]}>
+                    <View style={styles.modalHeader}>
+                      <Text style={[styles.modalTitle, { color: theme.text }]}>Filter Spots</Text>
+                      <Pressable onPress={() => setFilterModalVisible(false)}>
+                        <Ionicons name="close" size={24} color={theme.text} />
                       </Pressable>
                     </View>
-                  </ScrollView>
+
+                    <ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={false}>
+                      {/* Sport Filter */}
+                      <Text style={[styles.filterSectionTitle, { color: theme.text }]}>
+                        Sport Type
+                      </Text>
+                      {sportTypes.map((sport) => (
+                        <Pressable
+                          key={sport.value}
+                          style={[
+                            styles.sportOption,
+                            selectedSport === sport.value && { backgroundColor: `${YELLOW}20` },
+                          ]}
+                          onPress={() => setSelectedSport(sport.value)}
+                        >
+                          <View style={styles.sportOptionLeft}>
+                            <View
+                              style={[
+                                styles.sportIconContainer,
+                                {
+                                  backgroundColor:
+                                    selectedSport === sport.value
+                                      ? YELLOW
+                                      : isDark
+                                        ? '#2a2a2a'
+                                        : '#f0f0f0',
+                                },
+                              ]}
+                            >
+                              <Ionicons
+                                name={(SPORT_ICONS[sport.value] as any) || 'globe'}
+                                size={18}
+                                color={selectedSport === sport.value ? DARK : theme.textSecondary}
+                              />
+                            </View>
+                            <Text
+                              style={[
+                                styles.sportOptionText,
+                                {
+                                  color: theme.text,
+                                  fontWeight: selectedSport === sport.value ? '600' : '500',
+                                },
+                              ]}
+                            >
+                              {sport.label}
+                            </Text>
+                          </View>
+                          {selectedSport === sport.value && (
+                            <Ionicons name="checkmark-circle" size={22} color={YELLOW} />
+                          )}
+                        </Pressable>
+                      ))}
+
+                      {/* Category Filter */}
+                      <Text
+                        style={[styles.filterSectionTitle, { color: theme.text, marginTop: 20 }]}
+                      >
+                        Category
+                      </Text>
+                      {spotCategories.map((cat) => (
+                        <Pressable
+                          key={cat.id}
+                          style={[
+                            styles.sportOption,
+                            selectedCategory === cat.id && { backgroundColor: `${YELLOW}20` },
+                          ]}
+                          onPress={() => setSelectedCategory(cat.id)}
+                        >
+                          <View style={styles.sportOptionLeft}>
+                            <View
+                              style={[
+                                styles.sportIconContainer,
+                                {
+                                  backgroundColor:
+                                    selectedCategory === cat.id
+                                      ? YELLOW
+                                      : isDark
+                                        ? '#2a2a2a'
+                                        : '#f0f0f0',
+                                },
+                              ]}
+                            >
+                              <Ionicons
+                                name={cat.icon as any}
+                                size={18}
+                                color={selectedCategory === cat.id ? DARK : theme.textSecondary}
+                              />
+                            </View>
+                            <Text
+                              style={[
+                                styles.sportOptionText,
+                                {
+                                  color: theme.text,
+                                  fontWeight: selectedCategory === cat.id ? '600' : '500',
+                                },
+                              ]}
+                            >
+                              {cat.name}
+                            </Text>
+                          </View>
+                          {selectedCategory === cat.id && (
+                            <Ionicons name="checkmark-circle" size={22} color={YELLOW} />
+                          )}
+                        </Pressable>
+                      ))}
+
+                      {/* Apply Button */}
+                      <Pressable
+                        style={[styles.applyFilterButton, { backgroundColor: YELLOW }]}
+                        onPress={() => setFilterModalVisible(false)}
+                      >
+                        <Text style={styles.applyFilterButtonText}>Apply Filters</Text>
+                      </Pressable>
+                    </ScrollView>
+                  </Pressable>
                 </Pressable>
-              </Pressable>
-            </KeyboardAvoidingView>
+              </Modal>
+            </>
+          ) : (
+            // My Spots Tab
+            <>
+              {/* Sub-view toggle: flat Spots (authored + saved) vs. Collections. */}
+              <View style={styles.mySpotsSwitch}>
+                <Pressable
+                  style={[
+                    styles.mySpotsSwitchButton,
+                    mySpotsView === 'spots' && { backgroundColor: `${YELLOW}25` },
+                  ]}
+                  onPress={() => setMySpotsView('spots')}
+                >
+                  <Ionicons
+                    name="location"
+                    size={16}
+                    color={mySpotsView === 'spots' ? (isDark ? YELLOW : DARK) : theme.textSecondary}
+                  />
+                  <Text
+                    style={[
+                      styles.mySpotsSwitchText,
+                      {
+                        color:
+                          mySpotsView === 'spots' ? (isDark ? YELLOW : DARK) : theme.textSecondary,
+                      },
+                    ]}
+                  >
+                    Spots
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.mySpotsSwitchButton,
+                    mySpotsView === 'collections' && { backgroundColor: `${YELLOW}25` },
+                  ]}
+                  onPress={() => setMySpotsView('collections')}
+                >
+                  <Ionicons
+                    name="albums-outline"
+                    size={16}
+                    color={
+                      mySpotsView === 'collections' ? (isDark ? YELLOW : DARK) : theme.textSecondary
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.mySpotsSwitchText,
+                      {
+                        color:
+                          mySpotsView === 'collections'
+                            ? isDark
+                              ? YELLOW
+                              : DARK
+                            : theme.textSecondary,
+                      },
+                    ]}
+                  >
+                    Collections
+                  </Text>
+                </Pressable>
+              </View>
+
+              {mySpotsView === 'spots' ? (
+                mySpotsLoading && !mySpotsRefreshing ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color={YELLOW} />
+                  </View>
+                ) : (
+                  <FlatList
+                    data={mySpots}
+                    keyExtractor={(item) => item._id}
+                    contentContainerStyle={styles.listContent}
+                    showsVerticalScrollIndicator={false}
+                    refreshControl={
+                      <RefreshControl
+                        refreshing={mySpotsRefreshing}
+                        onRefresh={onMySpotsRefresh}
+                        tintColor={YELLOW}
+                      />
+                    }
+                    ItemSeparatorComponent={() => <View style={styles.listSeparator} />}
+                    ListEmptyComponent={
+                      <View style={styles.emptyContainer}>
+                        <Ionicons name="location-outline" size={48} color={theme.textSecondary} />
+                        <Text style={[styles.emptyTitle, { color: theme.text }]}>No spots yet</Text>
+                        <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+                          You haven't added or saved any spots yet
+                        </Text>
+                      </View>
+                    }
+                    renderItem={({ item }) => (
+                      <SpotListCard
+                        spot={item}
+                        theme={theme}
+                        badge={item.mineOrSaved}
+                        onPress={() => router.push(`/(tabs)/spots/${item._id}`)}
+                      />
+                    )}
+                  />
+                )
+              ) : listsLoading && !listsRefreshing ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator size="large" color={YELLOW} />
+                </View>
+              ) : (
+                <FlatList
+                  data={myLists}
+                  keyExtractor={(item) => item._id}
+                  contentContainerStyle={styles.myListsContent}
+                  showsVerticalScrollIndicator={false}
+                  refreshControl={
+                    <RefreshControl
+                      refreshing={listsRefreshing}
+                      onRefresh={onListsRefresh}
+                      tintColor={YELLOW}
+                    />
+                  }
+                  ListHeaderComponent={
+                    <Pressable
+                      style={[styles.createListButton, { backgroundColor: theme.surface }]}
+                      onPress={() => setCreateModalVisible(true)}
+                    >
+                      <View style={[styles.createListIcon, { backgroundColor: `${YELLOW}25` }]}>
+                        <Ionicons name="add" size={24} color={YELLOW} />
+                      </View>
+                      <Text style={[styles.createListText, { color: theme.text }]}>
+                        Create New List
+                      </Text>
+                      <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+                    </Pressable>
+                  }
+                  ListEmptyComponent={
+                    <View style={styles.emptyContainer}>
+                      <Ionicons name="bookmark-outline" size={48} color={theme.textSecondary} />
+                      <Text style={[styles.emptyTitle, { color: theme.text }]}>
+                        No spot lists yet
+                      </Text>
+                      <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+                        Create a list to save and organize your favorite spots
+                      </Text>
+                    </View>
+                  }
+                  renderItem={({ item }) => (
+                    <SpotListCardComponent
+                      list={item}
+                      onPress={() => router.push(`/(tabs)/spots/list/${item._id}`)}
+                    />
+                  )}
+                />
+              )}
+
+              {/* Create List Modal */}
+              <Modal
+                visible={createModalVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setCreateModalVisible(false)}
+              >
+                <KeyboardAvoidingView
+                  behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                  style={{ flex: 1 }}
+                >
+                  <Pressable style={styles.modalOverlay} onPress={handleCreateModalBackdropPress}>
+                    <Pressable
+                      style={[styles.modalContent, { backgroundColor: theme.surface }]}
+                      onPress={(e) => e.stopPropagation()}
+                    >
+                      <View style={styles.modalHeader}>
+                        <Text style={[styles.modalTitle, { color: theme.text }]}>
+                          Create Spot List
+                        </Text>
+                        <Pressable onPress={() => setCreateModalVisible(false)}>
+                          <Ionicons name="close" size={24} color={theme.text} />
+                        </Pressable>
+                      </View>
+
+                      <ScrollView keyboardShouldPersistTaps="handled">
+                        <View style={styles.createModalBody}>
+                          <Text style={[styles.inputLabel, { color: theme.text }]}>List Name</Text>
+                          <TextInput
+                            style={[
+                              styles.createInput,
+                              {
+                                backgroundColor: theme.background,
+                                color: theme.text,
+                                borderColor: theme.border,
+                              },
+                            ]}
+                            placeholder="e.g., My Favorite Skate Spots"
+                            placeholderTextColor={theme.textSecondary}
+                            value={newListName}
+                            onChangeText={setNewListName}
+                            autoFocus
+                          />
+
+                          <Text style={[styles.inputLabel, { color: theme.text, marginTop: 16 }]}>
+                            Description (optional)
+                          </Text>
+                          <TextInput
+                            style={[
+                              styles.createInput,
+                              styles.createInputMultiline,
+                              {
+                                backgroundColor: theme.background,
+                                color: theme.text,
+                                borderColor: theme.border,
+                              },
+                            ]}
+                            placeholder="Add a description for this list..."
+                            placeholderTextColor={theme.textSecondary}
+                            value={newListDescription}
+                            onChangeText={setNewListDescription}
+                            multiline
+                            numberOfLines={3}
+                          />
+
+                          <Pressable
+                            style={[
+                              styles.createSubmitButton,
+                              { backgroundColor: YELLOW },
+                              (!newListName.trim() || creating) &&
+                                styles.createSubmitButtonDisabled,
+                            ]}
+                            onPress={handleCreateList}
+                            disabled={!newListName.trim() || creating}
+                          >
+                            {creating ? (
+                              <ActivityIndicator size="small" color={DARK} />
+                            ) : (
+                              <Text style={styles.createSubmitButtonText}>Create List</Text>
+                            )}
+                          </Pressable>
+                        </View>
+                      </ScrollView>
+                    </Pressable>
+                  </Pressable>
+                </KeyboardAvoidingView>
+              </Modal>
+            </>
+          )}
+
+          {/* Named-list picker (opened via long-press on a save/bookmark control).
+          Mounted once at screen level and controlled by spotForListModal. */}
+          <AddToSpotListModal
+            visible={spotForListModal !== null}
+            spotId={spotForListModal?._id ?? ''}
+            spotName={spotForListModal?.name ?? ''}
+            onClose={() => setSpotForListModal(null)}
+            onSuccess={() => {
+              // The picker may have added the spot to the default Saved bucket.
+              if (spotForListModal) {
+                const id = spotForListModal._id;
+                setSavedSpotIds((prev) => {
+                  if (prev.has(id)) return prev;
+                  const next = new Set(prev);
+                  next.add(id);
+                  return next;
+                });
+              }
+            }}
+          />
+
+          {/* Google-Maps-style in-map search: places (Google) + our spots. */}
+          <Modal
+            visible={mapSearchVisible}
+            animationType="slide"
+            transparent={false}
+            onRequestClose={closeMapSearch}
+            presentationStyle="fullScreen"
+          >
+            <View
+              style={[
+                styles.mapSearchScreen,
+                { backgroundColor: theme.background, paddingTop: insets.top },
+              ]}
+            >
+              <View style={styles.mapSearchHeader}>
+                <View
+                  style={[
+                    styles.mapSearchBar,
+                    { backgroundColor: theme.surface, borderColor: theme.border },
+                  ]}
+                >
+                  <Ionicons name="search" size={18} color={theme.textSecondary} />
+                  <TextInput
+                    style={[styles.mapSearchInput, { color: theme.text }]}
+                    placeholder="Search places or spots"
+                    placeholderTextColor={theme.textSecondary}
+                    value={mapSearchText}
+                    onChangeText={setMapSearchText}
+                    autoFocus
+                    returnKeyType="search"
+                  />
+                  {mapSearchText.length > 0 && (
+                    <Pressable onPress={() => setMapSearchText('')} hitSlop={8}>
+                      <Ionicons name="close-circle" size={18} color={theme.textSecondary} />
+                    </Pressable>
+                  )}
+                </View>
+                <Pressable onPress={closeMapSearch} style={styles.mapSearchCancel}>
+                  <Text style={{ color: '#B8A800', fontWeight: '600' }}>Cancel</Text>
+                </Pressable>
+              </View>
+
+              <ScrollView keyboardShouldPersistTaps="handled" style={styles.mapSearchResults}>
+                {mapSearchLoading && <ActivityIndicator style={{ marginTop: 24 }} color={YELLOW} />}
+
+                {mapSearchSpots.length > 0 && (
+                  <Text style={[styles.mapSearchSection, { color: theme.textSecondary }]}>
+                    Spots
+                  </Text>
+                )}
+                {mapSearchSpots.map((s) => (
+                  <Pressable
+                    key={s._id}
+                    style={[styles.mapSearchRow, { borderBottomColor: theme.border }]}
+                    onPress={() => handleSelectSearchSpot(s)}
+                  >
+                    <View style={styles.mapSearchIcon}>
+                      <Ionicons name="location" size={18} color={DARK} />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[styles.mapSearchRowTitle, { color: theme.text }]}
+                        numberOfLines={1}
+                      >
+                        {s.name}
+                      </Text>
+                      <Text
+                        style={[styles.mapSearchRowSub, { color: theme.textSecondary }]}
+                        numberOfLines={1}
+                      >
+                        {[s.city, s.state].filter(Boolean).join(', ') || 'Spot'}
+                      </Text>
+                    </View>
+                  </Pressable>
+                ))}
+
+                {mapSearchPlaces.length > 0 && (
+                  <Text style={[styles.mapSearchSection, { color: theme.textSecondary }]}>
+                    Places
+                  </Text>
+                )}
+                {mapSearchPlaces.map((p) => (
+                  <Pressable
+                    key={p.placeId}
+                    style={[styles.mapSearchRow, { borderBottomColor: theme.border }]}
+                    onPress={() => handleSelectSearchPlace(p)}
+                  >
+                    <Ionicons
+                      name="business-outline"
+                      size={20}
+                      color={theme.textSecondary}
+                      style={{ width: 32 }}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text
+                        style={[styles.mapSearchRowTitle, { color: theme.text }]}
+                        numberOfLines={1}
+                      >
+                        {p.name}
+                      </Text>
+                      <Text
+                        style={[styles.mapSearchRowSub, { color: theme.textSecondary }]}
+                        numberOfLines={1}
+                      >
+                        {p.address}
+                      </Text>
+                    </View>
+                  </Pressable>
+                ))}
+
+                {!mapSearchLoading &&
+                  mapSearchText.trim().length >= 2 &&
+                  mapSearchSpots.length === 0 &&
+                  mapSearchPlaces.length === 0 && (
+                    <Text style={[styles.mapSearchEmpty, { color: theme.textSecondary }]}>
+                      No results for “{mapSearchText.trim()}”
+                    </Text>
+                  )}
+              </ScrollView>
+            </View>
           </Modal>
         </>
       )}
-
-      {/* Named-list picker (opened via long-press on a save/bookmark control).
-          Mounted once at screen level and controlled by spotForListModal. */}
-      <AddToSpotListModal
-        visible={spotForListModal !== null}
-        spotId={spotForListModal?._id ?? ''}
-        spotName={spotForListModal?.name ?? ''}
-        onClose={() => setSpotForListModal(null)}
-        onSuccess={() => {
-          // The picker may have added the spot to the default Saved bucket.
-          if (spotForListModal) {
-            const id = spotForListModal._id;
-            setSavedSpotIds((prev) => {
-              if (prev.has(id)) return prev;
-              const next = new Set(prev);
-              next.add(id);
-              return next;
-            });
-          }
-        }}
-      />
-
-      {/* Google-Maps-style in-map search: places (Google) + our spots. */}
-      <Modal
-        visible={mapSearchVisible}
-        animationType="slide"
-        transparent={false}
-        onRequestClose={closeMapSearch}
-        presentationStyle="fullScreen"
-      >
-        <View
-          style={[
-            styles.mapSearchScreen,
-            { backgroundColor: theme.background, paddingTop: insets.top },
-          ]}
-        >
-          <View style={styles.mapSearchHeader}>
-            <View
-              style={[
-                styles.mapSearchBar,
-                { backgroundColor: theme.surface, borderColor: theme.border },
-              ]}
-            >
-              <Ionicons name="search" size={18} color={theme.textSecondary} />
-              <TextInput
-                style={[styles.mapSearchInput, { color: theme.text }]}
-                placeholder="Search places or spots"
-                placeholderTextColor={theme.textSecondary}
-                value={mapSearchText}
-                onChangeText={setMapSearchText}
-                autoFocus
-                returnKeyType="search"
-              />
-              {mapSearchText.length > 0 && (
-                <Pressable onPress={() => setMapSearchText('')} hitSlop={8}>
-                  <Ionicons name="close-circle" size={18} color={theme.textSecondary} />
-                </Pressable>
-              )}
-            </View>
-            <Pressable onPress={closeMapSearch} style={styles.mapSearchCancel}>
-              <Text style={{ color: '#B8A800', fontWeight: '600' }}>Cancel</Text>
-            </Pressable>
-          </View>
-
-          <ScrollView keyboardShouldPersistTaps="handled" style={styles.mapSearchResults}>
-            {mapSearchLoading && <ActivityIndicator style={{ marginTop: 24 }} color={YELLOW} />}
-
-            {mapSearchSpots.length > 0 && (
-              <Text style={[styles.mapSearchSection, { color: theme.textSecondary }]}>Spots</Text>
-            )}
-            {mapSearchSpots.map((s) => (
-              <Pressable
-                key={s._id}
-                style={[styles.mapSearchRow, { borderBottomColor: theme.border }]}
-                onPress={() => handleSelectSearchSpot(s)}
-              >
-                <View style={styles.mapSearchIcon}>
-                  <Ionicons name="location" size={18} color={DARK} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.mapSearchRowTitle, { color: theme.text }]} numberOfLines={1}>
-                    {s.name}
-                  </Text>
-                  <Text
-                    style={[styles.mapSearchRowSub, { color: theme.textSecondary }]}
-                    numberOfLines={1}
-                  >
-                    {[s.city, s.state].filter(Boolean).join(', ') || 'Spot'}
-                  </Text>
-                </View>
-              </Pressable>
-            ))}
-
-            {mapSearchPlaces.length > 0 && (
-              <Text style={[styles.mapSearchSection, { color: theme.textSecondary }]}>Places</Text>
-            )}
-            {mapSearchPlaces.map((p) => (
-              <Pressable
-                key={p.placeId}
-                style={[styles.mapSearchRow, { borderBottomColor: theme.border }]}
-                onPress={() => handleSelectSearchPlace(p)}
-              >
-                <Ionicons
-                  name="business-outline"
-                  size={20}
-                  color={theme.textSecondary}
-                  style={{ width: 32 }}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.mapSearchRowTitle, { color: theme.text }]} numberOfLines={1}>
-                    {p.name}
-                  </Text>
-                  <Text
-                    style={[styles.mapSearchRowSub, { color: theme.textSecondary }]}
-                    numberOfLines={1}
-                  >
-                    {p.address}
-                  </Text>
-                </View>
-              </Pressable>
-            ))}
-
-            {!mapSearchLoading &&
-              mapSearchText.trim().length >= 2 &&
-              mapSearchSpots.length === 0 &&
-              mapSearchPlaces.length === 0 && (
-                <Text style={[styles.mapSearchEmpty, { color: theme.textSecondary }]}>
-                  No results for “{mapSearchText.trim()}”
-                </Text>
-              )}
-          </ScrollView>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
