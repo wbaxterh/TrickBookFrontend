@@ -31,6 +31,7 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { brandColors } from '@/constants/colors';
+import { ensureKaoriVrm } from '@/lib/companion/vrmCache';
 import { SnowWorld } from './SnowWorld';
 import {
   createTrickDemoState,
@@ -54,7 +55,8 @@ if (typeof navigator !== 'undefined' && typeof navigator.userAgent !== 'string')
   }
 }
 
-const KAORI_MODEL = require('../../../assets/models/kaori.vrm') as number;
+// Kaori's model is lazy-loaded from the CDN and cached on device (not bundled),
+// so `active` builds don't carry ~13MB. See lib/companion/vrmCache.
 
 const CAMERA_TARGET = new THREE.Vector3(0, 0.95, 0);
 const MIN_DISTANCE = 1.1;
@@ -509,15 +511,17 @@ function downgradeMToonMaterials(root: THREE.Object3D, glCtx: WebGL2RenderingCon
 }
 
 function KaoriModel({
+  vrmUri,
   onReady,
   voice,
   demo,
 }: {
+  vrmUri: string;
   onReady: () => void;
   voice: React.MutableRefObject<CompanionVoiceState>;
   demo: React.MutableRefObject<TrickDemoState>;
 }) {
-  const gltf = useLoader(GLTFLoader, KAORI_MODEL as unknown as string, (loader) => {
+  const gltf = useLoader(GLTFLoader, vrmUri, (loader) => {
     (loader as GLTFLoader).register((parser) => new VRMLoaderPlugin(parser));
   });
   const vrm = (gltf.userData as { vrm: VRM }).vrm;
@@ -875,6 +879,31 @@ function KaoriStageInner({ active = true, voiceState, demoState }: KaoriStagePro
   // Bumping this key remounts the error boundary + Canvas for a clean retry
   const [attempt, setAttempt] = useState(0);
 
+  // Lazy-load Kaori's model from the CDN (cached on device after the first
+  // open). Until the URI resolves we can't mount the Canvas model.
+  const [vrmUri, setVrmUri] = useState<string | null>(null);
+  const [dlProgress, setDlProgress] = useState(0);
+  const [dlFailed, setDlFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDlFailed(false);
+    setDlProgress(0);
+    ensureKaoriVrm((f) => {
+      if (!cancelled) setDlProgress(f);
+    })
+      .then((uri) => {
+        if (!cancelled) setVrmUri(uri);
+      })
+      .catch(() => {
+        if (!cancelled) setDlFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Re-run on retry (attempt bump).
+  }, [attempt]);
+
   // Built once — the gesture handlers only close over stable refs. Rebuilding
   // them every render (this screen re-renders on each keystroke/mode-tick)
   // needlessly churns the GestureDetector. Declared before any early return to
@@ -927,8 +956,9 @@ function KaoriStageInner({ active = true, voiceState, demoState }: KaoriStagePro
   const handleRetry = () => {
     // useLoader caches rejections module-wide — clear it or the retry
     // would instantly re-throw the same cached error.
-    useLoader.clear(GLTFLoader, KAORI_MODEL as unknown as string);
+    if (vrmUri) useLoader.clear(GLTFLoader, vrmUri);
     setReady(false);
+    setVrmUri(null);
     setAttempt((n) => n + 1);
   };
 
@@ -978,15 +1008,39 @@ function KaoriStageInner({ active = true, voiceState, demoState }: KaoriStagePro
             <SnowWorld demo={demo} />
             <CameraRig orbit={orbit} />
             <TrickBoard demo={demo} />
-            <Suspense fallback={null}>
-              <KaoriModel demo={demo} onReady={() => setReady(true)} voice={voice} />
-            </Suspense>
+            {vrmUri && (
+              <Suspense fallback={null}>
+                <KaoriModel
+                  vrmUri={vrmUri}
+                  demo={demo}
+                  onReady={() => setReady(true)}
+                  voice={voice}
+                />
+              </Suspense>
+            )}
           </Canvas>
-          {!ready && (
+          {dlFailed ? (
             <View style={styles.loadingOverlay}>
-              <ActivityIndicator color={brandColors.primary} size="large" />
-              <Text style={styles.loadingText}>Kaori is getting ready…</Text>
+              <Text style={styles.loadingText}>Couldn't download Kaori</Text>
+              <Text style={styles.fallbackBody}>
+                Check your connection and try again — the 3D model loads from the web the first
+                time.
+              </Text>
+              <Pressable onPress={handleRetry} style={styles.retryButton}>
+                <Text style={styles.retryText}>Try again</Text>
+              </Pressable>
             </View>
+          ) : (
+            !ready && (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator color={brandColors.primary} size="large" />
+                <Text style={styles.loadingText}>
+                  {vrmUri
+                    ? 'Kaori is getting ready…'
+                    : `Downloading Kaori… ${Math.round(dlProgress * 100)}%`}
+                </Text>
+              </View>
+            )
           )}
         </View>
       </GestureDetector>
