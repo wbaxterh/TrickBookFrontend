@@ -121,6 +121,10 @@ export function SnowWorld({ demo }: { demo: MutableRefObject<TrickDemoState> }) 
   const fog = useMemo(() => new THREE.FogExp2(FOG_COLOR.getHex(), 0), []);
   // Only flip scene.fog (a #define → shader recompile) at the threshold, not every frame.
   const fogOn = useRef(false);
+  // Snow only needs to advance every other frame — halves the 700-iteration
+  // JS loop cost during demos. Accumulated dt keeps the fall speed identical.
+  const snowTick = useRef(0);
+  const snowDt = useRef(0);
   const bg = useMemo(() => new THREE.Color(), []);
 
   useFrame((_, delta) => {
@@ -150,13 +154,18 @@ export function SnowWorld({ demo }: { demo: MutableRefObject<TrickDemoState> }) 
     if (keyLight.current) keyLight.current.intensity = 1.6 * w;
     if (fillLight.current) fillLight.current.intensity = 0.5 * w;
 
-    // Animate snow only when visible (studio mode = nearly free).
-    if (w > 0.02 && snowRef.current) {
+    // Animate snow only when visible (studio mode = nearly free), and only on
+    // every other frame — accumulate dt so the fall speed is unchanged.
+    snowDt.current += delta;
+    snowTick.current ^= 1;
+    if (w > 0.02 && snowRef.current && snowTick.current === 0) {
+      const dt = snowDt.current;
+      snowDt.current = 0;
       const p = snowRef.current.geometry.attributes.position as THREE.BufferAttribute;
       const arr = p.array as Float32Array;
       for (let i = 0; i < SNOW_COUNT; i++) {
         const iy = i * 3 + 1;
-        arr[iy] -= snow.vel[i] * delta;
+        arr[iy] -= snow.vel[i] * dt;
         arr[i * 3] += Math.sin((arr[iy] + i) * 0.6) * 0.01; // gentle sway
         if (arr[iy] < 0) {
           arr[iy] = SNOW_TOP; // wrap to ceiling, re-scatter XZ

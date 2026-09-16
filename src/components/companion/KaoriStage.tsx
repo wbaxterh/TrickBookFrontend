@@ -16,7 +16,16 @@
 import { type VRM, VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber/native';
 import * as Device from 'expo-device';
-import { Component, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Component,
+  memo,
+  type ReactNode,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as THREE from 'three';
@@ -854,7 +863,7 @@ export interface KaoriStageProps {
   demoState?: React.MutableRefObject<TrickDemoState>;
 }
 
-export function KaoriStage({ active = true, voiceState, demoState }: KaoriStageProps) {
+function KaoriStageInner({ active = true, voiceState, demoState }: KaoriStageProps) {
   const orbit = useRef<OrbitState>({ ...INITIAL_ORBIT });
   const pinchStartDistance = useRef(INITIAL_ORBIT.distance);
   const internalVoice = useRef<CompanionVoiceState>(createVoiceState());
@@ -865,6 +874,40 @@ export function KaoriStage({ active = true, voiceState, demoState }: KaoriStageP
 
   // Bumping this key remounts the error boundary + Canvas for a clean retry
   const [attempt, setAttempt] = useState(0);
+
+  // Built once — the gesture handlers only close over stable refs. Rebuilding
+  // them every render (this screen re-renders on each keystroke/mode-tick)
+  // needlessly churns the GestureDetector. Declared before any early return to
+  // keep hook order stable.
+  const gestures = useMemo(() => {
+    const pan = Gesture.Pan()
+      .maxPointers(1)
+      .runOnJS(true)
+      .onChange((event) => {
+        const next = orbit.current;
+        next.azimuth -= event.changeX * 0.008;
+        next.polar = THREE.MathUtils.clamp(
+          next.polar - event.changeY * 0.006,
+          MIN_POLAR,
+          MAX_POLAR,
+        );
+      });
+
+    const pinch = Gesture.Pinch()
+      .runOnJS(true)
+      .onStart(() => {
+        pinchStartDistance.current = orbit.current.distance;
+      })
+      .onUpdate((event) => {
+        orbit.current.distance = THREE.MathUtils.clamp(
+          pinchStartDistance.current / event.scale,
+          MIN_DISTANCE,
+          MAX_DISTANCE,
+        );
+      });
+
+    return Gesture.Simultaneous(pan, pinch);
+  }, []);
 
   // Simulator/emulator GL cannot compile these shaders — the iOS Simulator's
   // shader JIT hard-crashes (SIGBUS in cvmsServerElementBuild). Real 3D is
@@ -888,30 +931,6 @@ export function KaoriStage({ active = true, voiceState, demoState }: KaoriStageP
     setReady(false);
     setAttempt((n) => n + 1);
   };
-
-  const pan = Gesture.Pan()
-    .maxPointers(1)
-    .runOnJS(true)
-    .onChange((event) => {
-      const next = orbit.current;
-      next.azimuth -= event.changeX * 0.008;
-      next.polar = THREE.MathUtils.clamp(next.polar - event.changeY * 0.006, MIN_POLAR, MAX_POLAR);
-    });
-
-  const pinch = Gesture.Pinch()
-    .runOnJS(true)
-    .onStart(() => {
-      pinchStartDistance.current = orbit.current.distance;
-    })
-    .onUpdate((event) => {
-      orbit.current.distance = THREE.MathUtils.clamp(
-        pinchStartDistance.current / event.scale,
-        MIN_DISTANCE,
-        MAX_DISTANCE,
-      );
-    });
-
-  const gestures = Gesture.Simultaneous(pan, pinch);
 
   const errorFallback = (
     <View style={styles.fallback}>
@@ -974,6 +993,11 @@ export function KaoriStage({ active = true, voiceState, demoState }: KaoriStageP
     </StageErrorBoundary>
   );
 }
+
+// Memoized: props are stable (voiceState/demoState are refs, `active` is a
+// bool), so the consumer screen re-rendering on every keystroke / mode-pill
+// tick no longer reconciles the whole r3f tree.
+export const KaoriStage = memo(KaoriStageInner);
 
 const styles = StyleSheet.create({
   container: {
