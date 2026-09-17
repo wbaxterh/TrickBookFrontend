@@ -46,6 +46,25 @@ export interface VideoStatus {
   thumbnailUrl?: string;
   previewUrl?: string;
   availableResolutions?: string | null;
+  // Optional — present only if the backend status endpoint forwards them.
+  // Used to distinguish "genuinely transcoding" from "accepted but never started".
+  encodeProgress?: number;
+  storageSize?: number;
+}
+
+/**
+ * Thrown when the encoder never even starts working within the grace window —
+ * i.e. Bunny accepted the upload but transcoding is backed up / held. Distinct
+ * from a plain timeout so the UI can show a "try again shortly" message fast
+ * instead of spinning for the full poll budget.
+ */
+export class VideoProcessingStalledError extends Error {
+  constructor() {
+    super(
+      "Your clip uploaded, but our video processor is backed up right now and couldn't finish. Your post wasn't created — please try again in a little while.",
+    );
+    this.name = 'VideoProcessingStalledError';
+  }
 }
 
 export interface ImagePresignResponse {
@@ -87,15 +106,29 @@ export async function getVideoStatus(videoId: string): Promise<VideoStatus> {
 }
 
 /**
- * Poll for video processing completion
+ * Poll for video processing completion.
+ *
+ * A healthy upload leaves "processing" and reaches "transcoding" (or reports a
+ * duration / encode progress) within a few seconds. If the encoder never starts
+ * within `stallGraceMs`, Bunny has accepted the bytes but isn't encoding them
+ * (queue backed up, or account encoding held) — we throw VideoProcessingStalledError
+ * right away instead of spinning for the full `maxAttempts * intervalMs` budget.
+ *
+ * `onStatus` is called after every poll so the UI can show live progress.
  */
 export async function waitForVideoProcessing(
   videoId: string,
-  maxAttempts: number = 60,
-  intervalMs: number = 5000,
+  maxAttempts: number = 120,
+  intervalMs: number = 3000,
+  onStatus?: (status: VideoStatus, elapsedMs: number) => void,
 ): Promise<VideoStatus> {
+  const stallGraceMs = 90_000; // encoder must start within ~90s
+  let encoderStarted = false;
+
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const elapsedMs = attempt * intervalMs;
     const status = await getVideoStatus(videoId);
+    onStatus?.(status, elapsedMs);
 
     if (status.isReady) {
       return status;
@@ -105,7 +138,21 @@ export async function waitForVideoProcessing(
       throw new Error(`Video processing failed: ${status.status}`);
     }
 
-    // Wait before next check
+    // Signs the encoder is actually working (not just "accepted"): it moved to
+    // transcoding, reported a duration, or reported non-zero encode progress.
+    if (
+      status.status === 'transcoding' ||
+      (status.encodeProgress ?? 0) > 0 ||
+      (status.duration ?? 0) > 0
+    ) {
+      encoderStarted = true;
+    }
+
+    // Past the grace window and the encoder still hasn't started → stalled.
+    if (!encoderStarted && elapsedMs >= stallGraceMs) {
+      throw new VideoProcessingStalledError();
+    }
+
     await new Promise((resolve) => setTimeout(resolve, intervalMs));
   }
 

@@ -30,8 +30,10 @@ import { type CreatePostData, createPost } from '@/lib/api/feed';
 import { getSportTypes, type SportType, type Spot, searchSpots } from '@/lib/api/spots';
 import {
   createVideoEntry,
+  deleteVideo,
   uploadImageToS3,
   VISIBILITY_OPTIONS,
+  VideoProcessingStalledError,
   waitForVideoProcessing,
 } from '@/lib/api/upload';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
@@ -325,11 +327,35 @@ export default function UploadScreen() {
       throw new Error(uploadError.message || 'Failed to upload video');
     }
 
-    // Step 3: Wait for processing
+    // Step 3: Wait for processing. Show live progress and, if the encoder never
+    // starts, waitForVideoProcessing throws VideoProcessingStalledError (~90s)
+    // instead of spinning for minutes — surfaced to the user by handleSubmit.
     setUploadStep('processing');
     setProcessingStatus('Processing video...');
 
-    const processedVideo = await waitForVideoProcessing(videoEntry.videoId, 120, 3000);
+    let processedVideo: Awaited<ReturnType<typeof waitForVideoProcessing>>;
+    try {
+      processedVideo = await waitForVideoProcessing(
+        videoEntry.videoId,
+        120,
+        3000,
+        (status, elapsedMs) => {
+          if (status.encodeProgress && status.encodeProgress > 0) {
+            setProcessingStatus(`Processing video... ${status.encodeProgress}%`);
+          } else if (elapsedMs >= 15000) {
+            // Still just "accepted" after 15s — let the user know it's on our side.
+            setProcessingStatus('Processing video... hang tight');
+          }
+        },
+      );
+    } catch (err) {
+      // A stalled encode leaves a dead 0-byte Bunny entry — clean it up
+      // (best-effort) so repeated retries don't pile up orphans.
+      if (err instanceof VideoProcessingStalledError) {
+        deleteVideo(videoEntry.videoId).catch(() => {});
+      }
+      throw err;
+    }
 
     // Step 4: Create feed post
     setUploadStep('creating');
