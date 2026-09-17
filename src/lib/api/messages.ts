@@ -27,6 +27,7 @@ export type RichContentType =
   | 'spots_list'
   | 'tricklist_card'
   | 'trick_card'
+  | 'video_card'
   | 'spot_draft_confirmation';
 
 export interface RichContent {

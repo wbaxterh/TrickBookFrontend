@@ -51,6 +51,25 @@ interface BotMessage {
   _ephemeral?: boolean;
 }
 
+/**
+ * Text to show for a bot message. When the message carries an in-app card, the
+ * model's raw thetrickbook.com links are redundant (the card handles nav), so
+ * strip markdown links → their label and drop bare TrickBook URLs. (The web
+ * Kaori surface keeps the URLs since it renders plain text, not cards.)
+ */
+function displayBotText(item: BotMessage): string {
+  let text = item.message || '';
+  if (item.richContent) {
+    text = text
+      .replace(/\[([^\]]+)\]\(https?:\/\/(?:www\.)?thetrickbook\.com[^)]*\)/gi, '$1')
+      .replace(/https?:\/\/(?:www\.)?thetrickbook\.com\/\S*/gi, '')
+      .replace(/[ \t]{2,}/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+  return text;
+}
+
 export default function BotChatScreen() {
   const { botId } = useLocalSearchParams<{ botId: string }>();
   const { theme, colors } = useThemeContext();
@@ -257,41 +276,47 @@ export default function BotChatScreen() {
           }
           renderItem={({ item }) => {
             const isMe = item.type === 'user';
+            const displayText = isMe ? (item.message ?? '') : displayBotText(item);
+            // Hide the text bubble when a card replaced the whole message
+            // (e.g. a reply that was only a link) — the card stands alone.
+            const showBubble = displayText.length > 0 || !item.richContent;
 
             return (
               <>
-                <View style={[styles.messageRow, isMe && styles.messageRowMe]}>
-                  <View
-                    style={[
-                      styles.messageBubble,
-                      isMe ? styles.messageBubbleMe : styles.messageBubbleOther,
-                      { backgroundColor: isMe ? colors.primary : theme.surface },
-                    ]}
-                  >
-                    {item.message ? (
-                      <Text style={[styles.messageText, { color: isMe ? DARK : theme.text }]}>
-                        {item.message}
+                {showBubble && (
+                  <View style={[styles.messageRow, isMe && styles.messageRowMe]}>
+                    <View
+                      style={[
+                        styles.messageBubble,
+                        isMe ? styles.messageBubbleMe : styles.messageBubbleOther,
+                        { backgroundColor: isMe ? colors.primary : theme.surface },
+                      ]}
+                    >
+                      {item.message ? (
+                        <Text style={[styles.messageText, { color: isMe ? DARK : theme.text }]}>
+                          {displayText}
+                        </Text>
+                      ) : (
+                        // Legacy rows from before the backend persisted user
+                        // message text (fixed May 2026) have no message field.
+                        <Text
+                          style={[
+                            styles.messageText,
+                            styles.messageMissing,
+                            { color: isMe ? DARK : theme.textTertiary },
+                          ]}
+                        >
+                          message not saved
+                        </Text>
+                      )}
+                    </View>
+                    <View style={styles.messageFooter}>
+                      <Text style={[styles.timeText, { color: theme.textTertiary }]}>
+                        {formatTime(item.createdAt)}
                       </Text>
-                    ) : (
-                      // Legacy rows from before the backend persisted user
-                      // message text (fixed May 2026) have no message field.
-                      <Text
-                        style={[
-                          styles.messageText,
-                          styles.messageMissing,
-                          { color: isMe ? DARK : theme.textTertiary },
-                        ]}
-                      >
-                        message not saved
-                      </Text>
-                    )}
+                    </View>
                   </View>
-                  <View style={styles.messageFooter}>
-                    <Text style={[styles.timeText, { color: theme.textTertiary }]}>
-                      {formatTime(item.createdAt)}
-                    </Text>
-                  </View>
-                </View>
+                )}
                 {/* Rich content card from bot messages */}
                 {item.richContent && (
                   <View style={[styles.messageRow, { marginTop: -4 }]}>

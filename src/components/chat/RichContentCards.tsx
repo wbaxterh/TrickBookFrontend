@@ -201,6 +201,59 @@ function TrickCard({
   );
 }
 
+function VideoCard({
+  data,
+  onPress,
+}: {
+  data: {
+    _id: string;
+    title: string;
+    thumbnailUrl?: string;
+    producedBy?: string;
+    releaseYear?: number | string;
+    sportTypes?: string[];
+  };
+  onPress: () => void;
+}) {
+  const meta = [
+    data.producedBy,
+    data.releaseYear ? String(data.releaseYear) : null,
+    data.sportTypes?.[0],
+  ]
+    .filter(Boolean)
+    .join(' · ');
+  return (
+    <Pressable style={styles.card} onPress={onPress}>
+      <View style={styles.videoThumbWrap}>
+        {data.thumbnailUrl ? (
+          <Image source={{ uri: data.thumbnailUrl }} style={styles.cardImageSmall} />
+        ) : (
+          <View style={[styles.cardImageSmall, styles.videoThumbFallback]}>
+            <Ionicons name="film-outline" size={22} color="#666" />
+          </View>
+        )}
+        <View style={styles.videoPlayBadge}>
+          <Ionicons name="play" size={12} color="#1a1a1a" />
+        </View>
+      </View>
+      <View style={styles.cardBody}>
+        <Text style={styles.cardTitle} numberOfLines={2}>
+          {data.title}
+        </Text>
+        {meta ? (
+          <Text style={styles.cardDescription} numberOfLines={1}>
+            {meta}
+          </Text>
+        ) : null}
+        <View style={styles.cardMeta}>
+          <Ionicons name="play-circle-outline" size={14} color={YELLOW} />
+          <Text style={styles.videoWatchText}>Watch on TrickBook</Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 function SpotDraftCard({
   data,
 }: {
@@ -280,7 +333,10 @@ export function RichContentCard({ richContent }: { richContent: RichContent }) {
         router.push(`/(tabs)/trickbook/list/${id}`);
         break;
       case 'trick':
-        router.push('/(tabs)/trickbook');
+        router.push(`/(tabs)/trickbook/${id}`);
+        break;
+      case 'video':
+        router.push(`/(tabs)/media/video/${id}`);
         break;
     }
   };
@@ -314,6 +370,13 @@ export function RichContentCard({ richContent }: { richContent: RichContent }) {
           onPress={() => handleNavigate('trick', richContent.data._id)}
         />
       );
+    case 'video_card':
+      return (
+        <VideoCard
+          data={richContent.data}
+          onPress={() => handleNavigate('video', richContent.data._id)}
+        />
+      );
     case 'spot_draft_confirmation':
       return <SpotDraftCard data={richContent.data} />;
     default:
@@ -345,6 +408,29 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 100,
     backgroundColor: '#333',
+  },
+  videoThumbWrap: {
+    position: 'relative',
+  },
+  videoThumbFallback: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoPlayBadge: {
+    position: 'absolute',
+    bottom: 8,
+    right: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: YELLOW,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  videoWatchText: {
+    color: YELLOW,
+    fontSize: 12,
+    fontWeight: '600',
   },
   imagePlaceholder: {
     alignItems: 'center',

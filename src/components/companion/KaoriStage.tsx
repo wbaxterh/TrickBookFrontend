@@ -16,12 +16,22 @@
 import { type VRM, VRMLoaderPlugin, VRMUtils } from '@pixiv/three-vrm';
 import { Canvas, useFrame, useLoader, useThree } from '@react-three/fiber/native';
 import * as Device from 'expo-device';
-import { Component, type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Component,
+  memo,
+  type ReactNode,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { brandColors } from '@/constants/colors';
+import { ensureKaoriVrm } from '@/lib/companion/vrmCache';
 import { SnowWorld } from './SnowWorld';
 import {
   createTrickDemoState,
@@ -45,7 +55,8 @@ if (typeof navigator !== 'undefined' && typeof navigator.userAgent !== 'string')
   }
 }
 
-const KAORI_MODEL = require('../../../assets/models/kaori.vrm') as number;
+// Kaori's model is lazy-loaded from the CDN and cached on device (not bundled),
+// so `active` builds don't carry ~13MB. See lib/companion/vrmCache.
 
 const CAMERA_TARGET = new THREE.Vector3(0, 0.95, 0);
 const MIN_DISTANCE = 1.1;
@@ -500,15 +511,17 @@ function downgradeMToonMaterials(root: THREE.Object3D, glCtx: WebGL2RenderingCon
 }
 
 function KaoriModel({
+  vrmUri,
   onReady,
   voice,
   demo,
 }: {
+  vrmUri: string;
   onReady: () => void;
   voice: React.MutableRefObject<CompanionVoiceState>;
   demo: React.MutableRefObject<TrickDemoState>;
 }) {
-  const gltf = useLoader(GLTFLoader, KAORI_MODEL as unknown as string, (loader) => {
+  const gltf = useLoader(GLTFLoader, vrmUri, (loader) => {
     (loader as GLTFLoader).register((parser) => new VRMLoaderPlugin(parser));
   });
   const vrm = (gltf.userData as { vrm: VRM }).vrm;
@@ -854,7 +867,7 @@ export interface KaoriStageProps {
   demoState?: React.MutableRefObject<TrickDemoState>;
 }
 
-export function KaoriStage({ active = true, voiceState, demoState }: KaoriStageProps) {
+function KaoriStageInner({ active = true, voiceState, demoState }: KaoriStageProps) {
   const orbit = useRef<OrbitState>({ ...INITIAL_ORBIT });
   const pinchStartDistance = useRef(INITIAL_ORBIT.distance);
   const internalVoice = useRef<CompanionVoiceState>(createVoiceState());
@@ -865,6 +878,65 @@ export function KaoriStage({ active = true, voiceState, demoState }: KaoriStageP
 
   // Bumping this key remounts the error boundary + Canvas for a clean retry
   const [attempt, setAttempt] = useState(0);
+
+  // Lazy-load Kaori's model from the CDN (cached on device after the first
+  // open). Until the URI resolves we can't mount the Canvas model.
+  const [vrmUri, setVrmUri] = useState<string | null>(null);
+  const [dlProgress, setDlProgress] = useState(0);
+  const [dlFailed, setDlFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setDlFailed(false);
+    setDlProgress(0);
+    ensureKaoriVrm((f) => {
+      if (!cancelled) setDlProgress(f);
+    })
+      .then((uri) => {
+        if (!cancelled) setVrmUri(uri);
+      })
+      .catch(() => {
+        if (!cancelled) setDlFailed(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // Re-run on retry (attempt bump).
+  }, [attempt]);
+
+  // Built once — the gesture handlers only close over stable refs. Rebuilding
+  // them every render (this screen re-renders on each keystroke/mode-tick)
+  // needlessly churns the GestureDetector. Declared before any early return to
+  // keep hook order stable.
+  const gestures = useMemo(() => {
+    const pan = Gesture.Pan()
+      .maxPointers(1)
+      .runOnJS(true)
+      .onChange((event) => {
+        const next = orbit.current;
+        next.azimuth -= event.changeX * 0.008;
+        next.polar = THREE.MathUtils.clamp(
+          next.polar - event.changeY * 0.006,
+          MIN_POLAR,
+          MAX_POLAR,
+        );
+      });
+
+    const pinch = Gesture.Pinch()
+      .runOnJS(true)
+      .onStart(() => {
+        pinchStartDistance.current = orbit.current.distance;
+      })
+      .onUpdate((event) => {
+        orbit.current.distance = THREE.MathUtils.clamp(
+          pinchStartDistance.current / event.scale,
+          MIN_DISTANCE,
+          MAX_DISTANCE,
+        );
+      });
+
+    return Gesture.Simultaneous(pan, pinch);
+  }, []);
 
   // Simulator/emulator GL cannot compile these shaders — the iOS Simulator's
   // shader JIT hard-crashes (SIGBUS in cvmsServerElementBuild). Real 3D is
@@ -884,34 +956,11 @@ export function KaoriStage({ active = true, voiceState, demoState }: KaoriStageP
   const handleRetry = () => {
     // useLoader caches rejections module-wide — clear it or the retry
     // would instantly re-throw the same cached error.
-    useLoader.clear(GLTFLoader, KAORI_MODEL as unknown as string);
+    if (vrmUri) useLoader.clear(GLTFLoader, vrmUri);
     setReady(false);
+    setVrmUri(null);
     setAttempt((n) => n + 1);
   };
-
-  const pan = Gesture.Pan()
-    .maxPointers(1)
-    .runOnJS(true)
-    .onChange((event) => {
-      const next = orbit.current;
-      next.azimuth -= event.changeX * 0.008;
-      next.polar = THREE.MathUtils.clamp(next.polar - event.changeY * 0.006, MIN_POLAR, MAX_POLAR);
-    });
-
-  const pinch = Gesture.Pinch()
-    .runOnJS(true)
-    .onStart(() => {
-      pinchStartDistance.current = orbit.current.distance;
-    })
-    .onUpdate((event) => {
-      orbit.current.distance = THREE.MathUtils.clamp(
-        pinchStartDistance.current / event.scale,
-        MIN_DISTANCE,
-        MAX_DISTANCE,
-      );
-    });
-
-  const gestures = Gesture.Simultaneous(pan, pinch);
 
   const errorFallback = (
     <View style={styles.fallback}>
@@ -959,21 +1008,50 @@ export function KaoriStage({ active = true, voiceState, demoState }: KaoriStageP
             <SnowWorld demo={demo} />
             <CameraRig orbit={orbit} />
             <TrickBoard demo={demo} />
-            <Suspense fallback={null}>
-              <KaoriModel demo={demo} onReady={() => setReady(true)} voice={voice} />
-            </Suspense>
+            {vrmUri && (
+              <Suspense fallback={null}>
+                <KaoriModel
+                  vrmUri={vrmUri}
+                  demo={demo}
+                  onReady={() => setReady(true)}
+                  voice={voice}
+                />
+              </Suspense>
+            )}
           </Canvas>
-          {!ready && (
+          {dlFailed ? (
             <View style={styles.loadingOverlay}>
-              <ActivityIndicator color={brandColors.primary} size="large" />
-              <Text style={styles.loadingText}>Kaori is getting ready…</Text>
+              <Text style={styles.loadingText}>Couldn't download Kaori</Text>
+              <Text style={styles.fallbackBody}>
+                Check your connection and try again — the 3D model loads from the web the first
+                time.
+              </Text>
+              <Pressable onPress={handleRetry} style={styles.retryButton}>
+                <Text style={styles.retryText}>Try again</Text>
+              </Pressable>
             </View>
+          ) : (
+            !ready && (
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator color={brandColors.primary} size="large" />
+                <Text style={styles.loadingText}>
+                  {vrmUri
+                    ? 'Kaori is getting ready…'
+                    : `Downloading Kaori… ${Math.round(dlProgress * 100)}%`}
+                </Text>
+              </View>
+            )
           )}
         </View>
       </GestureDetector>
     </StageErrorBoundary>
   );
 }
+
+// Memoized: props are stable (voiceState/demoState are refs, `active` is a
+// bool), so the consumer screen re-rendering on every keystroke / mode-pill
+// tick no longer reconciles the whole r3f tree.
+export const KaoriStage = memo(KaoriStageInner);
 
 const styles = StyleSheet.create({
   container: {
