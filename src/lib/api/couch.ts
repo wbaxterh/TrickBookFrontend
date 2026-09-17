@@ -85,6 +85,8 @@ export async function getVideos(
     collection?: string;
     sort?: 'createdAt' | 'title' | 'releaseYear' | 'popular';
     limit?: number;
+    page?: number;
+    q?: string;
   } = {},
 ): Promise<CouchVideo[]> {
   try {
@@ -93,6 +95,8 @@ export async function getVideos(
     if (params.collection) queryParams.append('collection', params.collection);
     if (params.sort) queryParams.append('sort', params.sort);
     if (params.limit) queryParams.append('limit', params.limit.toString());
+    if (params.page) queryParams.append('page', params.page.toString());
+    if (params.q && params.q.trim()) queryParams.append('q', params.q.trim());
 
     const queryString = queryParams.toString();
     const endpoint = queryString

@@ -177,8 +177,11 @@ function CouchView({ theme, colors, onSwitchTab }: CouchViewProps) {
       <View style={styles.couchHeader}>
         <Text style={styles.couchHeaderTitle}>Media</Text>
         <View style={styles.couchHeaderActions}>
-          <Pressable style={styles.couchHeaderButton}>
-            <Ionicons name="albums-outline" size={24} color="#fff" />
+          <Pressable
+            style={styles.couchHeaderButton}
+            onPress={() => router.push('/(tabs)/media/explore')}
+          >
+            <Ionicons name="search" size={22} color="#fff" />
           </Pressable>
           <Pressable
             style={styles.couchHeaderButton}
@@ -199,6 +202,16 @@ function CouchView({ theme, colors, onSwitchTab }: CouchViewProps) {
         </Pressable>
       </View>
 
+      {/* Tappable search bar → full-index Explore browser. The rows below only
+          surface a slice of the catalog; this is the way into all 900+ videos. */}
+      <Pressable
+        style={styles.exploreSearchBar}
+        onPress={() => router.push('/(tabs)/media/explore')}
+      >
+        <Ionicons name="search" size={18} color="rgba(255,255,255,0.6)" />
+        <Text style={styles.exploreSearchText}>Search all videos</Text>
+      </Pressable>
+
       {hasContent ? (
         <>
           {/* Hero Featured */}
@@ -218,6 +231,15 @@ function CouchView({ theme, colors, onSwitchTab }: CouchViewProps) {
           {sportRows.map((row) => (
             <MediaRow key={row.sport} title={formatSportLabel(row.sport)} videos={row.videos} />
           ))}
+
+          {/* These rows are only a slice — send users to the full searchable index. */}
+          <Pressable
+            style={styles.exploreAllButton}
+            onPress={() => router.push('/(tabs)/media/explore')}
+          >
+            <Ionicons name="albums-outline" size={18} color="#000" />
+            <Text style={styles.exploreAllButtonText}>Explore all videos</Text>
+          </Pressable>
         </>
       ) : (
         <View style={styles.emptyContainer}>
@@ -1057,6 +1079,40 @@ const styles = StyleSheet.create({
     color: '#000',
     fontSize: 15,
     fontWeight: '600',
+  },
+
+  // Explore entry points
+  exploreSearchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 20,
+    paddingHorizontal: 14,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  exploreSearchText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 15,
+  },
+  exploreAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    marginHorizontal: 16,
+    marginTop: 4,
+    marginBottom: 12,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: YELLOW,
+  },
+  exploreAllButtonText: {
+    color: '#000',
+    fontSize: 15,
+    fontWeight: '700',
   },
 
   // Hero Section

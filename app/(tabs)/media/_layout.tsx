@@ -21,6 +21,7 @@ export default function MediaLayout() {
       }}
     >
       <Stack.Screen name="index" />
+      <Stack.Screen name="explore" />
       <Stack.Screen name="video/[videoId]" />
       <Stack.Screen name="collection/[collectionId]" />
       <Stack.Screen name="post/[postId]" />
