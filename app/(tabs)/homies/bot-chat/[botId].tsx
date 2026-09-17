@@ -242,7 +242,7 @@ export default function BotChatScreen() {
             style={styles.menuButton}
             onPress={() =>
               router.push({
-                pathname: '/(tabs)/homies/companion-stage/[botId]',
+                pathname: '/companion-stage/[botId]',
                 params: { botId, name: bot?.name ?? 'Kaori' },
               })
             }

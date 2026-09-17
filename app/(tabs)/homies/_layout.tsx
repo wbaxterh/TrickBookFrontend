@@ -26,10 +26,6 @@ export default function HomiesLayout() {
       <Stack.Screen name="[userId]" />
       <Stack.Screen name="chat/[conversationId]" />
       <Stack.Screen name="bot-chat/[botId]" />
-      <Stack.Screen
-        name="companion-stage/[botId]"
-        options={{ contentStyle: { backgroundColor: '#0b0e17' } }}
-      />
     </Stack>
   );
 }
