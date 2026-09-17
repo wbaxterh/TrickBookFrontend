@@ -199,6 +199,17 @@ export default function RootLayout() {
                     animation: 'slide_from_bottom',
                   }}
                 />
+                {/* Kaori's 3D stage is its own full-screen view (not part of the
+                    Homies tab stack) so it can't trap the tab, and X-ing out
+                    returns to wherever it was opened from. */}
+                <Stack.Screen
+                  name="companion-stage/[botId]"
+                  options={{
+                    presentation: 'fullScreenModal',
+                    headerShown: false,
+                    contentStyle: { backgroundColor: '#0b0e17' },
+                  }}
+                />
               </Stack>
             </View>
           </AuthGate>

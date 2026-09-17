@@ -298,7 +298,7 @@ export default function HomeScreen() {
                     .includes('kaori');
                   if (hasStage) {
                     router.push({
-                      pathname: '/(tabs)/homies/companion-stage/[botId]',
+                      pathname: '/companion-stage/[botId]',
                       params: { botId: companion._id, name: companion.name },
                     });
                   } else {
