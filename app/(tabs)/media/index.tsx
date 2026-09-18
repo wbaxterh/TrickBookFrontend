@@ -9,6 +9,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   FlatList,
   Image,
@@ -35,6 +36,7 @@ import {
 } from '@/lib/api/couch';
 import {
   addReaction,
+  deletePost,
   type FeedPost,
   formatCount,
   formatTimeAgo,
@@ -557,6 +559,36 @@ function FeedView({ theme, colors, onSwitchTab }: FeedViewProps) {
     setShareModalVisible(true);
   };
 
+  // Owner-only management, straight from the feed (edit caption/tags, delete).
+  const currentUserId = user?._id || user?.id;
+  const handleDeletePost = (post: FeedPost) => {
+    Alert.alert('Delete Post', 'This will permanently delete your post. This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          const ok = await deletePost(post._id);
+          if (ok) {
+            setPosts((prev) => prev.filter((p) => p._id !== post._id));
+          } else {
+            Alert.alert('Error', 'Failed to delete post. Please try again.');
+          }
+        },
+      },
+    ]);
+  };
+  const handleOwnerMenu = (post: FeedPost) => {
+    Alert.alert('Your Post', undefined, [
+      {
+        text: 'Edit caption & tags',
+        onPress: () => router.push(`/(tabs)/media/edit-post/${post._id}`),
+      },
+      { text: 'Delete post', style: 'destructive', onPress: () => handleDeletePost(post) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   if (loading) {
     return (
       <View style={[styles.feedLoadingContainer, { backgroundColor: '#000' }]}>
@@ -667,6 +699,8 @@ function FeedView({ theme, colors, onSwitchTab }: FeedViewProps) {
             post={item}
             isActive={index === activeIndex && isFocused}
             videoHeight={VIDEO_HEIGHT}
+            isOwner={!!currentUserId && item.userId === currentUserId}
+            onOwnerMenu={() => handleOwnerMenu(item)}
             onReaction={(type) => handleReaction(item, type)}
             onSave={() => handleSave(item)}
             onComment={() => handleOpenComments(item)}
@@ -718,6 +752,8 @@ interface FeedVideoItemProps {
   post: FeedPost;
   isActive: boolean;
   videoHeight: number;
+  isOwner?: boolean;
+  onOwnerMenu?: () => void;
   onReaction: (type: 'love' | 'respect') => void;
   onSave: () => void;
   onComment: () => void;
@@ -819,6 +855,8 @@ const FeedVideoItem = memo(function FeedVideoItem({
   post,
   isActive,
   videoHeight,
+  isOwner,
+  onOwnerMenu,
   onReaction,
   onSave,
   onComment,
@@ -911,6 +949,13 @@ const FeedVideoItem = memo(function FeedVideoItem({
             </View>
           )}
         </Pressable>
+
+        {/* Owner menu (edit/delete) — only on your own posts */}
+        {isOwner && (
+          <Pressable style={styles.actionItem} onPress={onOwnerMenu} hitSlop={8}>
+            <Ionicons name="ellipsis-horizontal" size={30} color="#fff" />
+          </Pressable>
+        )}
 
         {/* Love */}
         <Pressable style={styles.actionItem} onPress={() => onReaction('love')}>

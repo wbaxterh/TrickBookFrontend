@@ -20,7 +20,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { type FeedPost, getPost, updatePost } from '@/lib/api/feed';
+import { deletePost, type FeedPost, getPost, updatePost } from '@/lib/api/feed';
 import { getSportTypes, type SportType } from '@/lib/api/spots';
 import { VISIBILITY_OPTIONS } from '@/lib/api/upload';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
@@ -121,6 +121,28 @@ export default function EditPostScreen() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDelete = () => {
+    if (!postId) return;
+    Alert.alert('Delete Post', 'This will permanently delete your post. This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          setSaving(true);
+          const ok = await deletePost(postId);
+          setSaving(false);
+          if (ok) {
+            // Back out to My Posts (skip the now-deleted post's detail screen).
+            router.replace('/(tabs)/media/my-posts');
+          } else {
+            Alert.alert('Error', 'Failed to delete post. Please try again.');
+          }
+        },
+      },
+    ]);
   };
 
   if (loading) {
@@ -350,6 +372,12 @@ export default function EditPostScreen() {
             </View>
           </View>
 
+          {/* Delete */}
+          <Pressable style={styles.deleteButton} onPress={handleDelete} disabled={saving}>
+            <Ionicons name="trash-outline" size={18} color="#ef4444" />
+            <Text style={styles.deleteButtonText}>Delete Post</Text>
+          </Pressable>
+
           <View style={{ height: 40 }} />
         </ScrollView>
       </KeyboardAvoidingView>
@@ -538,5 +566,21 @@ const styles = StyleSheet.create({
   },
   visibilityTextSelected: {
     color: YELLOW,
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+    marginTop: 8,
+  },
+  deleteButtonText: {
+    color: '#ef4444',
+    fontSize: 15,
+    fontWeight: '600',
   },
 });

@@ -94,6 +94,45 @@ function DriveVideoPlayer({ embedUrl }: { embedUrl: string }) {
   );
 }
 
+/** Pull the 11-char video id out of any common YouTube URL shape. */
+function getYouTubeId(url?: string | null): string | null {
+  if (!url) return null;
+  const m = url.match(
+    /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|v\/|live\/)|youtu\.be\/)([\w-]{11})/,
+  );
+  if (m) return m[1];
+  if (/^[\w-]{11}$/.test(url.trim())) return url.trim();
+  return null;
+}
+
+// YouTube playback via an iframe in a WebView. The bulk of the Couch catalog is
+// YouTube-sourced (no Bunny/Drive stream), so this is the primary player. Using
+// an HTML wrapper with baseUrl set makes inline autoplay reliable on iOS.
+function YouTubeVideoPlayer({ videoId }: { videoId: string }) {
+  const html = `<!DOCTYPE html><html><head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<style>html,body{margin:0;padding:0;background:#000;height:100%;overflow:hidden}
+.wrap{position:absolute;top:0;left:0;right:0;bottom:0}
+iframe{width:100%;height:100%;border:0}</style></head>
+<body><div class="wrap">
+<iframe src="https://www.youtube.com/embed/${videoId}?playsinline=1&rel=0&modestbranding=1&autoplay=1&fs=1"
+  allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen></iframe>
+</div></body></html>`;
+
+  return (
+    <WebView
+      source={{ html, baseUrl: 'https://www.youtube.com' }}
+      style={styles.videoPlayer}
+      allowsFullscreenVideo
+      allowsInlineMediaPlayback
+      mediaPlaybackRequiresUserAction={false}
+      javaScriptEnabled
+      domStorageEnabled
+      originWhitelist={['*']}
+    />
+  );
+}
+
 export default function VideoDetailScreen() {
   const { videoId } = useLocalSearchParams<{ videoId: string }>();
   const { theme, colors } = useThemeContext();
@@ -127,10 +166,14 @@ export default function VideoDetailScreen() {
     setIsPlaying(true);
   };
 
-  // Determine which player to use based on stream type
+  // Determine which player to use. HLS (Bunny) and Drive come from the stream
+  // endpoint; YouTube (the bulk of the catalog) comes straight off the video doc
+  // since the stream endpoint doesn't handle it.
   const hasHLS = streamData?.type === 'hls' && streamData?.hlsUrl;
   const hasDriveEmbed = streamData?.type === 'drive' && streamData?.embedUrl;
-  const canPlay = hasHLS || hasDriveEmbed;
+  const youTubeId = getYouTubeId(video?.youtubeUrl);
+  const hasYouTube = !!youTubeId;
+  const canPlay = hasHLS || hasDriveEmbed || hasYouTube;
 
   if (loading) {
     return (
@@ -189,6 +232,8 @@ export default function VideoDetailScreen() {
         <View style={styles.videoContainer}>
           {isPlaying && hasHLS ? (
             <HLSVideoPlayer url={streamData.hlsUrl!} />
+          ) : isPlaying && hasYouTube ? (
+            <YouTubeVideoPlayer videoId={youTubeId!} />
           ) : isPlaying && hasDriveEmbed ? (
             <DriveVideoPlayer embedUrl={streamData.embedUrl!} />
           ) : (
