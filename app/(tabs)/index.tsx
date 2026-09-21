@@ -4,7 +4,7 @@
  *
  * Layout:
  * - Header: Avatar + "Yo, {name}!" + messages icon (badge) + settings icon
- * - Primary Actions: 3 large cards (Add Trick, Trickipedia, Find a Spot)
+ * - Primary Actions: 3 large cards (Trickipedia, Find a Spot, View Media)
  * - Companion Widget: Kaori AI companion quick-launch
  * - Current Goals: Horizontal scroll of GoalCards
  * - Feed CTA: Banner to browse the feed
@@ -266,12 +266,6 @@ export default function HomeScreen() {
             {/* Primary Action Cards */}
             <View style={styles.actionsRow}>
               <ActionCard
-                icon="add-circle"
-                label="Add Trick"
-                sublabel="Track progress"
-                onPress={() => router.push('/(tabs)/trickbook')}
-              />
-              <ActionCard
                 icon="book"
                 label="Trickipedia"
                 sublabel="Learn new tricks"
@@ -282,6 +276,12 @@ export default function HomeScreen() {
                 label="Find a Spot"
                 sublabel="Explore nearby"
                 onPress={() => router.push('/(tabs)/spots')}
+              />
+              <ActionCard
+                icon="play-circle"
+                label="View Media"
+                sublabel="Watch & explore"
+                onPress={() => router.push('/(tabs)/media')}
               />
             </View>
 

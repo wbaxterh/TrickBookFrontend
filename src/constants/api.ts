@@ -6,6 +6,15 @@
 // Environment-based API URL
 const isDevelopment = __DEV__;
 
+// Dev-only escape hatch: point a dev client at the PRODUCTION backend instead of
+// the local one. Set EXPO_PUBLIC_USE_PROD_API=1 when starting Metro to test
+// against real prod data (Couch catalog, your feed posts) on a physical device
+// without running a local server. No effect on release builds (they always use
+// prod). e.g. `EXPO_PUBLIC_USE_PROD_API=1 npx expo start --dev-client`.
+const useProdApi =
+  process.env.EXPO_PUBLIC_USE_PROD_API === '1' || process.env.EXPO_PUBLIC_USE_PROD_API === 'true';
+const useLocalApi = isDevelopment && !useProdApi;
+
 // Dev backend host for physical devices (localhost only works on simulators).
 // Defaults to this Mac's Bonjour/mDNS name so it never goes stale when the LAN
 // IP changes — it resolves to whatever IP the machine currently has, on any
@@ -15,12 +24,12 @@ const DEV_API_HOST = process.env.EXPO_PUBLIC_DEV_API_HOST || 'Wess-MacBook-Pro.l
 
 export const API_CONFIG = {
   // Base URLs
-  baseUrl: isDevelopment ? `http://${DEV_API_HOST}:9000/api` : 'https://api.thetrickbook.com/api',
+  baseUrl: useLocalApi ? `http://${DEV_API_HOST}:9000/api` : 'https://api.thetrickbook.com/api',
 
-  socketUrl: isDevelopment ? `http://${DEV_API_HOST}:9000` : 'https://api.thetrickbook.com',
+  socketUrl: useLocalApi ? `http://${DEV_API_HOST}:9000` : 'https://api.thetrickbook.com',
 
   // Kith voice sidecar — streams Kaori's TTS audio + emotion events (3D stage)
-  kithWsUrl: isDevelopment ? `ws://${DEV_API_HOST}:3040/ws` : 'wss://api.thetrickbook.com/kith/ws',
+  kithWsUrl: useLocalApi ? `ws://${DEV_API_HOST}:3040/ws` : 'wss://api.thetrickbook.com/kith/ws',
 
   // Website origin for static assets stored as relative paths in shared data
   // (e.g. trick images like "/images/trickipedia/bmx-180.jpg"). The web app
