@@ -18,6 +18,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { track } from '@/lib/analytics';
 import { getEvent, saveEvent, type TrickEvent, unsaveEvent } from '@/lib/api/events';
 import { formatEventDate, formatEventLocation } from '@/lib/eventFormat';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
@@ -137,12 +138,16 @@ function EventBody({ event, theme }: { event: TrickEvent; theme: Theme }) {
     try {
       if (next) await saveEvent(event._id);
       else await unsaveEvent(event._id);
+      await track(next ? 'event_saved' : 'event_unsaved', {
+        event_id: event._id,
+        event_slug: event.slug,
+      });
     } catch {
       setSaved(!next); // revert on failure
     } finally {
       setSavePending(false);
     }
-  }, [isAuthenticated, saved, savePending, event._id]);
+  }, [isAuthenticated, saved, savePending, event._id, event.slug]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>

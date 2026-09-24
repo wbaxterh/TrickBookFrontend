@@ -26,6 +26,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ShareToHomieModal } from '@/components/share';
+import { track } from '@/lib/analytics';
 import { addTrickToList, getTrickById, getUserTrickLists } from '@/lib/api/trickbook';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
@@ -147,6 +148,11 @@ export default function TrickDetailScreen() {
       );
 
       if (success) {
+        await track('trick_added', {
+          trick_id: trick._id,
+          list_id: listId,
+          category: trick.category,
+        });
         Alert.alert('Added!', `"${trick.name}" has been added to "${listName}"`);
         setListModalVisible(false);
       } else {

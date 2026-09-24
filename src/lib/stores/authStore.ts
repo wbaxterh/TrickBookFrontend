@@ -5,6 +5,7 @@
 
 import * as SecureStore from 'expo-secure-store';
 import { create } from 'zustand';
+import { track } from '@/lib/analytics';
 import * as authApi from '@/lib/api/auth';
 import { apiClient } from '@/lib/api/client';
 
@@ -118,6 +119,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: true,
         error: null,
       });
+      track('login_completed', { method: 'email' }).catch(() => {});
     } catch (error: any) {
       const errorMessage = error?.message || 'Login failed. Please try again.';
       set({ error: errorMessage });
@@ -148,6 +150,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: true,
         error: null,
       });
+      track('signup_completed', { method: 'email' }).catch(() => {});
     } catch (error: any) {
       const errorMessage = error?.message || 'Registration failed. Please try again.';
       set({ error: errorMessage });
