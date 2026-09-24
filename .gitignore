@@ -40,3 +40,9 @@ GoogleService-Info.plist
 
 expo-env.d.ts
 # @end expo-cli
+
+# Native projects are generated from app.config.js (Continuous Native
+# Generation). `npx expo prebuild` / `expo run:*` / EAS Build recreate them,
+# and they embed secrets (Google Maps key) that must never be committed.
+/ios/
+/android/

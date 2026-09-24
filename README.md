@@ -111,10 +111,24 @@ cp .env.example .env # fill in your own values (gitignored)
 # Start the bundler for a dev-client build
 npx expo start --dev-client
 
-# Or build + run natively
+# Or build + run natively (generates ios/ and android/ on first run)
 npm run ios
 npm run android
 ```
+
+### Native projects are generated, not committed
+
+`ios/` and `android/` are gitignored. They are produced from `app.config.js` by
+`npx expo prebuild` (run automatically by `expo run:*` and by EAS Build), so
+every native setting (permissions, the Maps key, entitlements, Podfile tweaks)
+must live in `app.config.js` or a config plugin under `plugins/`. Never edit the
+generated trees by hand; if they get out of sync, regenerate them:
+
+```bash
+npx expo prebuild --clean
+```
+
+`scripts/check-prod-ready.sh` fails if either directory is ever tracked again.
 
 ### Local backend
 
@@ -126,7 +140,7 @@ Documented in `.env.example` (placeholders only). Local values live in `.env` (g
 
 | Variable | Purpose |
 |---|---|
-| `GOOGLE_MAPS_API_KEY` | Google Maps SDK key, injected into iOS/Android config by `app.config.js` |
+| `GOOGLE_MAPS_API_KEY` | Google Maps SDK key, injected into the generated iOS/Android projects by `app.config.js`. Must be an EAS environment variable (`eas env:create`) because the native projects are generated on the build server |
 | `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` | Client-side alternative (Expo public prefix); used as fallback |
 | `GOOGLE_SERVICES_JSON` | Path to Firebase `google-services.json` for FCM — EAS **file** secret on builds; falls back to a gitignored local path |
 | `EAS_BUILD_PROFILE` | Set automatically by EAS Build; selects the APNs entitlement (development vs production) |
@@ -142,7 +156,8 @@ Documented in `.env.example` (placeholders only). Local values live in `.env` (g
 | `npm run lint` / `npm run lint:fix` | Biome checks (with autofix) |
 | `npm run format` / `npm run format:check` | Biome formatting |
 | `npm run typecheck` | `tsc --noEmit` |
-| `npm run validate` | Lint + typecheck (CI gate) |
+| `npm test` | Jest unit tests (`jest-expo` preset; pure TypeScript under `src/**/__tests__`) |
+| `npm run validate` | Lint + typecheck + unit tests (CI gate) |
 | `npm run check:prod` | Production readiness checks (`scripts/check-prod-ready.sh`) — verifies prod API URLs, EAS env config |
 
 Husky + lint-staged run Biome on staged files at commit time.
