@@ -24,6 +24,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ShareToHomieModal } from '@/components/share';
 import { AddToSpotListModal, SpotMap, SpotReviewsList } from '@/components/spots';
+import { track } from '@/lib/analytics';
 import {
   deleteSpot,
   deleteSpotPhoto,
@@ -140,6 +141,7 @@ export default function SpotDetailScreen() {
     const ok = next ? await saveSpot(spotId) : await unsaveSpot(spotId);
     if (ok) {
       if (next) Alert.alert('Saved', 'Saved to My Spots');
+      track(next ? 'spot_saved' : 'spot_unsaved', { spot_id: spotId });
     } else {
       // Revert on failure
       setIsSaved(!next);
@@ -405,7 +407,10 @@ export default function SpotDetailScreen() {
       ios: `maps://app?daddr=${spot.latitude},${spot.longitude}`,
       android: `google.navigation:q=${spot.latitude},${spot.longitude}`,
     });
-    if (url) Linking.openURL(url);
+    if (url) {
+      track('spot_directions_opened', { spot_id: spotId || '' });
+      Linking.openURL(url);
+    }
   };
 
   const handleShare = () => {

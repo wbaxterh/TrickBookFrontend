@@ -10,7 +10,9 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, useColorScheme, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { SoftAskSheet } from '@/components/notifications/SoftAskSheet';
+import { VersionUpdateGate } from '@/components/system/VersionUpdateGate';
 import { colors } from '@/constants/colors';
+import { flushAnalytics, track, trackScreen } from '@/lib/analytics';
 import {
   bootstrapNotifications,
   handleColdStartTap,
@@ -46,6 +48,18 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   // getLastNotificationResponseAsync() keeps returning the same tapped
   // notification, so calling it on every navigation re-pushes its URL.
   const coldStartHandledRef = useRef(false);
+  const routePath = segments.join('/');
+  const safeToPrompt =
+    !routePath.includes('companion-stage') && !routePath.includes('media/upload');
+
+  useEffect(() => {
+    track('app_opened');
+    flushAnalytics();
+  }, []);
+
+  useEffect(() => {
+    if (routePath) trackScreen(routePath);
+  }, [routePath]);
 
   // Bootstrap notifications once the user reaches an authenticated tab.
   // Soft-ask is gated on `notificationsReady` so the sheet only appears once
@@ -155,6 +169,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
     <>
       {children}
       <SoftAskSheet ready={notificationsReady && isAuthenticated} />
+      <VersionUpdateGate safeToPrompt={safeToPrompt} />
     </>
   );
 }

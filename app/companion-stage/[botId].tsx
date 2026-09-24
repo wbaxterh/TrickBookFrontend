@@ -33,6 +33,7 @@ import {
 import { brandColors } from '@/constants/colors';
 import { useKithVoice } from '@/hooks/useKithVoice';
 import { useVoiceInput } from '@/hooks/useVoiceInput';
+import { track } from '@/lib/analytics';
 import { apiClient } from '@/lib/api/client';
 
 interface StageMessage {
@@ -255,6 +256,10 @@ export default function CompanionStageScreen() {
   const [modeLabel, setModeLabel] = useState('idle');
   const sendLock = useRef(false);
 
+  useEffect(() => {
+    if (botId) track('ai_session_started', { bot_id: botId, surface: 'companion_stage' });
+  }, [botId]);
+
   const syncMode = useCallback(
     (mode: 'idle' | 'listening' | 'thinking' | 'speaking') => {
       setMode(mode);
@@ -294,6 +299,11 @@ export default function CompanionStageScreen() {
           sessionId ? { headers: { 'x-kith-session': sessionId } } : undefined,
         );
         const reply = response?.botMessage?.message;
+        track('ai_response_completed', {
+          bot_id: botId,
+          surface: 'companion_stage',
+          voice_enabled: Boolean(sessionId),
+        }).catch(() => {});
         if (reply) {
           setMessages((prev) => [
             ...prev.slice(-6),

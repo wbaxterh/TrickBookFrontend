@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RichContentCard } from '@/components/chat/RichContentCards';
+import { track } from '@/lib/analytics';
 import { apiClient } from '@/lib/api/client';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
@@ -109,6 +110,10 @@ export default function BotChatScreen() {
     fetchData();
   }, [fetchData]);
 
+  useEffect(() => {
+    if (botId) track('ai_session_started', { bot_id: botId, surface: 'bot_chat' });
+  }, [botId]);
+
   // Greet on open: each time the screen gains focus (and once we know it's
   // Kaori), fetch a fresh homie greeting and show it as an EPHEMERAL bubble —
   // it is never saved to history. Any prior ephemeral greeting is stripped so
@@ -174,6 +179,7 @@ export default function BotChatScreen() {
       }>('/bot-chat/message', { botId, message: messageContent });
 
       if (response) {
+        track('ai_response_completed', { bot_id: botId, surface: 'bot_chat' }).catch(() => {});
         // Replace temp message with real ones
         setMessages((prev) => {
           const withoutTemp = prev.filter((m) => m._id !== tempUserMsg._id);
