@@ -6,6 +6,15 @@
 const GOOGLE_MAPS_API_KEY =
   process.env.GOOGLE_MAPS_API_KEY || process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
+// The native projects are generated on the build server, so the key only reaches
+// Info.plist and AndroidManifest.xml through this variable. Fail the build rather
+// than ship a blank map. Set it with `eas env:create --name GOOGLE_MAPS_API_KEY`.
+if (process.env.EAS_BUILD === 'true' && !GOOGLE_MAPS_API_KEY) {
+  throw new Error(
+    'GOOGLE_MAPS_API_KEY is not set for this EAS build; add it as an EAS environment variable.',
+  );
+}
+
 export default {
   expo: {
     name: 'TrickBook',
