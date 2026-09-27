@@ -52,6 +52,7 @@ import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
 import type { CreateSpotListInput, SpotList } from '@/types/spots';
 import { EventsDiscovery } from '../events';
+import { ShopsDirectory } from '../shops';
 
 /**
  * Theme colors - see /src/constants/colors.ts for full policy
@@ -103,8 +104,9 @@ export default function SpotsScreen() {
 
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('allSpots');
-  // Spots tab hosts two sections: the spots map/lists and the Events archive.
-  const [section, setSection] = useState<'spots' | 'events'>('spots');
+  // Spots tab hosts three sections: the spots map/lists, the Events archive,
+  // and the Shops directory.
+  const [section, setSection] = useState<'spots' | 'events' | 'shops'>('spots');
 
   // All Spots state
   const [viewMode, setViewMode] = useState<ViewMode>('map');
@@ -587,11 +589,23 @@ export default function SpotsScreen() {
               Events
             </Text>
           </Pressable>
+          <Pressable
+            style={[styles.tab, section === 'shops' && { backgroundColor: YELLOW }]}
+            onPress={() => setSection('shops')}
+          >
+            <Text
+              style={[styles.tabText, { color: section === 'shops' ? DARK : theme.textSecondary }]}
+            >
+              Shops
+            </Text>
+          </Pressable>
         </View>
       )}
 
       {section === 'events' ? (
         <EventsDiscovery embedded />
+      ) : section === 'shops' ? (
+        <ShopsDirectory embedded />
       ) : (
         <>
           {/* Tab Toggle — hidden in fullscreen map. */}

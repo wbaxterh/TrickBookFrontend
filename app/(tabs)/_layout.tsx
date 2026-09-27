@@ -1,6 +1,7 @@
 /**
  * Tabs Layout
- * Main tab navigation with 5 visible tabs: Home, TrickBook, Spots, Homies, Media
+ * Main tab navigation with 5 visible tabs: Home, TrickBook, Spots, Riders, Media
+ * (Riders is the `homies` route renamed; Shops + Events live inside the Spots tab)
  * Profile is navigable but hidden from tab bar (accessed via profile pic on home screen)
  */
 
@@ -100,12 +101,13 @@ export default function TabsLayout() {
           ),
         }}
       />
-      {/* Events lives inside the Spots tab (Spots · Events segment) */}
+      {/* Events + Shops live inside the Spots tab (Spots · Events · Shops segments) */}
       <Tabs.Screen name="events" options={{ href: null }} />
+      <Tabs.Screen name="shops" options={{ href: null }} />
       <Tabs.Screen
         name="homies"
         options={{
-          title: t('tabs.homies'),
+          title: t('tabs.riders'),
           tabBarIcon: ({ focused, color, size }) => (
             <TabBarIcon
               focused={focused}

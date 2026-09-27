@@ -247,7 +247,7 @@ export default function HomiesScreen() {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Homies</Text>
+        <Text style={[styles.headerTitle, { color: theme.text }]}>Riders</Text>
         <View style={styles.headerActions}>
           <Pressable
             style={[styles.messageButton, { backgroundColor: theme.surface }]}
@@ -316,7 +316,7 @@ export default function HomiesScreen() {
           <Text
             style={[styles.tabText, { color: activeTab === 'riders' ? DARK : theme.textSecondary }]}
           >
-            Riders
+            Pros
           </Text>
         </Pressable>
         <Pressable

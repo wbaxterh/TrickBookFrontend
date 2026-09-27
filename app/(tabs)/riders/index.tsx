@@ -1,17 +1,18 @@
 /**
- * Riders Directory
- * Two data sources on one screen (mirrors the web /riders page):
- *  - Editorial pros (curated, rep-scored) shown as a horizontal shelf
- *  - Community members (network riders) in the main list, searchable + paged
+ * Riders Directory (Pros)
+ * The curated, rep-scored editorial pro riders — each links to a full profile
+ * that ties into their films/clips. Rendered standalone by the (hidden) /riders
+ * route and embedded inside the Riders tab's "Pros" segment. TrickBook app users
+ * you can add as homies live in the Find segment, not here.
  */
 
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -19,15 +20,11 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  type EditorialRider,
-  getEditorialRiders,
-  getNetworkRiders,
-  type NetworkRider,
-} from '@/lib/api/riders';
+import { type EditorialRider, getEditorialRiders } from '@/lib/api/riders';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 
 const SPORTS = ['', 'Skateboarding', 'BMX', 'Snowboarding', 'Skiing', 'Surfing', 'Wakeboarding'];
+const PAGE_SIZE = 24;
 
 function initials(name: string): string {
   return name
@@ -42,116 +39,61 @@ export default function RidersScreen() {
 }
 
 /**
- * The Riders directory body. Rendered standalone by the (hidden) /riders route
- * and embedded inside the Homies tab's "Riders" segment (embedded skips the
- * outer SafeAreaView + page header so it sits under the Homies chrome).
+ * The Riders directory body — editorial pros only, paginated + searchable.
+ * `embedded` skips the outer SafeAreaView + page header so it sits under the
+ * Riders tab chrome.
  */
 export function RidersDirectory({ embedded = false }: { embedded?: boolean }) {
   const { theme } = useThemeContext();
   const [query, setQuery] = useState('');
   const [sport, setSport] = useState('');
   const [pros, setPros] = useState<EditorialRider[]>([]);
-  const [members, setMembers] = useState<NetworkRider[]>([]);
   const [page, setPage] = useState(1);
   const [pages, setPages] = useState(1);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  const reqId = useRef(0);
 
+  // Reset + fetch page 1 whenever the query or sport changes (debounced).
   useEffect(() => {
+    const id = ++reqId.current;
+    setLoading(true);
+    setError('');
     const timer = setTimeout(async () => {
-      setLoading(true);
-      setError('');
       try {
-        // The pro shelf is additive — if it fails, the community directory
-        // still renders.
-        const [memberResult, proResult] = await Promise.allSettled([
-          getNetworkRiders({ q: query, sport, page }),
-          getEditorialRiders({ q: query, sport, limit: 12 }),
-        ]);
-        if (memberResult.status === 'rejected') throw memberResult.reason;
-        const data = memberResult.value;
-        setMembers(data.items ?? []);
+        const data = await getEditorialRiders({ q: query, sport, page: 1, limit: PAGE_SIZE });
+        if (id !== reqId.current) return;
+        setPros(data.items ?? []);
+        setPage(1);
         setPages(data.pages ?? 1);
         setTotal(data.total ?? 0);
-        setPros(proResult.status === 'fulfilled' ? (proResult.value.items ?? []) : []);
       } catch {
-        setError('The rider directory could not be loaded. Try again in a moment.');
+        if (id === reqId.current) setError('The riders directory could not be loaded.');
       } finally {
-        setLoading(false);
+        if (id === reqId.current) setLoading(false);
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [query, sport, page]);
+  }, [query, sport]);
 
-  const onQuery = useCallback((value: string) => {
-    setQuery(value);
-    setPage(1);
-  }, []);
-
-  const onSport = useCallback((value: string) => {
-    setSport(value);
-    setPage(1);
-  }, []);
-
-  const proShelf = useMemo(
-    () =>
-      pros.length > 0 ? (
-        <View style={styles.section}>
-          <Pressable
-            style={styles.sectionHeader}
-            onPress={() => router.push('/(tabs)/riders/pros')}
-          >
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Pros</Text>
-            <View style={styles.seeAll}>
-              <Text style={[styles.seeAllText, { color: theme.textSecondary }]}>See all</Text>
-              <Ionicons name="chevron-forward" size={15} color={theme.textSecondary} />
-            </View>
-          </Pressable>
-          <FlatList
-            horizontal
-            data={pros}
-            keyExtractor={(item) => item._id}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.shelfContent}
-            renderItem={({ item }) => (
-              <Pressable
-                style={[styles.proCard, { backgroundColor: theme.surface }]}
-                onPress={() => router.push(`/(tabs)/riders/${item.slug}`)}
-              >
-                <View style={[styles.proAvatar, { backgroundColor: theme.background }]}>
-                  {item.profileImage?.url || item.heroImage?.url ? (
-                    <Image
-                      source={{ uri: item.profileImage?.url ?? item.heroImage?.url }}
-                      style={styles.proAvatarImg}
-                    />
-                  ) : (
-                    <Text style={[styles.avatarInitials, { color: theme.textSecondary }]}>
-                      {initials(item.canonicalName)}
-                    </Text>
-                  )}
-                </View>
-                <Text numberOfLines={1} style={[styles.proName, { color: theme.text }]}>
-                  {item.canonicalName}
-                </Text>
-                {typeof item.rep?.score === 'number' && (
-                  <View style={styles.repBadge}>
-                    <Ionicons name="star" size={11} color="#1f1f1f" />
-                    <Text style={styles.repText}>{Math.round(item.rep.score)}</Text>
-                  </View>
-                )}
-                {item.primarySport ? (
-                  <Text numberOfLines={1} style={[styles.proSport, { color: theme.textSecondary }]}>
-                    {item.primarySport}
-                  </Text>
-                ) : null}
-              </Pressable>
-            )}
-          />
-        </View>
-      ) : null,
-    [pros, theme],
-  );
+  const loadMore = async () => {
+    if (loadingMore || loading || page >= pages) return;
+    const id = reqId.current;
+    setLoadingMore(true);
+    try {
+      const next = page + 1;
+      const data = await getEditorialRiders({ q: query, sport, page: next, limit: PAGE_SIZE });
+      if (id !== reqId.current) return;
+      setPros((prev) => [...prev, ...(data.items ?? [])]);
+      setPage(next);
+    } catch {
+      // stop advancing on error
+    } finally {
+      if (id === reqId.current) setLoadingMore(false);
+    }
+  };
 
   const Container = embedded ? View : SafeAreaView;
   const containerProps = embedded ? {} : { edges: ['top'] as const };
@@ -165,7 +107,7 @@ export function RidersDirectory({ embedded = false }: { embedded?: boolean }) {
         <View style={styles.header}>
           <Text style={[styles.headerTitle, { color: theme.text }]}>Riders</Text>
           <Text style={[styles.headerSubtitle, { color: theme.textSecondary }]}>
-            The people progressing action sports on TrickBook.
+            The pros progressing action sports.
           </Text>
         </View>
       )}
@@ -174,15 +116,15 @@ export function RidersDirectory({ embedded = false }: { embedded?: boolean }) {
         <Ionicons name="search" size={18} color={theme.textSecondary} />
         <TextInput
           value={query}
-          onChangeText={onQuery}
-          placeholder="Search riders"
+          onChangeText={setQuery}
+          placeholder="Search pros"
           placeholderTextColor={theme.textSecondary}
           style={[styles.searchInput, { color: theme.text }]}
           autoCapitalize="none"
           returnKeyType="search"
         />
         {query.length > 0 && (
-          <Pressable onPress={() => onQuery('')} hitSlop={8}>
+          <Pressable onPress={() => setQuery('')} hitSlop={8}>
             <Ionicons name="close-circle" size={18} color={theme.textSecondary} />
           </Pressable>
         )}
@@ -199,7 +141,7 @@ export function RidersDirectory({ embedded = false }: { embedded?: boolean }) {
             const active = sport === item;
             return (
               <Pressable
-                onPress={() => onSport(item)}
+                onPress={() => setSport(item)}
                 style={[styles.chip, { backgroundColor: active ? '#FCF150' : theme.surface }]}
               >
                 <Text style={[styles.chipText, { color: active ? '#1f1f1f' : theme.text }]}>
@@ -221,76 +163,69 @@ export function RidersDirectory({ embedded = false }: { embedded?: boolean }) {
         </View>
       ) : (
         <FlatList
-          data={members}
+          data={pros}
           keyExtractor={(item) => item._id}
-          ListHeaderComponent={proShelf}
           contentContainerStyle={styles.listContent}
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          ListHeaderComponent={
+            total > 0 ? (
+              <Text style={[styles.count, { color: theme.textSecondary }]}>
+                {total} pro{total === 1 ? '' : 's'}
+              </Text>
+            ) : null
+          }
           ListEmptyComponent={
             <View style={styles.centered}>
               <Text style={[styles.errorText, { color: theme.textSecondary }]}>
-                No riders match your search yet.
+                No pros match your search yet.
               </Text>
             </View>
           }
           renderItem={({ item }) => (
             <Pressable
               style={[styles.memberRow, { backgroundColor: theme.surface }]}
-              onPress={() => router.push(`/(tabs)/profile/${item._id}`)}
+              onPress={() => router.push(`/(tabs)/riders/${item.slug}`)}
             >
               <View style={[styles.memberAvatar, { backgroundColor: theme.background }]}>
-                {item.imageUri ? (
-                  <Image source={{ uri: item.imageUri }} style={styles.memberAvatarImg} />
+                {item.profileImage?.url || item.heroImage?.url ? (
+                  <Image
+                    source={{ uri: item.profileImage?.url ?? item.heroImage?.url }}
+                    style={styles.memberAvatarImg}
+                  />
                 ) : (
                   <Text style={[styles.avatarInitials, { color: theme.textSecondary }]}>
-                    {initials(item.name)}
+                    {initials(item.canonicalName)}
                   </Text>
                 )}
               </View>
               <View style={styles.memberInfo}>
                 <Text numberOfLines={1} style={[styles.memberName, { color: theme.text }]}>
-                  {item.name}
+                  {item.canonicalName}
                 </Text>
-                {item.sports && item.sports.length > 0 ? (
+                {item.primarySport ? (
                   <Text
                     numberOfLines={1}
                     style={[styles.memberSports, { color: theme.textSecondary }]}
                   >
-                    {item.sports.join(' · ')}
-                  </Text>
-                ) : item.bio ? (
-                  <Text
-                    numberOfLines={1}
-                    style={[styles.memberSports, { color: theme.textSecondary }]}
-                  >
-                    {item.bio}
+                    {item.primarySport}
+                    {item.homeRegion ? ` · ${item.homeRegion}` : ''}
                   </Text>
                 ) : null}
               </View>
+              {typeof item.rep?.score === 'number' && (
+                <View style={styles.repBadge}>
+                  <Ionicons name="star" size={11} color="#1f1f1f" />
+                  <Text style={styles.repText}>{Math.round(item.rep.score)}</Text>
+                </View>
+              )}
               <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
             </Pressable>
           )}
           ListFooterComponent={
-            pages > 1 ? (
-              <View style={styles.pager}>
-                <Pressable
-                  disabled={page <= 1}
-                  onPress={() => setPage((p) => Math.max(1, p - 1))}
-                  style={[styles.pagerBtn, { opacity: page <= 1 ? 0.4 : 1 }]}
-                >
-                  <Ionicons name="chevron-back" size={18} color={theme.text} />
-                </Pressable>
-                <Text style={[styles.pagerText, { color: theme.textSecondary }]}>
-                  Page {page} of {pages} · {total} riders
-                </Text>
-                <Pressable
-                  disabled={page >= pages}
-                  onPress={() => setPage((p) => Math.min(pages, p + 1))}
-                  style={[styles.pagerBtn, { opacity: page >= pages ? 0.4 : 1 }]}
-                >
-                  <Ionicons name="chevron-forward" size={18} color={theme.text} />
-                </Pressable>
-              </View>
-            ) : null
+            loadingMore ? <ActivityIndicator color="#FCF150" style={styles.footer} /> : null
           }
         />
       )}
@@ -318,49 +253,14 @@ const styles = StyleSheet.create({
   filterContent: { paddingHorizontal: 16, gap: 8 },
   chip: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
   chipText: { fontSize: 13, fontWeight: '600' },
-  section: { marginTop: 16 },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    marginBottom: 8,
-  },
-  sectionTitle: { fontSize: 18, fontWeight: '700' },
-  seeAll: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  seeAllText: { fontSize: 14, fontWeight: '600' },
-  shelfContent: { paddingHorizontal: 16, gap: 12 },
-  proCard: { width: 120, borderRadius: 14, padding: 12, alignItems: 'center' },
-  proAvatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-    marginBottom: 8,
-  },
-  proAvatarImg: { width: 72, height: 72 },
-  proName: { fontSize: 14, fontWeight: '700', textAlign: 'center' },
-  proSport: { fontSize: 12, marginTop: 2 },
-  repBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    backgroundColor: '#FCF150',
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 999,
-    marginTop: 6,
-  },
-  repText: { fontSize: 12, fontWeight: '800', color: '#1f1f1f' },
   listContent: { paddingHorizontal: 16, paddingBottom: 24, paddingTop: 4 },
+  count: { fontSize: 13, marginBottom: 8, marginTop: 4 },
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 12,
     padding: 10,
-    marginTop: 10,
+    marginBottom: 10,
     gap: 12,
   },
   memberAvatar: {
@@ -376,15 +276,17 @@ const styles = StyleSheet.create({
   memberInfo: { flex: 1 },
   memberName: { fontSize: 16, fontWeight: '700' },
   memberSports: { fontSize: 13, marginTop: 2 },
-  centered: { paddingVertical: 48, alignItems: 'center', justifyContent: 'center' },
-  errorText: { fontSize: 14, textAlign: 'center', paddingHorizontal: 24 },
-  pager: {
+  repBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-    marginTop: 18,
+    gap: 2,
+    backgroundColor: '#FCF150',
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
   },
-  pagerBtn: { padding: 8 },
-  pagerText: { fontSize: 13 },
+  repText: { fontSize: 12, fontWeight: '800', color: '#1f1f1f' },
+  centered: { paddingVertical: 48, alignItems: 'center', justifyContent: 'center' },
+  errorText: { fontSize: 14, textAlign: 'center', paddingHorizontal: 24 },
+  footer: { marginVertical: 20 },
 });
