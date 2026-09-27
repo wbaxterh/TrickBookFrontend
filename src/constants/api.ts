@@ -189,6 +189,17 @@ export const ENDPOINTS = {
     report: (postId: string) => `/feed/${postId}/report`,
   },
 
+  // Shops - Rider-owned / core skate & board shops directory
+  shops: {
+    list: '/shops',
+    detail: (slugOrId: string) => `/shops/${slugOrId}`,
+    comments: (slugOrId: string) => `/shops/${slugOrId}/comments`,
+    commentReplies: (slugOrId: string, commentId: string) =>
+      `/shops/${slugOrId}/comments/${commentId}/replies`,
+    deleteComment: (slugOrId: string, commentId: string) =>
+      `/shops/${slugOrId}/comments/${commentId}`,
+  },
+
   // Payments
   payments: {
     subscription: '/payments/subscription',
