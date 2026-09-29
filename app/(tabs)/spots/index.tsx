@@ -29,6 +29,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { AddToSpotListModal, SpotListCard as SpotListCardComponent } from '@/components/spots';
 import { useKeyboardVisible } from '@/hooks/useKeyboardVisible';
 import { useMapClusters } from '@/hooks/useMapClusters';
+import { getShops, type Shop } from '@/lib/api/shops';
 import { createSpotList, getSpotLists } from '@/lib/api/spotlists';
 import {
   getMapPins,
@@ -63,6 +64,19 @@ const DARK = '#1a1a1a';
 
 // Spot categories and sport types are fetched from API in the component
 const ALL_SPOT_CATEGORY: SpotCategory = { id: 'all', name: 'All', icon: 'location' };
+// Synthetic category that overlays shop pins (from the shops directory) on the
+// map. Selected → only shops; also shown under "All". Replaces "backcountry".
+const SHOPS_CATEGORY: SpotCategory = { id: 'shops', name: 'Shops', icon: 'storefront' };
+const SHOP_MARKER_COLOR = '#10b981'; // emerald — distinct from the yellow spot pins
+
+/** Extract a shop's map coordinate from its address (lat/lng or GeoJSON point). */
+function shopCoord(shop: Shop): { latitude: number; longitude: number } | null {
+  const a = shop.address;
+  if (a?.lat != null && a?.lng != null) return { latitude: a.lat, longitude: a.lng };
+  const c = a?.location?.coordinates;
+  if (c && c.length === 2) return { latitude: c[1], longitude: c[0] };
+  return null;
+}
 
 // Sport icons mapping
 const SPORT_ICONS: Record<string, string> = {
@@ -119,6 +133,8 @@ export default function SpotsScreen() {
   const [spots, setSpots] = useState<Spot[]>([]);
   const [sportTypes, setSportTypes] = useState<SportType[]>([]);
   const [spotCategories, setSpotCategories] = useState<SpotCategory[]>([ALL_SPOT_CATEGORY]);
+  // Shop pins overlaid on the map when the "Shops" or "All" filter is active.
+  const [shopMapPins, setShopMapPins] = useState<Shop[]>([]);
   const [_totalCount, setTotalCount] = useState(0);
   const [selectedSpot, setSelectedSpot] = useState<Spot | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(
@@ -259,7 +275,11 @@ export default function SpotsScreen() {
       setSportTypes([{ value: 'all', label: 'All Sports' }, ...types]);
     });
     getSpotCategories().then((cats) => {
-      setSpotCategories([ALL_SPOT_CATEGORY, ...cats]);
+      // Drop "backcountry" and surface a synthetic "Shops" pill in its place.
+      const filtered = cats.filter(
+        (c) => c.id !== 'backcountry' && c.name?.toLowerCase() !== 'backcountry',
+      );
+      setSpotCategories([ALL_SPOT_CATEGORY, SHOPS_CATEGORY, ...filtered]);
     });
   }, []);
 
@@ -373,6 +393,11 @@ export default function SpotsScreen() {
         clearTimeout(mapPinsDebounceRef.current);
       }
       mapPinsDebounceRef.current = setTimeout(async () => {
+        // "Shops" is a shop-only overlay, not a real spot category — no spot pins.
+        if (selectedCategory === 'shops') {
+          setMapPins([]);
+          return;
+        }
         const bounds = {
           minLat: region.latitude - region.latitudeDelta / 2,
           maxLat: region.latitude + region.latitudeDelta / 2,
@@ -397,6 +422,34 @@ export default function SpotsScreen() {
 
   // Cluster the viewport pins in JS (supercluster) — keeps rendered marker count bounded.
   const { clusters, getClusterExpansionRegion } = useMapClusters(mapPins, region);
+
+  // Shop pins are shown only under the "Shops" or "All" filter. Fetch the shop
+  // directory once when that becomes active (they don't page by viewport), keep
+  // just the ones with coordinates, and clear them otherwise.
+  const showShopsOnMap = selectedCategory === 'all' || selectedCategory === 'shops';
+  useEffect(() => {
+    if (!showShopsOnMap) {
+      setShopMapPins([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      // The list endpoint caps ~60/page, so page through it (bounded) to get
+      // every shop with coordinates onto the map.
+      const all: Shop[] = [];
+      let cursor: string | undefined;
+      for (let i = 0; i < 8 && !cancelled; i++) {
+        const data = await getShops({ limit: 60, cursor });
+        all.push(...data.shops);
+        if (!data.nextCursor) break;
+        cursor = data.nextCursor;
+      }
+      if (!cancelled) setShopMapPins(all.filter((s) => shopCoord(s) !== null));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [showShopsOnMap]);
 
   // Refetch pins when filters change, using the current visible region if available.
   useEffect(() => {
@@ -878,6 +931,51 @@ export default function SpotsScreen() {
                           </Pressable>
                         );
                       })}
+
+                      {/* Shop pins (Shops/All filter). Kept mounted-but-hidden
+                      off-screen like spot markers to avoid the Fabric unmount
+                      crash. Tap → shop detail. */}
+                      {showShopsOnMap &&
+                        shopMapPins.map((shop) => {
+                          const coord = shopCoord(shop);
+                          if (!coord) return null;
+                          const pt = projectToScreenXY(
+                            coord.latitude,
+                            coord.longitude,
+                            projectionRegion,
+                            mapLayout,
+                          );
+                          if (!pt) return null;
+                          const hidden = !pt.onScreen;
+                          return (
+                            <Pressable
+                              key={`shop-${shop._id}`}
+                              pointerEvents={hidden ? 'none' : 'auto'}
+                              style={[
+                                styles.overlayMarker,
+                                {
+                                  left: pt.x,
+                                  top: pt.y,
+                                  opacity: hidden ? 0 : 1,
+                                  transform: [{ translateX: -20 }, { translateY: -47 }],
+                                },
+                              ]}
+                              onPress={() => router.push(`/(tabs)/shops/${shop.slug || shop._id}`)}
+                            >
+                              <View style={styles.markerContainer}>
+                                <View style={[styles.marker, styles.shopMarker]}>
+                                  <Ionicons name="storefront" size={16} color="#fff" />
+                                </View>
+                                <View
+                                  style={[
+                                    styles.markerPoint,
+                                    { borderTopColor: SHOP_MARKER_COLOR },
+                                  ]}
+                                />
+                              </View>
+                            </Pressable>
+                          );
+                        })}
                     </View>
                   )}
 
@@ -1954,6 +2052,10 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  shopMarker: {
+    backgroundColor: SHOP_MARKER_COLOR,
+    borderColor: '#0b7a56',
   },
   markerPoint: {
     width: 0,
