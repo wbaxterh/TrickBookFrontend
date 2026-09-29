@@ -24,6 +24,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommentsBottomSheet } from '@/components/feed';
+import { UploadProgressBanner } from '@/components/media/UploadProgressBanner';
 import { ShareToHomieModal } from '@/components/share';
 import {
   type CouchCollection,
@@ -47,6 +48,7 @@ import {
 } from '@/lib/api/feed';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { useUploadStore } from '@/lib/stores/uploadStore';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const POSTER_WIDTH = 130;
@@ -59,6 +61,7 @@ type TabType = 'couch' | 'feed';
 
 export default function MediaScreen() {
   const { theme, colors } = useThemeContext();
+  const insets = useSafeAreaInsets();
   const { tab } = useLocalSearchParams<{ tab?: string }>();
   const [activeTab, setActiveTab] = useState<TabType>(tab === 'feed' ? 'feed' : 'couch');
 
@@ -76,6 +79,8 @@ export default function MediaScreen() {
       ) : (
         <FeedView theme={theme} colors={colors} onSwitchTab={() => setActiveTab('couch')} />
       )}
+      {/* Background upload progress — overlays whichever media view is active. */}
+      <UploadProgressBanner topOffset={insets.top + 92} />
     </View>
   );
 }
@@ -411,6 +416,17 @@ function FeedView({ theme, colors, onSwitchTab }: FeedViewProps) {
   const { user } = useAuthStore();
   const insets = useSafeAreaInsets();
   const [posts, setPosts] = useState<FeedPost[]>([]);
+
+  // When a background upload finishes, drop the new post straight into the feed.
+  const uploadJobPhase = useUploadStore((s) => s.job?.phase);
+  const uploadPost = useUploadStore((s) => s.job?.post);
+  useEffect(() => {
+    if (uploadJobPhase === 'done' && uploadPost) {
+      setPosts((prev) =>
+        prev.some((p) => p._id === uploadPost._id) ? prev : [uploadPost, ...prev],
+      );
+    }
+  }, [uploadJobPhase, uploadPost]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [page, setPage] = useState(1);

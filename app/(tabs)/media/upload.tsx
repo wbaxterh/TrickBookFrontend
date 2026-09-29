@@ -5,7 +5,7 @@
 
 import { Ionicons } from '@expo/vector-icons';
 import { ResizeMode, Video } from 'expo-av';
-import { FileSystemUploadType, getInfoAsync, uploadAsync } from 'expo-file-system/legacy';
+import { getInfoAsync } from 'expo-file-system/legacy';
 import * as ImagePicker from 'expo-image-picker';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -26,18 +26,11 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { type CreatePostData, createPost } from '@/lib/api/feed';
 import { getSportTypes, type SportType, type Spot, searchSpots } from '@/lib/api/spots';
-import {
-  createVideoEntry,
-  deleteVideo,
-  uploadImageToS3,
-  VISIBILITY_OPTIONS,
-  VideoProcessingStalledError,
-  waitForVideoProcessing,
-} from '@/lib/api/upload';
+import { VISIBILITY_OPTIONS } from '@/lib/api/upload';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
 import { useAuthStore } from '@/lib/stores/authStore';
+import { useUploadStore } from '@/lib/stores/uploadStore';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const YELLOW = '#FCF150';
@@ -48,7 +41,8 @@ type MediaType = 'video' | 'image' | null;
 
 export default function UploadScreen() {
   const { theme, colors } = useThemeContext();
-  const { user, token } = useAuthStore();
+  const { user } = useAuthStore();
+  const startUpload = useUploadStore((s) => s.startUpload);
 
   // Sport types (fetched from API)
   const [sportTypes, setSportTypes] = useState<SportType[]>([]);
@@ -72,10 +66,8 @@ export default function UploadScreen() {
   const [spotResults, setSpotResults] = useState<Spot[]>([]);
   const [spotSearching, setSpotSearching] = useState(false);
 
-  // Upload state
+  // Brief submitting gate (we hand off to the background uploader and leave).
   const [uploadStep, setUploadStep] = useState<UploadStep>('idle');
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [processingStatus, setProcessingStatus] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   // Redirect if not logged in
@@ -140,7 +132,6 @@ export default function UploadScreen() {
     setSelectedFile(null);
     setMediaType(null);
     setUploadStep('idle');
-    setUploadProgress(0);
     setError(null);
   };
 
@@ -215,233 +206,34 @@ export default function UploadScreen() {
     }
 
     setError(null);
+    setUploadStep('uploading');
 
+    // Confirm the file is still readable, then hand off to the background
+    // uploader and drop the user straight into the Feed to keep browsing.
     try {
-      // Verify file exists before attempting upload
       const fileInfo = await getInfoAsync(selectedFile.uri);
       if (!fileInfo.exists) {
         throw new Error('Selected file no longer exists. Please select again.');
       }
-
-      if (mediaType === 'video') {
-        await handleVideoUpload();
-      } else {
-        await handleImageUpload();
-      }
     } catch (err: any) {
-      setError(err.message || 'Upload failed. Please try again.');
-      setUploadStep('error');
-    }
-  };
-
-  const handleVideoUpload = async () => {
-    if (!selectedFile || !token) return;
-
-    // Step 1: Create video entry
-    setUploadStep('uploading');
-    setUploadProgress(0);
-    setProcessingStatus('Creating video entry...');
-
-    const videoTitle = caption.slice(0, 50) || `Video ${Date.now()}`;
-    const videoEntry = await createVideoEntry(videoTitle);
-
-    // Step 2: Upload video using TUS
-    setProcessingStatus('Uploading video...');
-
-    // Get actual file info using expo-file-system (more reliable on physical devices)
-    const fileInfo = await getInfoAsync(selectedFile.uri);
-    if (!fileInfo.exists) {
-      throw new Error('Video file not found');
+      setUploadStep('idle');
+      setError(err.message || 'Could not read the selected file.');
+      return;
     }
 
-    const fileSize = fileInfo.size || selectedFile.fileSize || 0;
-    if (fileSize === 0) {
-      throw new Error('Could not determine video file size');
-    }
-
-    // Detect MIME type from URI/extension (iPhones often use .mov)
-    const isMovFile = selectedFile.uri.toLowerCase().includes('.mov');
-    const mimeType = isMovFile ? 'video/quicktime' : 'video/mp4';
-    const fileName = isMovFile ? 'video.mov' : 'video.mp4';
-
-    // Upload to Bunny TUS endpoint
-    const tusHeaders = videoEntry.uploadCredentials.headers;
-
-    try {
-      // First, create the TUS upload session
-      const createResponse = await fetch(videoEntry.uploadCredentials.tusEndpoint, {
-        method: 'POST',
-        headers: {
-          'Tus-Resumable': '1.0.0',
-          'Upload-Length': fileSize.toString(),
-          'Upload-Metadata': `filename ${btoa(fileName)},filetype ${btoa(mimeType)}`,
-          AuthorizationSignature: tusHeaders.AuthorizationSignature,
-          AuthorizationExpire: tusHeaders.AuthorizationExpire.toString(),
-          VideoId: tusHeaders.VideoId,
-          LibraryId: tusHeaders.LibraryId,
-        },
-      });
-
-      if (!createResponse.ok) {
-        const _errorText = await createResponse.text();
-        throw new Error('Failed to initiate upload');
-      }
-
-      const locationHeader = createResponse.headers.get('Location');
-      if (!locationHeader) {
-        throw new Error('No upload URL received');
-      }
-
-      // Construct full upload URL - Location header may be relative
-      let uploadUrl = locationHeader;
-      if (locationHeader.startsWith('/')) {
-        // Extract base URL from TUS endpoint (e.g., https://video.bunnycdn.com)
-        const tusUrl = new URL(videoEntry.uploadCredentials.tusEndpoint);
-        uploadUrl = `${tusUrl.protocol}//${tusUrl.host}${locationHeader}`;
-      }
-      setUploadProgress(10);
-      setProcessingStatus('Uploading video file...');
-
-      // Use expo-file-system uploadAsync for reliable uploads on physical devices
-      // Include auth headers - Bunny.net TUS requires them for PATCH as well
-      const uploadResult = await uploadAsync(uploadUrl, selectedFile.uri, {
-        httpMethod: 'PATCH',
-        uploadType: FileSystemUploadType.BINARY_CONTENT,
-        headers: {
-          'Tus-Resumable': '1.0.0',
-          'Upload-Offset': '0',
-          'Content-Type': 'application/offset+octet-stream',
-          AuthorizationSignature: tusHeaders.AuthorizationSignature,
-          AuthorizationExpire: tusHeaders.AuthorizationExpire.toString(),
-          VideoId: tusHeaders.VideoId,
-          LibraryId: tusHeaders.LibraryId,
-        },
-      });
-
-      if (uploadResult.status !== 204 && uploadResult.status !== 200) {
-        throw new Error('Failed to upload video data');
-      }
-
-      setUploadProgress(100);
-    } catch (uploadError: any) {
-      throw new Error(uploadError.message || 'Failed to upload video');
-    }
-
-    // Step 3: Wait for processing. Show live progress and, if the encoder never
-    // starts, waitForVideoProcessing throws VideoProcessingStalledError (~90s)
-    // instead of spinning for minutes — surfaced to the user by handleSubmit.
-    setUploadStep('processing');
-    setProcessingStatus('Processing video...');
-
-    let processedVideo: Awaited<ReturnType<typeof waitForVideoProcessing>>;
-    try {
-      processedVideo = await waitForVideoProcessing(
-        videoEntry.videoId,
-        120,
-        3000,
-        (status, elapsedMs) => {
-          if (status.encodeProgress && status.encodeProgress > 0) {
-            setProcessingStatus(`Processing video... ${status.encodeProgress}%`);
-          } else if (elapsedMs >= 15000) {
-            // Still just "accepted" after 15s — let the user know it's on our side.
-            setProcessingStatus('Processing video... hang tight');
-          }
-        },
-      );
-    } catch (err) {
-      // A stalled encode leaves a dead 0-byte Bunny entry — clean it up
-      // (best-effort) so repeated retries don't pile up orphans.
-      if (err instanceof VideoProcessingStalledError) {
-        deleteVideo(videoEntry.videoId).catch(() => {});
-      }
-      throw err;
-    }
-
-    // Step 4: Create feed post
-    setUploadStep('creating');
-    setProcessingStatus('Creating post...');
-
-    const aspectRatio =
-      selectedFile.width && selectedFile.height
-        ? selectedFile.width > selectedFile.height
-          ? '16:9'
-          : '9:16'
-        : '9:16';
-
-    const postData: CreatePostData = {
-      mediaType: 'video',
-      bunnyVideoId: videoEntry.videoId,
-      hlsUrl: processedVideo.hlsUrl || undefined,
-      thumbnailUrl: processedVideo.thumbnailUrl,
-      caption,
-      sportTypes: selectedSports,
-      tricks,
-      visibility,
-      duration: processedVideo.duration,
-      aspectRatio,
-      spotId: selectedSpot?._id,
-    };
-
-    const post = await createPost(postData);
-
-    if (!post) {
-      throw new Error('Failed to create post');
-    }
-
-    setUploadStep('done');
-    setProcessingStatus('Post created!');
-
-    // Redirect after short delay
-    setTimeout(() => {
-      router.replace('/(tabs)/media?tab=feed');
-    }, 1500);
-  };
-
-  const handleImageUpload = async () => {
-    if (!selectedFile || !token) return;
-
-    // Step 1: Upload image to S3
-    setUploadStep('uploading');
-    setUploadProgress(0);
-    setProcessingStatus('Uploading image...');
-
-    // Detect image type from URI
-    const isPng = selectedFile.uri.toLowerCase().includes('.png');
-    const isHeic = selectedFile.uri.toLowerCase().includes('.heic');
-    const filename = `feed-${Date.now()}.${isPng ? 'png' : 'jpg'}`;
-    const contentType = isPng ? 'image/png' : isHeic ? 'image/heic' : 'image/jpeg';
-
-    const { fileUrl } = await uploadImageToS3(selectedFile.uri, filename, contentType, (progress) =>
-      setUploadProgress(progress),
-    );
-
-    // Step 2: Create feed post
-    setUploadStep('creating');
-    setProcessingStatus('Creating post...');
-
-    const postData: CreatePostData = {
-      mediaType: 'image',
-      imageUrls: [fileUrl],
-      thumbnailUrl: fileUrl,
+    startUpload({
+      mediaType: mediaType === 'image' ? 'image' : 'video',
+      fileUri: selectedFile.uri,
+      fileSize: selectedFile.fileSize ?? undefined,
+      width: selectedFile.width,
+      height: selectedFile.height,
       caption,
       sportTypes: selectedSports,
       tricks,
       visibility,
       spotId: selectedSpot?._id,
-    };
-
-    const post = await createPost(postData);
-
-    if (!post) {
-      throw new Error('Failed to create post');
-    }
-
-    setUploadStep('done');
-    setProcessingStatus('Post created!');
-
-    setTimeout(() => {
-      router.replace('/(tabs)/media?tab=feed');
-    }, 1500);
+    });
+    router.replace('/(tabs)/media?tab=feed');
   };
 
   const isUploading = uploadStep !== 'idle' && uploadStep !== 'error';
@@ -692,35 +484,16 @@ export default function UploadScreen() {
             </View>
           )}
 
-          {/* Upload Progress */}
+          {/* Brief hand-off indicator — the background uploader + the Feed's
+              upload banner take over the moment we navigate away. */}
           {isUploading && (
             <View style={[styles.progressContainer, { backgroundColor: theme.surface }]}>
               <View style={styles.progressHeader}>
-                {uploadStep === 'done' ? (
-                  <Ionicons name="checkmark-circle" size={24} color="#22c55e" />
-                ) : (
-                  <ActivityIndicator size="small" color={YELLOW} />
-                )}
-                <Text style={[styles.progressText, { color: theme.text }]}>{processingStatus}</Text>
+                <ActivityIndicator size="small" color={YELLOW} />
+                <Text style={[styles.progressText, { color: theme.text }]}>
+                  Starting upload… taking you to the Feed
+                </Text>
               </View>
-
-              {(uploadStep === 'uploading' || uploadStep === 'processing') && (
-                <View style={styles.progressBarContainer}>
-                  <View
-                    style={[
-                      styles.progressBar,
-                      {
-                        width: uploadStep === 'processing' ? '100%' : `${uploadProgress}%`,
-                        opacity: uploadStep === 'processing' ? 0.5 : 1,
-                      },
-                    ]}
-                  />
-                </View>
-              )}
-
-              {uploadStep === 'done' && (
-                <Text style={styles.successText}>Redirecting to feed...</Text>
-              )}
             </View>
           )}
 
@@ -737,9 +510,7 @@ export default function UploadScreen() {
             {isUploading ? (
               <>
                 <ActivityIndicator size="small" color={DARK} />
-                <Text style={styles.submitButtonText}>
-                  {uploadStep === 'done' ? 'Done!' : 'Uploading...'}
-                </Text>
+                <Text style={styles.submitButtonText}>Sharing…</Text>
               </>
             ) : (
               <Text style={styles.submitButtonText}>Share Post</Text>
