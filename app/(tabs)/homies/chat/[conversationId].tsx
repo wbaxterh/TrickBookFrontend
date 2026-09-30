@@ -11,6 +11,7 @@ import {
   FlatList,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -45,6 +46,55 @@ import { useAuthStore } from '@/lib/stores/authStore';
 
 const YELLOW = '#FCF150';
 const DARK = '#1a1a1a';
+const LINK_PATTERN = /(\[[^\]]+\]\(https?:\/\/[^)\s]+\)|https?:\/\/[^\s]+)/g;
+
+function openMessageUrl(href: string) {
+  try {
+    const url = new URL(href);
+    const eventMatch =
+      /^(?:www\.)?thetrickbook\.com$/i.test(url.hostname) &&
+      url.pathname.match(/^\/events\/([^/?#]+)/);
+    if (eventMatch) {
+      router.push(`/(tabs)/events/${decodeURIComponent(eventMatch[1])}`);
+      return;
+    }
+  } catch (_error) {}
+  Linking.openURL(href).catch(() => {});
+}
+
+function MessageText({
+  content,
+  color,
+  linkColor,
+}: {
+  content: string;
+  color: string;
+  linkColor: string;
+}) {
+  const parts = content.split(LINK_PATTERN);
+  let offset = 0;
+  return (
+    <Text style={[styles.messageText, { color }]}>
+      {parts.map((part) => {
+        const partOffset = offset;
+        offset += part.length;
+        const markdown = part.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/);
+        const href =
+          markdown?.[2] || (part.startsWith('http') ? part.replace(/[),.!?]+$/, '') : '');
+        if (!href) return part;
+        return (
+          <Text
+            key={`${href}-${partOffset}`}
+            style={[styles.messageLink, { color: linkColor }]}
+            onPress={() => openMessageUrl(href)}
+          >
+            {markdown?.[1] || href}
+          </Text>
+        );
+      })}
+    </Text>
+  );
+}
 
 // Shared Content Bubble Component
 function SharedContentBubble({
@@ -592,9 +642,11 @@ export default function ChatScreen() {
                         { backgroundColor: isMe ? colors.primary : theme.surface },
                       ]}
                     >
-                      <Text style={[styles.messageText, { color: isMe ? DARK : theme.text }]}>
-                        {item.content}
-                      </Text>
+                      <MessageText
+                        content={item.content}
+                        color={isMe ? DARK : theme.text}
+                        linkColor={isMe ? DARK : YELLOW}
+                      />
                     </View>
                   )}
                   <View style={styles.messageFooter}>
@@ -621,9 +673,11 @@ export default function ChatScreen() {
                         { backgroundColor: isMe ? colors.primary : theme.surface },
                       ]}
                     >
-                      <Text style={[styles.messageText, { color: isMe ? DARK : theme.text }]}>
-                        {item.content}
-                      </Text>
+                      <MessageText
+                        content={item.content}
+                        color={isMe ? DARK : theme.text}
+                        linkColor={isMe ? DARK : YELLOW}
+                      />
                     </View>
                   </View>
                 )}
@@ -1092,6 +1146,10 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 16,
     lineHeight: 22,
+  },
+  messageLink: {
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
   messageFooter: {
     flexDirection: 'row',
