@@ -3,6 +3,7 @@
  * Sets up providers, fonts, and navigation structure
  */
 
+import * as Sentry from '@sentry/react-native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { router, Stack, useRootNavigationState, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -26,6 +27,19 @@ import { useLanguageStore } from '@/lib/stores/languageStore';
 // Initialize i18n before first render (detects device locale, falls back to en)
 import '@/lib/i18n';
 import '../global.css';
+
+// Crash reporting is opt-in per build: with no DSN nothing initialises and the
+// layout exports unwrapped. The native layer links through prebuild, so a new
+// EAS build is needed before native crashes are captured.
+const SENTRY_DSN = process.env.EXPO_PUBLIC_SENTRY_DSN;
+if (SENTRY_DSN) {
+  Sentry.init({
+    dsn: SENTRY_DSN,
+    environment: process.env.EXPO_PUBLIC_SENTRY_ENVIRONMENT || 'production',
+    tracesSampleRate: 0,
+    enableNative: true,
+  });
+}
 
 // React Query client
 const queryClient = new QueryClient({
@@ -174,7 +188,7 @@ function AuthGate({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function RootLayout() {
+function RootLayout() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
@@ -233,3 +247,5 @@ export default function RootLayout() {
     </SafeAreaProvider>
   );
 }
+
+export default SENTRY_DSN ? Sentry.wrap(RootLayout) : RootLayout;

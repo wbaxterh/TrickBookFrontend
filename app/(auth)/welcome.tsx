@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/ui';
+import { track } from '@/lib/analytics';
 import { appleSignIn, googleSignIn } from '@/lib/api/auth';
 import { getUserCount } from '@/lib/api/user';
 import { useThemeContext } from '@/lib/providers/ThemeProvider';
@@ -70,6 +71,7 @@ export default function WelcomeScreen() {
         const { token, user } = await googleSignIn(response.data.idToken);
         setToken(token);
         setUser(user);
+        track('login_completed', { method: 'google' }).catch(() => {});
         router.replace('/(tabs)');
       } else {
         Alert.alert('Error', 'Google sign-in failed. Please try again.');
@@ -108,6 +110,7 @@ export default function WelcomeScreen() {
         );
         setToken(token);
         setUser(user);
+        track('login_completed', { method: 'apple' }).catch(() => {});
         router.replace('/(tabs)');
       }
     } catch (error: any) {

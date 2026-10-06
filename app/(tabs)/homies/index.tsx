@@ -25,6 +25,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { track } from '@/lib/analytics';
 import { apiClient } from '@/lib/api/client';
 import {
   acceptHomieRequest,
@@ -208,6 +209,7 @@ export default function HomiesScreen() {
   const handleAccept = async (request: HomieRequest) => {
     const success = await acceptHomieRequest(request.from);
     if (success) {
+      track('homie_connected', { homie_id: request.from }).catch(() => {});
       setReceivedRequests((prev) => prev.filter((r) => r.from !== request.from));
       // Refresh homies list
       const newHomies = await getMyHomies();

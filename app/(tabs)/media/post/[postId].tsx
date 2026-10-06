@@ -22,6 +22,8 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { track } from '@/lib/analytics';
+import { commentCreatedProperties } from '@/lib/analytics/properties';
 import {
   addComment,
   addReaction,
@@ -122,6 +124,7 @@ export default function PostDetailScreen() {
     try {
       const newComment = await addComment(postId, content);
       if (newComment) {
+        track('comment_created', commentCreatedProperties(postId)).catch(() => {});
         setPostComments((prev) => [newComment, ...prev]);
         // Update post comment count
         if (post) {

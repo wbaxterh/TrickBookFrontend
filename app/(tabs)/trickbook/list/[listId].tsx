@@ -32,6 +32,7 @@ import {
 import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ShareToHomieModal } from '@/components/share';
+import { track } from '@/lib/analytics';
 import {
   addTrickToList,
   deleteTrickList,
@@ -126,7 +127,10 @@ export default function TrickListDetailScreen() {
     const newStatus: TrickStatus = currentlyComplete ? 'Not Started' : 'Mastered';
 
     try {
-      await updateTrickStatus(listId, trick._id, newStatus, token);
+      const saved = await updateTrickStatus(listId, trick._id, newStatus, token);
+      if (saved && newStatus === 'Mastered') {
+        track('trick_landed', { trick_id: trick._id, list_id: listId }).catch(() => {});
+      }
 
       // Update local state
       setList((prev) => {

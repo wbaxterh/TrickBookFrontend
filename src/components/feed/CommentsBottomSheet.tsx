@@ -21,6 +21,8 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { track } from '@/lib/analytics';
+import { commentCreatedProperties } from '@/lib/analytics/properties';
 import {
   addComment,
   type Comment,
@@ -126,6 +128,7 @@ export default function CommentsBottomSheet({ visible, post, onClose }: Comments
     try {
       const comment = await addComment(post._id, newComment.trim());
       if (comment) {
+        track('comment_created', commentCreatedProperties(post._id)).catch(() => {});
         // Add to top of list
         setComments((prev) => [comment, ...prev]);
         setNewComment('');
