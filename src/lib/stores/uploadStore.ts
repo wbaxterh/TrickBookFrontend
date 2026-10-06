@@ -14,6 +14,8 @@
 import { FileSystemUploadType, getInfoAsync, uploadAsync } from 'expo-file-system/legacy';
 import * as Notifications from 'expo-notifications';
 import { create } from 'zustand';
+import { track } from '@/lib/analytics';
+import { postCreatedProperties } from '@/lib/analytics/properties';
 import { type CreatePostData, createPost, type FeedPost } from '@/lib/api/feed';
 import {
   createVideoEntry,
@@ -165,6 +167,7 @@ export const useUploadStore = create<UploadStoreState>((set, get) => {
     };
     const post = await createPost(postData);
     if (!post) throw new Error('Failed to create post');
+    track('post_created', postCreatedProperties(post)).catch(() => {});
     return post;
   };
 
@@ -189,6 +192,7 @@ export const useUploadStore = create<UploadStoreState>((set, get) => {
       spotId: input.spotId,
     });
     if (!post) throw new Error('Failed to create post');
+    track('post_created', postCreatedProperties(post)).catch(() => {});
     return post;
   };
 
