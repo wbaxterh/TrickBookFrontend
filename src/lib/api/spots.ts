@@ -182,6 +182,17 @@ export interface MapBounds {
   maxLng: number;
 }
 
+interface MapPinsResponse {
+  type: 'pins';
+  dataVersion: string;
+  items: MapPin[];
+}
+
+export function normalizeMapPinsResponse(response: MapPinsResponse | MapPin[]): MapPin[] {
+  if (Array.isArray(response)) return response;
+  return response?.type === 'pins' && Array.isArray(response.items) ? response.items : [];
+}
+
 /**
  * Get lightweight map pins inside a bounding box, optionally filtered by sport/category.
  */
@@ -189,6 +200,7 @@ export async function getMapPins(
   bounds: MapBounds,
   sportType?: string,
   category?: string,
+  zoom = 12,
 ): Promise<MapPin[]> {
   try {
     const params = new URLSearchParams({
@@ -196,15 +208,19 @@ export async function getMapPins(
       maxLat: bounds.maxLat.toString(),
       minLng: bounds.minLng.toString(),
       maxLng: bounds.maxLng.toString(),
+      zoom: zoom.toString(),
+      v: '2',
+      // Mobile retains its crash-safe JS clustering and projected markers.
+      aggregate: 'false',
     });
     if (sportType && sportType !== 'all') params.append('sportType', sportType);
     if (category && category !== 'all') params.append('category', category);
 
-    const response = await apiClient.get<MapPin[]>(
+    const response = await apiClient.get<MapPinsResponse | MapPin[]>(
       `${ENDPOINTS.spots.list}/map-pins?${params.toString()}`,
       { skipAuth: true },
     );
-    return response || [];
+    return normalizeMapPinsResponse(response);
   } catch (_error) {
     return [];
   }
