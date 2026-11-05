@@ -168,6 +168,7 @@ export default function SpotsScreen() {
   const [mapReady, setMapReady] = useState(false);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const mapPinsDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mapPinsRequestRef = useRef(0);
 
   // Google-Maps-style in-map search: type a query, get matching places (Google
   // Places, biased to the current viewport) + our spots, tap one to fly there.
@@ -389,6 +390,7 @@ export default function SpotsScreen() {
   // Fetch map pins for a given visible region (bounding box) with debouncing.
   const fetchMapPinsForRegion = useCallback(
     (region: Region) => {
+      const requestSequence = ++mapPinsRequestRef.current;
       if (mapPinsDebounceRef.current) {
         clearTimeout(mapPinsDebounceRef.current);
       }
@@ -404,8 +406,9 @@ export default function SpotsScreen() {
           minLng: region.longitude - region.longitudeDelta / 2,
           maxLng: region.longitude + region.longitudeDelta / 2,
         };
-        const pins = await getMapPins(bounds, selectedSport, selectedCategory);
-        setMapPins(pins);
+        const zoom = Math.max(0, Math.min(22, Math.log2(360 / region.longitudeDelta)));
+        const pins = await getMapPins(bounds, selectedSport, selectedCategory, zoom);
+        if (requestSequence === mapPinsRequestRef.current) setMapPins(pins);
       }, 350);
     },
     [selectedSport, selectedCategory],
